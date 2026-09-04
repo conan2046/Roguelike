@@ -15,10 +15,10 @@ namespace Rouge.ECS
         {
             float dt = SystemAPI.Time.DeltaTime;
             Entities.WithAll<EnemyTag>().ForEach(
-                (ref Translation t, in MoveSpeed s) =>
+                (ref LocalTransform t, in MoveSpeed s) =>
                 {
-                    t.Value += new float3(0f, 0f, -s.Value * dt);
-                }).Schedule();
+                    t.Position += new float3(0f, 0f, -s.Value * dt);
+                }).ScheduleParallel();
         }
     }
 }
