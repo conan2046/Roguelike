@@ -25,6 +25,25 @@ public sealed partial class PerformanceScenarioConfig : Luban.BeanBase
         {int n0 = _buf.ReadSize(); MonsterIds = new System.Collections.Generic.List<int>(n0);for(var i0 = 0 ; i0 < n0 ; i0++) { int _e0;  _e0 = _buf.ReadInt(); MonsterIds.Add(_e0);}}
         {int n0 = _buf.ReadSize(); SkillIds = new System.Collections.Generic.List<int>(n0);for(var i0 = 0 ; i0 < n0 ; i0++) { int _e0;  _e0 = _buf.ReadInt(); SkillIds.Add(_e0);}}
         EntityCount = _buf.ReadInt();
+        WarmupSeconds = _buf.ReadFloat();
+        SampleSeconds = _buf.ReadFloat();
+        TargetAverageFps = _buf.ReadFloat();
+        MaxP95FrameTimeMs = _buf.ReadFloat();
+        ScreenWidth = _buf.ReadInt();
+        ScreenHeight = _buf.ReadInt();
+        SpawnColumns = _buf.ReadInt();
+        HorizontalSpacing = _buf.ReadFloat();
+        VerticalSpacing = _buf.ReadFloat();
+        EntityScale = _buf.ReadFloat();
+        MoveAmplitude = _buf.ReadFloat();
+        MoveSpeedMin = _buf.ReadFloat();
+        MoveSpeedMax = _buf.ReadFloat();
+        RandomSeed = _buf.ReadInt();
+        MaxGcAllocBytesPerFrame = _buf.ReadInt();
+        CameraPadding = _buf.ReadFloat();
+        VSyncCount = _buf.ReadInt();
+        TargetFrameRate = _buf.ReadInt();
+        RunInBackground = _buf.ReadBool();
     }
 
     public static PerformanceScenarioConfig DeserializePerformanceScenarioConfig(ByteBuf _buf)
@@ -58,6 +77,82 @@ public sealed partial class PerformanceScenarioConfig : Luban.BeanBase
     /// 目标同屏实体数量
     /// </summary>
     public readonly int EntityCount;
+    /// <summary>
+    /// 预热秒数，预热期间不计入结果
+    /// </summary>
+    public readonly float WarmupSeconds;
+    /// <summary>
+    /// 正式采样秒数
+    /// </summary>
+    public readonly float SampleSeconds;
+    /// <summary>
+    /// 平均帧率通过线
+    /// </summary>
+    public readonly float TargetAverageFps;
+    /// <summary>
+    /// P95帧耗时上限，毫秒
+    /// </summary>
+    public readonly float MaxP95FrameTimeMs;
+    /// <summary>
+    /// 性能测试窗口宽度
+    /// </summary>
+    public readonly int ScreenWidth;
+    /// <summary>
+    /// 性能测试窗口高度
+    /// </summary>
+    public readonly int ScreenHeight;
+    /// <summary>
+    /// 实体网格列数
+    /// </summary>
+    public readonly int SpawnColumns;
+    /// <summary>
+    /// 实体水平间距
+    /// </summary>
+    public readonly float HorizontalSpacing;
+    /// <summary>
+    /// 实体垂直间距
+    /// </summary>
+    public readonly float VerticalSpacing;
+    /// <summary>
+    /// 测试实体渲染缩放
+    /// </summary>
+    public readonly float EntityScale;
+    /// <summary>
+    /// 实体往复移动振幅
+    /// </summary>
+    public readonly float MoveAmplitude;
+    /// <summary>
+    /// 实体最小移动角速度
+    /// </summary>
+    public readonly float MoveSpeedMin;
+    /// <summary>
+    /// 实体最大移动角速度
+    /// </summary>
+    public readonly float MoveSpeedMax;
+    /// <summary>
+    /// 确定性生成随机种子
+    /// </summary>
+    public readonly int RandomSeed;
+    /// <summary>
+    /// 采样期单帧GC分配上限，字节
+    /// </summary>
+    public readonly int MaxGcAllocBytesPerFrame;
+    /// <summary>
+    /// 正交相机边缘留白
+    /// </summary>
+    public readonly float CameraPadding;
+    /// <summary>
+    /// 垂直同步间隔，0表示关闭
+    /// </summary>
+    public readonly int VSyncCount;
+    /// <summary>
+    /// 目标帧率，-1表示不限制
+    /// </summary>
+    public readonly int TargetFrameRate;
+    /// <summary>
+    /// 失去焦点后是否继续运行
+    /// </summary>
+    public readonly bool RunInBackground;
    
     public const int __ID__ = 1968250658;
     public override int GetTypeId() => __ID__;
@@ -81,6 +176,25 @@ public sealed partial class PerformanceScenarioConfig : Luban.BeanBase
         + "monsterIds:" + Luban.StringUtil.CollectionToString(MonsterIds) + ","
         + "skillIds:" + Luban.StringUtil.CollectionToString(SkillIds) + ","
         + "entityCount:" + EntityCount + ","
+        + "warmupSeconds:" + WarmupSeconds + ","
+        + "sampleSeconds:" + SampleSeconds + ","
+        + "targetAverageFps:" + TargetAverageFps + ","
+        + "maxP95FrameTimeMs:" + MaxP95FrameTimeMs + ","
+        + "screenWidth:" + ScreenWidth + ","
+        + "screenHeight:" + ScreenHeight + ","
+        + "spawnColumns:" + SpawnColumns + ","
+        + "horizontalSpacing:" + HorizontalSpacing + ","
+        + "verticalSpacing:" + VerticalSpacing + ","
+        + "entityScale:" + EntityScale + ","
+        + "moveAmplitude:" + MoveAmplitude + ","
+        + "moveSpeedMin:" + MoveSpeedMin + ","
+        + "moveSpeedMax:" + MoveSpeedMax + ","
+        + "randomSeed:" + RandomSeed + ","
+        + "maxGcAllocBytesPerFrame:" + MaxGcAllocBytesPerFrame + ","
+        + "cameraPadding:" + CameraPadding + ","
+        + "vSyncCount:" + VSyncCount + ","
+        + "targetFrameRate:" + TargetFrameRate + ","
+        + "runInBackground:" + RunInBackground + ","
         + "}";
     }
 }

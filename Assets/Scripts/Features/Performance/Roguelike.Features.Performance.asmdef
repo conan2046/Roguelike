@@ -1,12 +1,16 @@
 {
-  "name": "Roguelike.App",
-  "rootNamespace": "Roguelike.App",
+  "name": "Roguelike.Features.Performance",
+  "rootNamespace": "Roguelike.Features.Performance",
   "references": [
     "Roguelike.Core",
-    "Roguelike.Infrastructure",
-    "Roguelike.Features.Gameplay",
-    "Roguelike.Features.Performance",
-    "Roguelike.Presentation"
+    "Roguelike.Generated",
+    "Luban.Runtime",
+    "Unity.Burst",
+    "Unity.Collections",
+    "Unity.Entities",
+    "Unity.Entities.Graphics",
+    "Unity.Mathematics",
+    "Unity.Transforms"
   ],
   "includePlatforms": [],
   "excludePlatforms": [],

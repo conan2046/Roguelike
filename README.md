@@ -31,6 +31,38 @@ cd Roguelike
 `SampleScene` 已加入 Build Settings，构建玩家版本时可直接选择目标平台后执行 Build。
 `Assets/Scenes/MCPDemo.unity` 保留了当前 Kapai 地图移动演示，可用于检查地图、角色与输入迁移效果。
 
+### Windows 离线包
+
+Windows Player 固定使用 YooAsset `OfflinePlayMode`。构建脚本会先校验 Luban，完整重建
+`DefaultPackage` 并同步到内置资源目录，然后构建 Player 和执行启动冒烟验证。
+
+将 `$UnityEditorPath` 设为本机 Unity 2022.3.62f3 的 `Unity.exe` 路径后执行：
+
+```powershell
+./Tools/Build/build-windows-offline.ps1 `
+  -UnityEditorPath $UnityEditorPath `
+  -PackageVersion '1.0.0'
+```
+
+通过验证的输出位于 `Builds/Windows/<版本>/`。构建过程不会修改 Scene、Prefab 或业务配置表；
+`Bundles`、`Assets/StreamingAssets/yoo` 和 `Builds` 均为可重新生成的本地产物，不纳入版本管理。
+
+### 独立 Player 性能测试
+
+性能场景、实体数量、分辨率、预热/采样时间和通过门槛全部来自 Luban
+`TbPerformanceScenario`。以下命令构建离线 Win64 Player，并运行场景 1 的 1000 实体测试：
+
+```powershell
+./Tools/Performance/run-performance-scenario.ps1 `
+  -UnityEditorPath $UnityEditorPath `
+  -PackageVersion '1.0.0-perf' `
+  -ScenarioId 1
+```
+
+验证结果、Player 日志和截图位于
+`Builds/Windows/<版本>/Performance/Scenario-<ID>/`。脚本仅在实体数、平均 FPS 和 P95 帧耗时达到表内门槛时返回成功；
+GC Profiler 标记在当前 Player 可用时同时执行表内分配上限校验。
+
 ## Luban 数据表
 
 Excel 是配置数据的唯一来源。表结构和源数据位于 `Config/Datas`，Luban `4.11.0` 已固定在 `Tools/Luban`。

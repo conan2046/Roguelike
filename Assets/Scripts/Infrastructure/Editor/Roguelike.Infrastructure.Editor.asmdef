@@ -3,6 +3,7 @@
   "rootNamespace": "Roguelike.Infrastructure.Editor",
   "references": [
     "Roguelike.Infrastructure",
+    "Unity.RenderPipelines.Universal.Runtime",
     "YooAsset",
     "YooAsset.Editor"
   ],

@@ -12,7 +12,7 @@ $ValidationRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('roguelike-luban-
 $GeneratedCodeDir = Join-Path $ValidationRoot 'code'
 $GeneratedDataDir = Join-Path $ValidationRoot 'data'
 
-function Get-RelativeHashes([string]$Root) {
+function Get-RelativeHashes([string]$Root, [switch]$NormalizeCodeLineEndings) {
     if (-not (Test-Path -LiteralPath $Root)) {
         throw "Generated directory is missing: $Root"
     }
@@ -20,7 +20,16 @@ function Get-RelativeHashes([string]$Root) {
     $result = @{}
     foreach ($file in Get-ChildItem -LiteralPath $Root -Recurse -File | Where-Object Extension -ne '.meta' | Sort-Object FullName) {
         $relative = [System.IO.Path]::GetRelativePath($Root, $file.FullName).Replace('\', '/')
-        $result[$relative] = (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash
+        if ($NormalizeCodeLineEndings -and $file.Extension -eq '.cs') {
+            $content = [System.IO.File]::ReadAllText($file.FullName)
+            $normalized = $content.Replace("`r`n", "`n").Replace("`r", "`n")
+            $bytes = [System.Text.Encoding]::UTF8.GetBytes($normalized)
+            $result[$relative] = [System.Convert]::ToHexString(
+                [System.Security.Cryptography.SHA256]::HashData($bytes))
+        }
+        else {
+            $result[$relative] = (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash
+        }
     }
     return $result
 }
@@ -40,12 +49,12 @@ try {
         throw "Luban validation generation failed with exit code $LASTEXITCODE."
     }
 
-    $expected = Get-RelativeHashes $GeneratedCodeDir
+    $expected = Get-RelativeHashes $GeneratedCodeDir -NormalizeCodeLineEndings
     foreach ($entry in (Get-RelativeHashes $GeneratedDataDir).GetEnumerator()) {
         $expected['data/' + $entry.Key] = $entry.Value
     }
 
-    $actual = Get-RelativeHashes $CommittedCodeDir
+    $actual = Get-RelativeHashes $CommittedCodeDir -NormalizeCodeLineEndings
     foreach ($entry in (Get-RelativeHashes $CommittedDataDir).GetEnumerator()) {
         $actual['data/' + $entry.Key] = $entry.Value
     }

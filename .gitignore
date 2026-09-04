@@ -3,11 +3,15 @@
 [Tt]emp/
 [Oo]bj/
 [Bb]uild/
+!/Tools/Build/
+!/Tools/Build/build-windows-offline.ps1
 [Bb]uilds/
 [Mm]emoryCaptures/
 Logs/
 UserSettings/
 /Bundles/
+/Assets/StreamingAssets/yoo/
+/Assets/StreamingAssets/yoo.meta
 # 本地 IDE / OS
 .vs/
 .vscode/

@@ -17,7 +17,7 @@ namespace Roguelike.Tests
     public sealed class YooAssetStartupTests
     {
         /// <summary>
-        /// Initializes the local package, loads generated tables, then requests the first configured resource by TbResource.id.
+        /// Initializes the local package, validates the generated performance scenario, then requests the first configured resource by TbResource.id.
         /// </summary>
         /// <returns>Unity coroutine that yields while the real YooAsset operations complete.</returns>
         /// <remarks>Destroys the automatic composition root first so this isolated test owns YooAsset global state.</remarks>
@@ -48,6 +48,9 @@ namespace Roguelike.Tests
 
                 Assert.IsTrue(config.IsInitialized);
                 Assert.IsNotEmpty(config.Tables.TbResource.DataList);
+                Assert.AreEqual(1000, config.Tables.TbPerformanceScenario.Get(1).EntityCount);
+                Assert.GreaterOrEqual(config.Tables.TbPerformanceScenario.Get(1).TargetAverageFps, 60f);
+                Assert.Greater(config.Tables.TbPerformanceScenario.Get(1).SampleSeconds, 0f);
 
                 int resourceId = config.Tables.TbResource.DataList[0].Id;
                 var resources = new YooAssetResourceService(initializer, config);

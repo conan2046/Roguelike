@@ -5,6 +5,7 @@ using Roguelike.Core;
 using Roguelike.Core.Features;
 using Roguelike.Core.Startup;
 using Roguelike.Features.Gameplay;
+using Roguelike.Features.Performance;
 using Roguelike.Infrastructure.Configuration;
 using Roguelike.Infrastructure.Events;
 using Roguelike.Infrastructure.Pooling;
@@ -75,7 +76,8 @@ namespace Roguelike.App
 
             var features = new List<IGameFeature>
             {
-                new GameplayFeature()
+                new GameplayFeature(),
+                new PerformanceFeature()
             };
 
             var pipeline = new StartupPipeline(new IStartupStep[]
