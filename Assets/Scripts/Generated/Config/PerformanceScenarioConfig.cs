@@ -20,7 +20,6 @@ public sealed partial class PerformanceScenarioConfig : Luban.BeanBase
     public PerformanceScenarioConfig(ByteBuf _buf) 
     {
         Id = _buf.ReadInt();
-        Key = _buf.ReadString();
         Name = _buf.ReadString();
         Kind = (EPerformanceKind)_buf.ReadInt();
         {int n0 = _buf.ReadSize(); MonsterIds = new System.Collections.Generic.List<int>(n0);for(var i0 = 0 ; i0 < n0 ; i0++) { int _e0;  _e0 = _buf.ReadInt(); MonsterIds.Add(_e0);}}
@@ -37,10 +36,6 @@ public sealed partial class PerformanceScenarioConfig : Luban.BeanBase
     /// 测试场景ID
     /// </summary>
     public readonly int Id;
-    /// <summary>
-    /// 测试场景唯一键
-    /// </summary>
-    public readonly string Key;
     /// <summary>
     /// 测试场景名称
     /// </summary>
@@ -81,7 +76,6 @@ public sealed partial class PerformanceScenarioConfig : Luban.BeanBase
     {
         return "{ "
         + "id:" + Id + ","
-        + "key:" + Key + ","
         + "name:" + Name + ","
         + "kind:" + Kind + ","
         + "monsterIds:" + Luban.StringUtil.CollectionToString(MonsterIds) + ","

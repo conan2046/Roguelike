@@ -20,7 +20,6 @@ public sealed partial class StageConfig : Luban.BeanBase
     public StageConfig(ByteBuf _buf) 
     {
         Id = _buf.ReadInt();
-        Key = _buf.ReadString();
         Name = _buf.ReadString();
         MapId = _buf.ReadInt();
         MapId_Ref = null;
@@ -35,10 +34,6 @@ public sealed partial class StageConfig : Luban.BeanBase
     /// 关卡ID
     /// </summary>
     public readonly int Id;
-    /// <summary>
-    /// 关卡唯一键
-    /// </summary>
-    public readonly string Key;
     /// <summary>
     /// 关卡名称
     /// </summary>
@@ -61,7 +56,6 @@ public sealed partial class StageConfig : Luban.BeanBase
     {
         return "{ "
         + "id:" + Id + ","
-        + "key:" + Key + ","
         + "name:" + Name + ","
         + "mapId:" + MapId + ","
         + "}";

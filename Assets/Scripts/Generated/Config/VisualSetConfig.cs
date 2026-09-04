@@ -20,7 +20,6 @@ public sealed partial class VisualSetConfig : Luban.BeanBase
     public VisualSetConfig(ByteBuf _buf) 
     {
         Id = _buf.ReadInt();
-        Key = _buf.ReadString();
         Category = (EVisualCategory)_buf.ReadInt();
         if(_buf.ReadBool()){ StandClipId = _buf.ReadInt(); } else { StandClipId = null; }
         StandClipId_Ref = null;
@@ -36,13 +35,9 @@ public sealed partial class VisualSetConfig : Luban.BeanBase
     }
 
     /// <summary>
-    /// 表现集合ID
+    /// 表现ID：类别位+4位序号，例如10001=角色表现1
     /// </summary>
     public readonly int Id;
-    /// <summary>
-    /// 表现集合唯一键
-    /// </summary>
-    public readonly string Key;
     /// <summary>
     /// 表现类别
     /// </summary>
@@ -83,7 +78,6 @@ public sealed partial class VisualSetConfig : Luban.BeanBase
     {
         return "{ "
         + "id:" + Id + ","
-        + "key:" + Key + ","
         + "category:" + Category + ","
         + "standClipId:" + StandClipId + ","
         + "moveClipId:" + MoveClipId + ","

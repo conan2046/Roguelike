@@ -20,7 +20,6 @@ public sealed partial class SkillConfig : Luban.BeanBase
     public SkillConfig(ByteBuf _buf) 
     {
         Id = _buf.ReadInt();
-        Key = _buf.ReadString();
         Name = _buf.ReadString();
         VisualSetId = _buf.ReadInt();
         VisualSetId_Ref = null;
@@ -32,13 +31,9 @@ public sealed partial class SkillConfig : Luban.BeanBase
     }
 
     /// <summary>
-    /// 技能ID
+    /// 技能ID：20000+资源编号，例如skill_101=20101
     /// </summary>
     public readonly int Id;
-    /// <summary>
-    /// 技能唯一键
-    /// </summary>
-    public readonly string Key;
     /// <summary>
     /// 临时显示名，当前使用资源组名
     /// </summary>
@@ -61,7 +56,6 @@ public sealed partial class SkillConfig : Luban.BeanBase
     {
         return "{ "
         + "id:" + Id + ","
-        + "key:" + Key + ","
         + "name:" + Name + ","
         + "visualSetId:" + VisualSetId + ","
         + "}";

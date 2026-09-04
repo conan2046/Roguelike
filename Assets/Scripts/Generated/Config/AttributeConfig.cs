@@ -20,7 +20,6 @@ public sealed partial class AttributeConfig : Luban.BeanBase
     public AttributeConfig(ByteBuf _buf) 
     {
         Id = _buf.ReadInt();
-        Key = _buf.ReadString();
         Name = _buf.ReadString();
         DisplayFormat = _buf.ReadString();
     }
@@ -34,10 +33,6 @@ public sealed partial class AttributeConfig : Luban.BeanBase
     /// 属性ID
     /// </summary>
     public readonly int Id;
-    /// <summary>
-    /// 属性唯一键
-    /// </summary>
-    public readonly string Key;
     /// <summary>
     /// 显示名称
     /// </summary>
@@ -58,7 +53,6 @@ public sealed partial class AttributeConfig : Luban.BeanBase
     {
         return "{ "
         + "id:" + Id + ","
-        + "key:" + Key + ","
         + "name:" + Name + ","
         + "displayFormat:" + DisplayFormat + ","
         + "}";

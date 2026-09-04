@@ -20,7 +20,6 @@ public sealed partial class ResourceConfig : Luban.BeanBase
     public ResourceConfig(ByteBuf _buf) 
     {
         Id = _buf.ReadInt();
-        Key = _buf.ReadString();
         Type = (EResourceType)_buf.ReadInt();
         Path = _buf.ReadString();
     }
@@ -31,13 +30,9 @@ public sealed partial class ResourceConfig : Luban.BeanBase
     }
 
     /// <summary>
-    /// 稳定资源ID，由规范化路径确定
+    /// 资源ID：类别位+类型位+4位序号，例如110001=角色动画1
     /// </summary>
     public readonly int Id;
-    /// <summary>
-    /// 资源唯一键
-    /// </summary>
-    public readonly string Key;
     /// <summary>
     /// 资源类型
     /// </summary>
@@ -58,7 +53,6 @@ public sealed partial class ResourceConfig : Luban.BeanBase
     {
         return "{ "
         + "id:" + Id + ","
-        + "key:" + Key + ","
         + "type:" + Type + ","
         + "path:" + Path + ","
         + "}";

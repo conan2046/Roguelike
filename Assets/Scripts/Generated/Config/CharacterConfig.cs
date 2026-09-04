@@ -20,7 +20,6 @@ public sealed partial class CharacterConfig : Luban.BeanBase
     public CharacterConfig(ByteBuf _buf) 
     {
         Id = _buf.ReadInt();
-        Key = _buf.ReadString();
         Name = _buf.ReadString();
         VisualSetId = _buf.ReadInt();
         VisualSetId_Ref = null;
@@ -32,13 +31,9 @@ public sealed partial class CharacterConfig : Luban.BeanBase
     }
 
     /// <summary>
-    /// 角色ID
+    /// 角色ID：从10001开始递增
     /// </summary>
     public readonly int Id;
-    /// <summary>
-    /// 角色唯一键
-    /// </summary>
-    public readonly string Key;
     /// <summary>
     /// 临时显示名，当前使用资源前缀
     /// </summary>
@@ -61,7 +56,6 @@ public sealed partial class CharacterConfig : Luban.BeanBase
     {
         return "{ "
         + "id:" + Id + ","
-        + "key:" + Key + ","
         + "name:" + Name + ","
         + "visualSetId:" + VisualSetId + ","
         + "}";

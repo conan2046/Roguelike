@@ -20,7 +20,6 @@ public sealed partial class ItemConfig : Luban.BeanBase
     public ItemConfig(ByteBuf _buf) 
     {
         Id = _buf.ReadInt();
-        Key = _buf.ReadString();
         Name = _buf.ReadString();
         if(_buf.ReadBool()){ IconResourceId = _buf.ReadInt(); } else { IconResourceId = null; }
         IconResourceId_Ref = null;
@@ -35,10 +34,6 @@ public sealed partial class ItemConfig : Luban.BeanBase
     /// 物品ID
     /// </summary>
     public readonly int Id;
-    /// <summary>
-    /// 物品唯一键
-    /// </summary>
-    public readonly string Key;
     /// <summary>
     /// 显示名称
     /// </summary>
@@ -61,7 +56,6 @@ public sealed partial class ItemConfig : Luban.BeanBase
     {
         return "{ "
         + "id:" + Id + ","
-        + "key:" + Key + ","
         + "name:" + Name + ","
         + "iconResourceId:" + IconResourceId + ","
         + "}";

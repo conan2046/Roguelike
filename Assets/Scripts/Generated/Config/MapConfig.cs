@@ -20,7 +20,6 @@ public sealed partial class MapConfig : Luban.BeanBase
     public MapConfig(ByteBuf _buf) 
     {
         Id = _buf.ReadInt();
-        Key = _buf.ReadString();
         Name = _buf.ReadString();
         if(_buf.ReadBool()){ VisualSetId = _buf.ReadInt(); } else { VisualSetId = null; }
         VisualSetId_Ref = null;
@@ -35,10 +34,6 @@ public sealed partial class MapConfig : Luban.BeanBase
     /// 地图ID
     /// </summary>
     public readonly int Id;
-    /// <summary>
-    /// 地图唯一键
-    /// </summary>
-    public readonly string Key;
     /// <summary>
     /// 地图名称
     /// </summary>
@@ -61,7 +56,6 @@ public sealed partial class MapConfig : Luban.BeanBase
     {
         return "{ "
         + "id:" + Id + ","
-        + "key:" + Key + ","
         + "name:" + Name + ","
         + "visualSetId:" + VisualSetId + ","
         + "}";

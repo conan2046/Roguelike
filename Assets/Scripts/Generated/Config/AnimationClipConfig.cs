@@ -20,7 +20,6 @@ public sealed partial class AnimationClipConfig : Luban.BeanBase
     public AnimationClipConfig(ByteBuf _buf) 
     {
         Id = _buf.ReadInt();
-        Key = _buf.ReadString();
         AniResourceId = _buf.ReadInt();
         AniResourceId_Ref = null;
         TextureResourceId = _buf.ReadInt();
@@ -36,13 +35,9 @@ public sealed partial class AnimationClipConfig : Luban.BeanBase
     }
 
     /// <summary>
-    /// 动画片段ID
+    /// 动画ID：类别位+4位序号，例如10001=角色动画1
     /// </summary>
     public readonly int Id;
-    /// <summary>
-    /// 动画片段唯一键
-    /// </summary>
-    public readonly string Key;
     /// <summary>
     /// ANI资源ID
     /// </summary>
@@ -79,7 +74,6 @@ public sealed partial class AnimationClipConfig : Luban.BeanBase
     {
         return "{ "
         + "id:" + Id + ","
-        + "key:" + Key + ","
         + "aniResourceId:" + AniResourceId + ","
         + "textureResourceId:" + TextureResourceId + ","
         + "action:" + Action + ","

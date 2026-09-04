@@ -54,6 +54,10 @@ public partial class Tables
     /// </summary>
     public TbStage TbStage {get; }
     /// <summary>
+    /// GameConfig generated from Excel
+    /// </summary>
+    public GameConfig GameConfig {get; }
+    /// <summary>
     /// TbPerformanceScenario generated from Excel
     /// </summary>
     public TbPerformanceScenario TbPerformanceScenario {get; }
@@ -70,6 +74,7 @@ public partial class Tables
         TbMonster = new TbMonster(loader("tbmonster"));
         TbSkill = new TbSkill(loader("tbskill"));
         TbStage = new TbStage(loader("tbstage"));
+        GameConfig = new GameConfig(loader("gameconfig"));
         TbPerformanceScenario = new TbPerformanceScenario(loader("tbperformancescenario"));
         ResolveRef();
     }
@@ -86,6 +91,7 @@ public partial class Tables
         TbMonster.ResolveRef(this);
         TbSkill.ResolveRef(this);
         TbStage.ResolveRef(this);
+        GameConfig.ResolveRef(this);
         TbPerformanceScenario.ResolveRef(this);
     }
 }
