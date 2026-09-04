@@ -1,0 +1,4 @@
+repository "rouge@tj_conan@cloud.cn"
+  path "/"
+    br "/main"
+    co "/main"

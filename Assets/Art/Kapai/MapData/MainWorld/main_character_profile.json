@@ -1,0 +1,21 @@
+{
+    "schemaVersion": 1,
+    "playerName": "Player",
+    "level": 80,
+    "professional": 1,
+    "weaponId": 5011,
+    "weaponEffectId": 1,
+    "mountId": 3,
+    "wingId": 3,
+    "artifactId": 1,
+    "mapId": 1,
+    "mapPictureId": 1,
+    "requestedSpawn": {
+        "x": 100.0,
+        "y": 100.0
+    },
+    "spawnFace": 1,
+    "appearanceSource": "gm_data.equip[slot=5].type fallback (single-player save has no LightEffect)",
+    "playerSourceSha256": "4db02754501782a23e2d9343525357672dac2d5ccb904cd2a3ee767e8e7b8440",
+    "equipmentSourceSha256": "a9959a26f2800903545e021b80a66e5b750f4d394a2be5b0189caca9073ed79e"
+}

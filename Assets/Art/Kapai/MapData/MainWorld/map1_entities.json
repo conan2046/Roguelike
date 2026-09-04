@@ -1,0 +1,16 @@
+{
+  "mapId": 1,
+  "mapName": "灵雾村",
+  "npcInstanceSourceSha256": "aa6eca48210477e341e994c8ba280a5754d9c0c3a0f575064a5d7497241075c1",
+  "npcTemplateSourceSha256": "bf93297c505af890fdf4b621c1870565c3df200dc1bcbd8619e9a81e32908018",
+  "monsterDistributionSourceSha256": "9454266b0aa442252bb62f8d795df2f3224473794aa8f27f659fed16d0b9e203",
+  "monsterBasicSourceSha256": "f8acd427a324062e8ea297623b09b5b5ddbd558eba47ac4748bc2372d0dd49ee",
+  "npcs": [
+    { "instanceId": 74, "templateId": 74, "mapId": 1, "pictureId": 104, "type": 0, "face": 0, "colorType": 0, "serialNumber": 0, "state": 0, "state2": 0, "logo": 0, "displayName": "南极仙翁", "requestedSpawn": { "x": 888.0, "y": 1240.0 } },
+    { "instanceId": 501, "templateId": 501, "mapId": 1, "pictureId": 101, "type": 0, "face": 3, "colorType": 0, "serialNumber": 0, "state": 0, "state2": 0, "logo": 0, "displayName": "灵雾村顽童", "requestedSpawn": { "x": 863.0, "y": 483.0 } },
+    { "instanceId": 506, "templateId": 506, "mapId": 1, "pictureId": 93, "type": 0, "face": 0, "colorType": 0, "serialNumber": 0, "state": 0, "state2": 0, "logo": 0, "displayName": "灵雾村村长", "requestedSpawn": { "x": 2277.0, "y": 632.0 } },
+    { "instanceId": 530, "templateId": 530, "mapId": 1, "pictureId": 92, "type": 0, "face": 3, "colorType": 0, "serialNumber": 0, "state": 0, "state2": 0, "logo": 0, "displayName": "怜花姑娘", "requestedSpawn": { "x": 1437.0, "y": 831.0 } },
+    { "instanceId": 531, "templateId": 531, "mapId": 1, "pictureId": 105, "type": 0, "face": 0, "colorType": 0, "serialNumber": 0, "state": 0, "state2": 0, "logo": 0, "displayName": "樵夫", "requestedSpawn": { "x": 2523.0, "y": 880.0 } }
+  ],
+  "monsters": []
+}

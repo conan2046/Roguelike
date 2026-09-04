@@ -1,0 +1,269 @@
+{
+    "generatedAtUtc": "2026-08-11T14:18:30.4574733Z",
+    "entries": [
+        {
+            "csbPath": "csd/MainScene.csb",
+            "nodePath": "Scene/FileNode_1/xingongneng/Title",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF"
+        },
+        {
+            "csbPath": "csd/MainScene.csb",
+            "nodePath": "Scene/FileNode_1/xingongneng/zhanli",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF"
+        },
+        {
+            "csbPath": "csd/MainScene.csb",
+            "nodePath": "Scene/FileNode_1/xingongneng/zhanli/Value",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF"
+        },
+        {
+            "csbPath": "csd/MainScene.csb",
+            "nodePath": "Scene/FileNode_1/xingongneng/zhanli/Value/UpImage/Value_0",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF"
+        },
+        {
+            "csbPath": "csd/MainScene.csb",
+            "nodePath": "Scene/FileNode_1/xingongneng/BgImage/Text",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF"
+        },
+        {
+            "csbPath": "csd/MainScene.csb",
+            "nodePath": "Scene/FileNode_1/xingongneng/btn_Confirm/Text",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF"
+        },
+        {
+            "csbPath": "csd/Plist/kapaiguaiwuLayer.csb",
+            "nodePath": "Layer/ScrollView_4/Image_99/Node_1/Image_qipao/Text_1_4",
+            "fontReference": "MicrosoftArial.ttf",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/MicrosoftArial.ttf"
+        },
+        {
+            "csbPath": "csd/Plist/kapaiguaiwuLayer.csb",
+            "nodePath": "Layer/ScrollView_4/Image_99/Node_2/Image_qipao/Text_1_4",
+            "fontReference": "MicrosoftArial.ttf",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/MicrosoftArial.ttf"
+        },
+        {
+            "csbPath": "csd/Plist/kapaiguaiwuLayer.csb",
+            "nodePath": "Layer/ScrollView_4/Image_99/Node_3/Image_qipao/Text_1_4",
+            "fontReference": "MicrosoftArial.ttf",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/MicrosoftArial.ttf"
+        },
+        {
+            "csbPath": "csd/Plist/kapaiguaiwuLayer.csb",
+            "nodePath": "Layer/ScrollView_4/Image_99/Node_4/Image_qipao/Text_1_4",
+            "fontReference": "MicrosoftArial.ttf",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/MicrosoftArial.ttf"
+        },
+        {
+            "csbPath": "csd/Plist/kapaiguaiwuLayer.csb",
+            "nodePath": "Layer/ScrollView_4/Image_99/Node_5/Image_qipao/Text_1_4",
+            "fontReference": "MicrosoftArial.ttf",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/MicrosoftArial.ttf"
+        },
+        {
+            "csbPath": "csd/Plist/kapaiguaiwuLayer.csb",
+            "nodePath": "Layer/ScrollView_4/Image_99/Node_6/Image_qipao/Text_1_4",
+            "fontReference": "MicrosoftArial.ttf",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/MicrosoftArial.ttf"
+        },
+        {
+            "csbPath": "csd/Plist/kapaiguaiwuLayer.csb",
+            "nodePath": "Layer/ScrollView_4/Image_99/Node_7/Image_qipao/Text_1_4",
+            "fontReference": "MicrosoftArial.ttf",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/MicrosoftArial.ttf"
+        },
+        {
+            "csbPath": "csd/Plist/kapaiguaiwuLayer.csb",
+            "nodePath": "Layer/ScrollView_4/Image_99/Node_8/Image_qipao/Text_1_4",
+            "fontReference": "MicrosoftArial.ttf",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/MicrosoftArial.ttf"
+        },
+        {
+            "csbPath": "csd/Plist/kapaiguaiwuLayer.csb",
+            "nodePath": "Layer/ScrollView_4/Image_99/Node_9/Image_qipao/Text_1_4",
+            "fontReference": "MicrosoftArial.ttf",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/MicrosoftArial.ttf"
+        },
+        {
+            "csbPath": "csd/Plist/kapaiguaiwuLayer.csb",
+            "nodePath": "Layer/ScrollView_4/Image_99/Node_10/Image_qipao/Text_1_4",
+            "fontReference": "MicrosoftArial.ttf",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/MicrosoftArial.ttf"
+        },
+        {
+            "csbPath": "csd/ScoreRankLayer.csb",
+            "nodePath": "Layer/Lundao/Ranking/Name/PlaceNum",
+            "fontReference": "MicrosoftArial.ttf",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/MicrosoftArial.ttf"
+        },
+        {
+            "csbPath": "csd/ScoreRankLayer.csb",
+            "nodePath": "Layer/Lundao/Ranking/Name/PlaceName",
+            "fontReference": "MicrosoftArial.ttf",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/MicrosoftArial.ttf"
+        },
+        {
+            "csbPath": "csd/ScoreRankLayer.csb",
+            "nodePath": "Layer/Lundao/Ranking/Name/HurtValue",
+            "fontReference": "MicrosoftArial.ttf",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/MicrosoftArial.ttf"
+        },
+        {
+            "csbPath": "csd/ScoreRankLayer.csb",
+            "nodePath": "Layer/Lundao/Ranking/Image_1/Text",
+            "fontReference": "MicrosoftArial.ttf",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/MicrosoftArial.ttf"
+        },
+        {
+            "csbPath": "csd/ScoreRankLayer.csb",
+            "nodePath": "Layer/Lundao/Ranking/Image_2/Text",
+            "fontReference": "MicrosoftArial.ttf",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/MicrosoftArial.ttf"
+        },
+        {
+            "csbPath": "csd/ScoreRankLayer.csb",
+            "nodePath": "Layer/Lundao/Ranking/PersonalBg/Ranking_1",
+            "fontReference": "MicrosoftArial.ttf",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/MicrosoftArial.ttf"
+        },
+        {
+            "csbPath": "csd/ScoreRankLayer.csb",
+            "nodePath": "Layer/Lundao/Ranking/PersonalBg/Ranking_1/Value",
+            "fontReference": "MicrosoftArial.ttf",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/MicrosoftArial.ttf"
+        },
+        {
+            "csbPath": "csd/ScoreRankLayer.csb",
+            "nodePath": "Layer/Lundao/Ranking/PersonalBg/Ranking_2",
+            "fontReference": "MicrosoftArial.ttf",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/MicrosoftArial.ttf"
+        },
+        {
+            "csbPath": "csd/ScoreRankLayer.csb",
+            "nodePath": "Layer/Lundao/Ranking/PersonalBg/Ranking_2/Value",
+            "fontReference": "MicrosoftArial.ttf",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/MicrosoftArial.ttf"
+        },
+        {
+            "csbPath": "csd/ScoreRankLayer.csb",
+            "nodePath": "Layer/Lundao/Ranking/PersonalBg/PersonalScore",
+            "fontReference": "MicrosoftArial.ttf",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/MicrosoftArial.ttf"
+        },
+        {
+            "csbPath": "csd/ScoreRankLayer.csb",
+            "nodePath": "Layer/Lundao/Ranking/PersonalBg/PersonalScore/Value",
+            "fontReference": "MicrosoftArial.ttf",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/MicrosoftArial.ttf"
+        },
+        {
+            "csbPath": "csd/ScoreRankLayer.csb",
+            "nodePath": "Layer/Lundao/Ranking/PersonalBg/ServerScore",
+            "fontReference": "MicrosoftArial.ttf",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/MicrosoftArial.ttf"
+        },
+        {
+            "csbPath": "csd/ScoreRankLayer.csb",
+            "nodePath": "Layer/Lundao/Ranking/PersonalBg/ServerScore/Value",
+            "fontReference": "MicrosoftArial.ttf",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/MicrosoftArial.ttf"
+        },
+        {
+            "csbPath": "csd/WorldMapLayerNew.csb",
+            "nodePath": "Layer/PageView/Panel_1/Bg1/btn_1/Label/Text",
+            "fontReference": "MicrosoftArial.ttf",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/MicrosoftArial.ttf"
+        },
+        {
+            "csbPath": "csd/WorldMapLayerNew.csb",
+            "nodePath": "Layer/PageView/Panel_1/Bg1/btn_2/Label/Text",
+            "fontReference": "MicrosoftArial.ttf",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/MicrosoftArial.ttf"
+        },
+        {
+            "csbPath": "csd/WorldMapLayerNew.csb",
+            "nodePath": "Layer/PageView/Panel_1/Bg1/btn_3/Label/Text",
+            "fontReference": "MicrosoftArial.ttf",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/MicrosoftArial.ttf"
+        },
+        {
+            "csbPath": "csd/WorldMapLayerNew.csb",
+            "nodePath": "Layer/PageView/Panel_1/Bg1/btn_4/Label/Text",
+            "fontReference": "MicrosoftArial.ttf",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/MicrosoftArial.ttf"
+        },
+        {
+            "csbPath": "csd/WorldMapLayerNew.csb",
+            "nodePath": "Layer/PageView/Panel_1/Bg1/btn_5/Label/Text",
+            "fontReference": "MicrosoftArial.ttf",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/MicrosoftArial.ttf"
+        },
+        {
+            "csbPath": "csd/WorldMapLayerNew.csb",
+            "nodePath": "Layer/PageView/Panel_1/Bg1/btn_6/Label/Text",
+            "fontReference": "MicrosoftArial.ttf",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/MicrosoftArial.ttf"
+        },
+        {
+            "csbPath": "csd/WorldMapLayerNew.csb",
+            "nodePath": "Layer/PageView/Panel_1/Bg1/btn_7/Text_0",
+            "fontReference": "MicrosoftArial.ttf",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/MicrosoftArial.ttf"
+        },
+        {
+            "csbPath": "csd/WorldMapLayerNew.csb",
+            "nodePath": "Layer/PageView/Panel_1/Bg1/btn_7/Label/Text",
+            "fontReference": "MicrosoftArial.ttf",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/MicrosoftArial.ttf"
+        },
+        {
+            "csbPath": "csd/WorldMapLayerNew.csb",
+            "nodePath": "Layer/PageView/Panel_1/Bg1/btn_8/Text_0",
+            "fontReference": "MicrosoftArial.ttf",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/MicrosoftArial.ttf"
+        },
+        {
+            "csbPath": "csd/WorldMapLayerNew.csb",
+            "nodePath": "Layer/PageView/Panel_1/Bg1/btn_8/Label/Text",
+            "fontReference": "MicrosoftArial.ttf",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/MicrosoftArial.ttf"
+        },
+        {
+            "csbPath": "csd/WorldMapLayerNew.csb",
+            "nodePath": "Layer/PageView/Panel_1/Bg1/btn_9/Text_0",
+            "fontReference": "MicrosoftArial.ttf",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/MicrosoftArial.ttf"
+        },
+        {
+            "csbPath": "csd/WorldMapLayerNew.csb",
+            "nodePath": "Layer/PageView/Panel_1/Bg1/btn_9/Label/Text",
+            "fontReference": "MicrosoftArial.ttf",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/MicrosoftArial.ttf"
+        },
+        {
+            "csbPath": "csd/WorldMapLayerNew.csb",
+            "nodePath": "Layer/PageView/Panel_1/Bg1/btn_10/Label/Text",
+            "fontReference": "MicrosoftArial.ttf",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/MicrosoftArial.ttf"
+        },
+        {
+            "csbPath": "csd/WorldMapLayerNew.csb",
+            "nodePath": "Layer/PageView/Panel_1/Bg1/btn_11/Label/Text",
+            "fontReference": "MicrosoftArial.ttf",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/MicrosoftArial.ttf"
+        },
+        {
+            "csbPath": "csd/WorldMapLayerNew.csb",
+            "nodePath": "Layer/PageView/Panel_1/Bg1/btn_12/Label/Text",
+            "fontReference": "MicrosoftArial.ttf",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/MicrosoftArial.ttf"
+        }
+    ]
+}

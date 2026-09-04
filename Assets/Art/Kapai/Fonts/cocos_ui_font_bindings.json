@@ -1,0 +1,2728 @@
+{
+    "generatedAtUtc": "2026-08-11T11:12:43.9557568Z",
+    "entries": [
+        {
+            "csbPath": "csd/ActivityLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_ActivityLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 20,
+            "assignedTextNodes": 20,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/ActivityLevelLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_ActivityLevelLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 1,
+            "assignedTextNodes": 1,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/ActivityRankingLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_ActivityRankingLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 70,
+            "assignedTextNodes": 70,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/AnswerLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_AnswerLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 12,
+            "assignedTextNodes": 12,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/ArenaLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_ArenaLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 24,
+            "assignedTextNodes": 24,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/BagLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_BagLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 9,
+            "assignedTextNodes": 9,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/BattleLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_BattleLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 18,
+            "assignedTextNodes": 18,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/BestrongLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_BestrongLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 5,
+            "assignedTextNodes": 5,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/BtnListLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_BtnListLayer.prefab",
+            "fontReference": "",
+            "fontAssetPath": "",
+            "disposition": "no-explicit-font",
+            "textNodes": 0,
+            "assignedTextNodes": 0,
+            "sourceFontReferences": []
+        },
+        {
+            "csbPath": "csd/caiquanLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_caiquanLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 4,
+            "assignedTextNodes": 4,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/CangbaotuLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_CangbaotuLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 17,
+            "assignedTextNodes": 17,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/ChannelSetLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_ChannelSetLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 8,
+            "assignedTextNodes": 8,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/ChatLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_ChatLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 6,
+            "assignedTextNodes": 6,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/CheckBoxLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_CheckBoxLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 5,
+            "assignedTextNodes": 5,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/ChengZhangLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_ChengZhangLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 34,
+            "assignedTextNodes": 34,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/chouchongLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_chouchongLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 1,
+            "assignedTextNodes": 1,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/CleanRecordLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_CleanRecordLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 2,
+            "assignedTextNodes": 2,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/CommonBg_fuliLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_CommonBg_fuliLayer.prefab",
+            "fontReference": "",
+            "fontAssetPath": "",
+            "disposition": "no-explicit-font",
+            "textNodes": 0,
+            "assignedTextNodes": 0,
+            "sourceFontReferences": []
+        },
+        {
+            "csbPath": "csd/CommonPageLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_CommonPageLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 3,
+            "assignedTextNodes": 3,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/CurMapLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_CurMapLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 1,
+            "assignedTextNodes": 1,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/DadituuiLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_DadituuiLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 5,
+            "assignedTextNodes": 5,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/DailyBossLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_DailyBossLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 34,
+            "assignedTextNodes": 34,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/DailyChargeLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_DailyChargeLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 10,
+            "assignedTextNodes": 10,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/danciLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_danciLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 12,
+            "assignedTextNodes": 12,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/DevelopChooseLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_DevelopChooseLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 3,
+            "assignedTextNodes": 3,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/DialogLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_DialogLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 3,
+            "assignedTextNodes": 3,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/DiscountShopLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_DiscountShopLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 24,
+            "assignedTextNodes": 24,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/DiscountShopLayer2.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_DiscountShopLayer2.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 24,
+            "assignedTextNodes": 24,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/DonateLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_DonateLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 25,
+            "assignedTextNodes": 25,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/DrawCardsLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_DrawCardsLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 15,
+            "assignedTextNodes": 15,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/EnterNumLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_EnterNumLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 3,
+            "assignedTextNodes": 3,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/ExpressionLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_ExpressionLayer.prefab",
+            "fontReference": "",
+            "fontAssetPath": "",
+            "disposition": "no-explicit-font",
+            "textNodes": 0,
+            "assignedTextNodes": 0,
+            "sourceFontReferences": []
+        },
+        {
+            "csbPath": "csd/fanpai.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_fanpai.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 5,
+            "assignedTextNodes": 5,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/feixianzhanchangLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_feixianzhanchangLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 15,
+            "assignedTextNodes": 15,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/FengShenLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_FengShenLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 16,
+            "assignedTextNodes": 16,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/FengShenLayer2.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_FengShenLayer2.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 24,
+            "assignedTextNodes": 24,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/Fenjie2Layer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_Fenjie2Layer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 13,
+            "assignedTextNodes": 13,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/FenjieLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_FenjieLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 5,
+            "assignedTextNodes": 5,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/FightLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_FightLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 60,
+            "assignedTextNodes": 60,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/FirstChargeLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_FirstChargeLayer.prefab",
+            "fontReference": "",
+            "fontAssetPath": "",
+            "disposition": "no-explicit-font",
+            "textNodes": 0,
+            "assignedTextNodes": 0,
+            "sourceFontReferences": []
+        },
+        {
+            "csbPath": "csd/FirstRewardLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_FirstRewardLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 16,
+            "assignedTextNodes": 16,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/FishLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_FishLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 10,
+            "assignedTextNodes": 10,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/ForgeLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_ForgeLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 38,
+            "assignedTextNodes": 38,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/FormationLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_FormationLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 31,
+            "assignedTextNodes": 31,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/GameLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_GameLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 14,
+            "assignedTextNodes": 14,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/GameNoticeLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_GameNoticeLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 3,
+            "assignedTextNodes": 3,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/GameSceneLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_GameSceneLayer.prefab",
+            "fontReference": "",
+            "fontAssetPath": "",
+            "disposition": "no-explicit-font",
+            "textNodes": 0,
+            "assignedTextNodes": 0,
+            "sourceFontReferences": []
+        },
+        {
+            "csbPath": "csd/GiftsListLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_GiftsListLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 9,
+            "assignedTextNodes": 9,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/GiveGiftsLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_GiveGiftsLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 32,
+            "assignedTextNodes": 32,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/GodTreeLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_GodTreeLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 20,
+            "assignedTextNodes": 20,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/GoldTreeLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_GoldTreeLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 16,
+            "assignedTextNodes": 16,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/guaiwubaoxiangLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_guaiwubaoxiangLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 10,
+            "assignedTextNodes": 10,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/guanqiaxiangxiLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_guanqiaxiangxiLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 18,
+            "assignedTextNodes": 18,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/GuideLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_GuideLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 2,
+            "assignedTextNodes": 2,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/GuidIconLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_GuidIconLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 5,
+            "assignedTextNodes": 5,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/GuildActivityLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_GuildActivityLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 21,
+            "assignedTextNodes": 21,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/GuildApplyLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_GuildApplyLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 16,
+            "assignedTextNodes": 16,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/GuildApplyListLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_GuildApplyListLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 11,
+            "assignedTextNodes": 11,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/GuildDonateLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_GuildDonateLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 14,
+            "assignedTextNodes": 14,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/GuildEventLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_GuildEventLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 6,
+            "assignedTextNodes": 6,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/GuildfoundLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_GuildfoundLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 13,
+            "assignedTextNodes": 13,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/GuildGodLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_GuildGodLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 12,
+            "assignedTextNodes": 12,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/GuildGuardLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_GuildGuardLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 7,
+            "assignedTextNodes": 7,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/GuildIconLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_GuildIconLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 5,
+            "assignedTextNodes": 5,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/GuildIntoLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_GuildIntoLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 9,
+            "assignedTextNodes": 9,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/GuildKejiLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_GuildKejiLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 19,
+            "assignedTextNodes": 19,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/GuildMemberLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_GuildMemberLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 20,
+            "assignedTextNodes": 20,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/GuildNewsLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_GuildNewsLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 41,
+            "assignedTextNodes": 41,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/GuildSkillLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_GuildSkillLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 32,
+            "assignedTextNodes": 32,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/GuildWar2Layer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_GuildWar2Layer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 65,
+            "assignedTextNodes": 65,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/GuildWarLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_GuildWarLayer.prefab",
+            "fontReference": "",
+            "fontAssetPath": "",
+            "disposition": "no-explicit-font",
+            "textNodes": 0,
+            "assignedTextNodes": 0,
+            "sourceFontReferences": []
+        },
+        {
+            "csbPath": "csd/GuildXianzunLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_GuildXianzunLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 15,
+            "assignedTextNodes": 15,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/GuiZuLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_GuiZuLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 11,
+            "assignedTextNodes": 11,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/HechengPopupLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_HechengPopupLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 15,
+            "assignedTextNodes": 15,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/HPNode.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_HPNode.prefab",
+            "fontReference": "",
+            "fontAssetPath": "",
+            "disposition": "no-explicit-font",
+            "textNodes": 0,
+            "assignedTextNodes": 0,
+            "sourceFontReferences": []
+        },
+        {
+            "csbPath": "csd/HuoyueLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_HuoyueLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 34,
+            "assignedTextNodes": 34,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/HuoyueLevelLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_HuoyueLevelLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 2,
+            "assignedTextNodes": 2,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/IllustrationsLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_IllustrationsLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 26,
+            "assignedTextNodes": 26,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/InstancesLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_InstancesLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 40,
+            "assignedTextNodes": 40,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/ItemIconLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_ItemIconLayer.prefab",
+            "fontReference": "",
+            "fontAssetPath": "",
+            "disposition": "no-explicit-font",
+            "textNodes": 0,
+            "assignedTextNodes": 0,
+            "sourceFontReferences": []
+        },
+        {
+            "csbPath": "csd/ItemInfoLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_ItemInfoLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 11,
+            "assignedTextNodes": 11,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/ItemWearLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_ItemWearLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 7,
+            "assignedTextNodes": 7,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/JihuomaLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_JihuomaLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 3,
+            "assignedTextNodes": 3,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/JingjieLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_JingjieLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 12,
+            "assignedTextNodes": 12,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/kapaiguaiwuLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_kapaiguaiwuLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 20,
+            "assignedTextNodes": 20,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/kuafulaba.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_kuafulaba.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 1,
+            "assignedTextNodes": 1,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/kuafuliaotian.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_kuafuliaotian.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 4,
+            "assignedTextNodes": 4,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/kunlunshanLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_kunlunshanLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 24,
+            "assignedTextNodes": 24,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/LevelGiftLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_LevelGiftLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 2,
+            "assignedTextNodes": 2,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/LevelUpLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_LevelUpLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 9,
+            "assignedTextNodes": 9,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/LilianLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_LilianLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 20,
+            "assignedTextNodes": 20,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/LineupLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_LineupLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 12,
+            "assignedTextNodes": 12,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/LiujieLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_LiujieLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 7,
+            "assignedTextNodes": 7,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/LoadingCommenLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_LoadingCommenLayer.prefab",
+            "fontReference": "MicrosoftArial.ttf",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/MicrosoftArial.ttf",
+            "disposition": "bound",
+            "textNodes": 1,
+            "assignedTextNodes": 1,
+            "sourceFontReferences": [
+                "MicrosoftArial.ttf"
+            ]
+        },
+        {
+            "csbPath": "csd/LoadingCommonLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_LoadingCommonLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 2,
+            "assignedTextNodes": 2,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/LoadingLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_LoadingLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 7,
+            "assignedTextNodes": 7,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/LoginBgLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_LoginBgLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 4,
+            "assignedTextNodes": 4,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/LoginBgLayer2.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_LoginBgLayer2.prefab",
+            "fontReference": "MicrosoftArial.ttf",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/MicrosoftArial.ttf",
+            "disposition": "bound",
+            "textNodes": 4,
+            "assignedTextNodes": 4,
+            "sourceFontReferences": [
+                "MicrosoftArial.ttf"
+            ]
+        },
+        {
+            "csbPath": "csd/LoginCarnivalLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_LoginCarnivalLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 6,
+            "assignedTextNodes": 6,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/LoginGiftLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_LoginGiftLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 3,
+            "assignedTextNodes": 3,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/loginLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_loginLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 13,
+            "assignedTextNodes": 13,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/Lundao2Layer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_Lundao2Layer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 14,
+            "assignedTextNodes": 14,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/LundaoLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_LundaoLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 20,
+            "assignedTextNodes": 20,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/MailLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_MailLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 15,
+            "assignedTextNodes": 15,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/MainChatLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_MainChatLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 23,
+            "assignedTextNodes": 23,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/MainScene.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_MainScene.prefab",
+            "fontReference": "",
+            "fontAssetPath": "",
+            "disposition": "no-explicit-font",
+            "textNodes": 0,
+            "assignedTextNodes": 0,
+            "sourceFontReferences": []
+        },
+        {
+            "csbPath": "csd/MessageBoxLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_MessageBoxLayer.prefab",
+            "fontReference": "",
+            "fontAssetPath": "",
+            "disposition": "no-explicit-font",
+            "textNodes": 0,
+            "assignedTextNodes": 0,
+            "sourceFontReferences": []
+        },
+        {
+            "csbPath": "csd/MijingHpLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_MijingHpLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 14,
+            "assignedTextNodes": 14,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/MijingHpNode.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_MijingHpNode.prefab",
+            "fontReference": "",
+            "fontAssetPath": "",
+            "disposition": "no-explicit-font",
+            "textNodes": 0,
+            "assignedTextNodes": 0,
+            "sourceFontReferences": []
+        },
+        {
+            "csbPath": "csd/MijingLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_MijingLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 10,
+            "assignedTextNodes": 10,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/MountInfoLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_MountInfoLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 23,
+            "assignedTextNodes": 23,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/MountjinjieLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_MountjinjieLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 13,
+            "assignedTextNodes": 13,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/MountUpgradeLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_MountUpgradeLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 34,
+            "assignedTextNodes": 34,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/MustDoLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_MustDoLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 15,
+            "assignedTextNodes": 15,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/NameLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_NameLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 3,
+            "assignedTextNodes": 3,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/NewFunctionLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_NewFunctionLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 6,
+            "assignedTextNodes": 6,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/NoticeLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_NoticeLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 6,
+            "assignedTextNodes": 6,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/OffLineLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_OffLineLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 17,
+            "assignedTextNodes": 17,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/OneLevelLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_OneLevelLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 6,
+            "assignedTextNodes": 6,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/OnlineGiftLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_OnlineGiftLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 2,
+            "assignedTextNodes": 2,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/PetDiscountLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_PetDiscountLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 9,
+            "assignedTextNodes": 9,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/PetInstancesLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_PetInstancesLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 42,
+            "assignedTextNodes": 42,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/PetRewardLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_PetRewardLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 2,
+            "assignedTextNodes": 2,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/PetShowLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_PetShowLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 65,
+            "assignedTextNodes": 65,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/PlantListLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_PlantListLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 5,
+            "assignedTextNodes": 5,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/PlatinumLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_PlatinumLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 20,
+            "assignedTextNodes": 20,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/PlayerCheckLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_PlayerCheckLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 5,
+            "assignedTextNodes": 5,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/Plist/kapaiguaiwuLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_Plist_kapaiguaiwuLayer.prefab",
+            "fontReference": "",
+            "fontAssetPath": "",
+            "disposition": "ambiguous-multiple-fonts",
+            "textNodes": 0,
+            "assignedTextNodes": 0,
+            "sourceFontReferences": [
+                "MicrosoftArial.ttf",
+                "STLITI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/PromptLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_PromptLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 1,
+            "assignedTextNodes": 1,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/PropListLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_PropListLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 4,
+            "assignedTextNodes": 4,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/PropSynthesis.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_PropSynthesis.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 15,
+            "assignedTextNodes": 15,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/QuestDialogLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_QuestDialogLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 7,
+            "assignedTextNodes": 7,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/RechargeLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_RechargeLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 36,
+            "assignedTextNodes": 36,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/RechargeLevelLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_RechargeLevelLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 2,
+            "assignedTextNodes": 2,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/RegisterLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_RegisterLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 4,
+            "assignedTextNodes": 4,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/RewardBackLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_RewardBackLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 17,
+            "assignedTextNodes": 17,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/RoleCreateLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_RoleCreateLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 4,
+            "assignedTextNodes": 4,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/RoleCreateLayer2.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_RoleCreateLayer2.prefab",
+            "fontReference": "",
+            "fontAssetPath": "",
+            "disposition": "no-explicit-font",
+            "textNodes": 0,
+            "assignedTextNodes": 0,
+            "sourceFontReferences": []
+        },
+        {
+            "csbPath": "csd/RoleLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_RoleLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 69,
+            "assignedTextNodes": 69,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/RoleListLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_RoleListLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 3,
+            "assignedTextNodes": 3,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/RoomChangeLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_RoomChangeLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 13,
+            "assignedTextNodes": 13,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/saodangLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_saodangLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 22,
+            "assignedTextNodes": 22,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/Scene.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_Scene.prefab",
+            "fontReference": "",
+            "fontAssetPath": "",
+            "disposition": "no-explicit-font",
+            "textNodes": 0,
+            "assignedTextNodes": 0,
+            "sourceFontReferences": []
+        },
+        {
+            "csbPath": "csd/ScoreRankLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_ScoreRankLayer.prefab",
+            "fontReference": "",
+            "fontAssetPath": "",
+            "disposition": "ambiguous-multiple-fonts",
+            "textNodes": 0,
+            "assignedTextNodes": 0,
+            "sourceFontReferences": [
+                "MicrosoftArial.ttf",
+                "STLITI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/SecondLevelLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_SecondLevelLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 1,
+            "assignedTextNodes": 1,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/SevenDaysLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_SevenDaysLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 23,
+            "assignedTextNodes": 23,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/SeverListLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_SeverListLayer.prefab",
+            "fontReference": "",
+            "fontAssetPath": "",
+            "disposition": "no-explicit-font",
+            "textNodes": 0,
+            "assignedTextNodes": 0,
+            "sourceFontReferences": []
+        },
+        {
+            "csbPath": "csd/shengxingchenggongLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_shengxingchenggongLayer.prefab",
+            "fontReference": "",
+            "fontAssetPath": "",
+            "disposition": "no-explicit-font",
+            "textNodes": 0,
+            "assignedTextNodes": 0,
+            "sourceFontReferences": []
+        },
+        {
+            "csbPath": "csd/shenjiangEquip2Layer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_shenjiangEquip2Layer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 27,
+            "assignedTextNodes": 27,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/shenjiangEquipLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_shenjiangEquipLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 73,
+            "assignedTextNodes": 73,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/shenjiangInfoLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_shenjiangInfoLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 45,
+            "assignedTextNodes": 45,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/shenjiangListLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_shenjiangListLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 3,
+            "assignedTextNodes": 3,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/shenjiangshengxingLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_shenjiangshengxingLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 42,
+            "assignedTextNodes": 42,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/shenjiangSkillDetailsLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_shenjiangSkillDetailsLayer.prefab",
+            "fontReference": "",
+            "fontAssetPath": "",
+            "disposition": "no-explicit-font",
+            "textNodes": 0,
+            "assignedTextNodes": 0,
+            "sourceFontReferences": []
+        },
+        {
+            "csbPath": "csd/shenjiangSkillLayer2.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_shenjiangSkillLayer2.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 63,
+            "assignedTextNodes": 63,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/shenjiangxiulianLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_shenjiangxiulianLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 30,
+            "assignedTextNodes": 30,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/shenjiangzhenxingLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_shenjiangzhenxingLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 38,
+            "assignedTextNodes": 38,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/ShenqiDevelopLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_ShenqiDevelopLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 24,
+            "assignedTextNodes": 24,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/shenqiGiftLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_shenqiGiftLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 8,
+            "assignedTextNodes": 8,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/ShenqiLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_ShenqiLayer.prefab",
+            "fontReference": "",
+            "fontAssetPath": "",
+            "disposition": "no-explicit-font",
+            "textNodes": 0,
+            "assignedTextNodes": 0,
+            "sourceFontReferences": []
+        },
+        {
+            "csbPath": "csd/ShenshouLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_ShenshouLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 17,
+            "assignedTextNodes": 17,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/shilianchouLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_shilianchouLayer.prefab",
+            "fontReference": "",
+            "fontAssetPath": "",
+            "disposition": "no-explicit-font",
+            "textNodes": 0,
+            "assignedTextNodes": 0,
+            "sourceFontReferences": []
+        },
+        {
+            "csbPath": "csd/ShopLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_ShopLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 38,
+            "assignedTextNodes": 38,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/ShouChongLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_ShouChongLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 8,
+            "assignedTextNodes": 8,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/SignLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_SignLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 5,
+            "assignedTextNodes": 5,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/SkillIconLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_SkillIconLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 1,
+            "assignedTextNodes": 1,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/SkillLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_SkillLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 30,
+            "assignedTextNodes": 30,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/SocialLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_SocialLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 26,
+            "assignedTextNodes": 26,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/SocialPopupLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_SocialPopupLayer.prefab",
+            "fontReference": "",
+            "fontAssetPath": "",
+            "disposition": "no-explicit-font",
+            "textNodes": 0,
+            "assignedTextNodes": 0,
+            "sourceFontReferences": []
+        },
+        {
+            "csbPath": "csd/SourceLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_SourceLayer.prefab",
+            "fontReference": "",
+            "fontAssetPath": "",
+            "disposition": "no-explicit-font",
+            "textNodes": 0,
+            "assignedTextNodes": 0,
+            "sourceFontReferences": []
+        },
+        {
+            "csbPath": "csd/SystemLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_SystemLayer.prefab",
+            "fontReference": "",
+            "fontAssetPath": "",
+            "disposition": "no-explicit-font",
+            "textNodes": 0,
+            "assignedTextNodes": 0,
+            "sourceFontReferences": []
+        },
+        {
+            "csbPath": "csd/TargetLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_TargetLayer.prefab",
+            "fontReference": "",
+            "fontAssetPath": "",
+            "disposition": "no-explicit-font",
+            "textNodes": 0,
+            "assignedTextNodes": 0,
+            "sourceFontReferences": []
+        },
+        {
+            "csbPath": "csd/TaskAcceptLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_TaskAcceptLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 5,
+            "assignedTextNodes": 5,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/TaskPopupLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_TaskPopupLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 16,
+            "assignedTextNodes": 16,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/TeamIntoListLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_TeamIntoListLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 7,
+            "assignedTextNodes": 7,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/TeamInviteListLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_TeamInviteListLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 11,
+            "assignedTextNodes": 11,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/TeamMembersLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_TeamMembersLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 29,
+            "assignedTextNodes": 29,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/TeamQuickLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_TeamQuickLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 20,
+            "assignedTextNodes": 20,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/TeamSetupLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_TeamSetupLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 10,
+            "assignedTextNodes": 10,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/TheChartsLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_TheChartsLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 17,
+            "assignedTextNodes": 17,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/tianyuanzhengba.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_tianyuanzhengba.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 6,
+            "assignedTextNodes": 6,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/tiligoumaiLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_tiligoumaiLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 17,
+            "assignedTextNodes": 17,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/tiliLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_tiliLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 9,
+            "assignedTextNodes": 9,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/tililingquLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_tililingquLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 11,
+            "assignedTextNodes": 11,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/tilishiyongLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_tilishiyongLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 9,
+            "assignedTextNodes": 9,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/TitleLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_TitleLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 18,
+            "assignedTextNodes": 18,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/tongguanLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_tongguanLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 1,
+            "assignedTextNodes": 1,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/TouchLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_TouchLayer.prefab",
+            "fontReference": "",
+            "fontAssetPath": "",
+            "disposition": "no-explicit-font",
+            "textNodes": 0,
+            "assignedTextNodes": 0,
+            "sourceFontReferences": []
+        },
+        {
+            "csbPath": "csd/TowerLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_TowerLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 31,
+            "assignedTextNodes": 31,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/TowerLayer2.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_TowerLayer2.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 12,
+            "assignedTextNodes": 12,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/TowerLayer3.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_TowerLayer3.prefab",
+            "fontReference": "",
+            "fontAssetPath": "",
+            "disposition": "no-explicit-font",
+            "textNodes": 0,
+            "assignedTextNodes": 0,
+            "sourceFontReferences": []
+        },
+        {
+            "csbPath": "csd/TowerLayer4.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_TowerLayer4.prefab",
+            "fontReference": "",
+            "fontAssetPath": "",
+            "disposition": "no-explicit-font",
+            "textNodes": 0,
+            "assignedTextNodes": 0,
+            "sourceFontReferences": []
+        },
+        {
+            "csbPath": "csd/UImainLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_UImainLayer.prefab",
+            "fontReference": "",
+            "fontAssetPath": "",
+            "disposition": "no-explicit-font",
+            "textNodes": 0,
+            "assignedTextNodes": 0,
+            "sourceFontReferences": []
+        },
+        {
+            "csbPath": "csd/VIPLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_VIPLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 9,
+            "assignedTextNodes": 9,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/VoiceWindow.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_VoiceWindow.prefab",
+            "fontReference": "",
+            "fontAssetPath": "",
+            "disposition": "no-explicit-font",
+            "textNodes": 0,
+            "assignedTextNodes": 0,
+            "sourceFontReferences": []
+        },
+        {
+            "csbPath": "csd/wannengsuipianLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_wannengsuipianLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 11,
+            "assignedTextNodes": 11,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/WarshipLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_WarshipLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 22,
+            "assignedTextNodes": 22,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/WearPopupLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_WearPopupLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 3,
+            "assignedTextNodes": 3,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/WelfareLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_WelfareLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 2,
+            "assignedTextNodes": 2,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/WingDevelopLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_WingDevelopLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 23,
+            "assignedTextNodes": 23,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/WingLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_WingLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 24,
+            "assignedTextNodes": 24,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/WorldMapLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_WorldMapLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 15,
+            "assignedTextNodes": 15,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/WorldMapLayerNew.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_WorldMapLayerNew.prefab",
+            "fontReference": "",
+            "fontAssetPath": "",
+            "disposition": "ambiguous-multiple-fonts",
+            "textNodes": 0,
+            "assignedTextNodes": 0,
+            "sourceFontReferences": [
+                "MicrosoftArial.ttf",
+                "STLITI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/XilianLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_XilianLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 20,
+            "assignedTextNodes": 20,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/xingongnengLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_xingongnengLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 6,
+            "assignedTextNodes": 6,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/yingxiongInfoLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_yingxiongInfoLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 49,
+            "assignedTextNodes": 49,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/yingxiongjueseLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_yingxiongjueseLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 3,
+            "assignedTextNodes": 3,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/yingxiongListLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_yingxiongListLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 3,
+            "assignedTextNodes": 3,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/yingxiongshengjiScene1.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_yingxiongshengjiScene1.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 17,
+            "assignedTextNodes": 17,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/yingxiongshengxingendLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_yingxiongshengxingendLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 25,
+            "assignedTextNodes": 25,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/yingxiongshengxingLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_yingxiongshengxingLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 18,
+            "assignedTextNodes": 18,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/yingxiongshuxingLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_yingxiongshuxingLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 37,
+            "assignedTextNodes": 37,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/yingxiongtianfuLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_yingxiongtianfuLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 6,
+            "assignedTextNodes": 6,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/yingxiongtujianendLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_yingxiongtujianendLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 5,
+            "assignedTextNodes": 5,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/yingxiongtujianLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_yingxiongtujianLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 26,
+            "assignedTextNodes": 26,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/yingxiongtupoendLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_yingxiongtupoendLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 13,
+            "assignedTextNodes": 13,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/yingxiongtupoLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_yingxiongtupoLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 28,
+            "assignedTextNodes": 28,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/yingxiongxinxiLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_yingxiongxinxiLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 31,
+            "assignedTextNodes": 31,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/ZengsongLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_ZengsongLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 20,
+            "assignedTextNodes": 20,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/zhandouijiesuan1Layer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_zhandouijiesuan1Layer.prefab",
+            "fontReference": "",
+            "fontAssetPath": "",
+            "disposition": "no-explicit-font",
+            "textNodes": 0,
+            "assignedTextNodes": 0,
+            "sourceFontReferences": []
+        },
+        {
+            "csbPath": "csd/zhandoujiesuan1Layer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_zhandoujiesuan1Layer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 23,
+            "assignedTextNodes": 23,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/zhanlitishengLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_zhanlitishengLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 2,
+            "assignedTextNodes": 2,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/ZhengbaLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_ZhengbaLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 59,
+            "assignedTextNodes": 59,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/zhengba_2.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_zhengba_2.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 45,
+            "assignedTextNodes": 45,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/zhengba_3.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_zhengba_3.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 27,
+            "assignedTextNodes": 27,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/zhuangbeiyangcheng/Common_jiban.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_zhuangbeiyangcheng_Common_jiban.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 5,
+            "assignedTextNodes": 5,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/zhuangbeiyangcheng/shengxingchenggong.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_zhuangbeiyangcheng_shengxingchenggong.prefab",
+            "fontReference": "",
+            "fontAssetPath": "",
+            "disposition": "no-explicit-font",
+            "textNodes": 0,
+            "assignedTextNodes": 0,
+            "sourceFontReferences": []
+        },
+        {
+            "csbPath": "csd/zhuangbeiyangcheng/yijianduihuan.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_zhuangbeiyangcheng_yijianduihuan.prefab",
+            "fontReference": "",
+            "fontAssetPath": "",
+            "disposition": "no-explicit-font",
+            "textNodes": 0,
+            "assignedTextNodes": 0,
+            "sourceFontReferences": []
+        },
+        {
+            "csbPath": "csd/zhuangbeiyangcheng/yijianjinglian.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_zhuangbeiyangcheng_yijianjinglian.prefab",
+            "fontReference": "",
+            "fontAssetPath": "",
+            "disposition": "no-explicit-font",
+            "textNodes": 0,
+            "assignedTextNodes": 0,
+            "sourceFontReferences": []
+        },
+        {
+            "csbPath": "csd/zhuangbeiyangcheng/yijianshengxing.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_zhuangbeiyangcheng_yijianshengxing.prefab",
+            "fontReference": "",
+            "fontAssetPath": "",
+            "disposition": "no-explicit-font",
+            "textNodes": 0,
+            "assignedTextNodes": 0,
+            "sourceFontReferences": []
+        },
+        {
+            "csbPath": "csd/zhuangbeiyangcheng/zhuangbeiyangcheng.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_zhuangbeiyangcheng_zhuangbeiyangcheng.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 65,
+            "assignedTextNodes": 65,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        },
+        {
+            "csbPath": "csd/ZhuanpanLayer.csb",
+            "prefabPath": "Assets/ProjectX/GeneratedPrefabs/CocosUi/csd_ZhuanpanLayer.prefab",
+            "fontReference": "STXINWEI.TTF",
+            "fontAssetPath": "Assets/ProjectX/CocosAssets/Fonts/STXINWEI.TTF",
+            "disposition": "bound",
+            "textNodes": 23,
+            "assignedTextNodes": 23,
+            "sourceFontReferences": [
+                "STXINWEI.TTF"
+            ]
+        }
+    ]
+}

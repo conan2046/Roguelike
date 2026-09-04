@@ -1,0 +1,31 @@
+# ===== Unity 生成目录（不入库） =====
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Mm]emoryCaptures/
+Logs/
+UserSettings/
+# 本地 IDE / OS
+.vs/
+.idea/
+*.csproj
+*.sln
+*.unityproj
+*.booproj
+*.userprefs
+.DS_Store
+
+# ===== 敏感 / 个人数据（禁止推送到公开仓库） =====
+# .workbuddy 含手机号、邮箱、子女、房产等 PII，绝不入库
+.workbuddy/
+
+# ===== 可选：大二进制资源建议走 Git LFS（见说明） =====
+# Assets/StreamingAssets/ProjectX/CocosAnimations/**/*.ani
+# Assets/StreamingAssets/ProjectX/CocosAnimations/**/*.png
+
+# ===== 其他 =====
+*.log
+~$*
+Thumbs.db
