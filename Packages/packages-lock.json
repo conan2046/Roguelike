@@ -17,6 +17,18 @@
       },
       "hash": "30d22075093d1d35dfb0091c1c7550e9ad948577"
     },
+    "com.tuyoogame.yooasset": {
+      "version": "2.3.19",
+      "depth": 0,
+      "source": "registry",
+      "dependencies": {
+        "com.unity.modules.assetbundle": "1.0.0",
+        "com.unity.modules.unitywebrequest": "1.0.0",
+        "com.unity.modules.unitywebrequestassetbundle": "1.0.0",
+        "com.unity.scriptablebuildpipeline": "1.21.25"
+      },
+      "url": "https://package.openupm.com"
+    },
     "com.unity.2d.animation": {
       "version": "9.2.0",
       "depth": 1,

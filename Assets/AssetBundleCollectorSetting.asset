@@ -1,0 +1,66 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 185f6993d5150494d98da50e26cb1c25, type: 3}
+  m_Name: AssetBundleCollectorSetting
+  m_EditorClassIdentifier: 
+  ShowPackageView: 0
+  ShowEditorAlias: 0
+  UniqueBundleName: 0
+  Packages:
+  - PackageName: DefaultPackage
+    PackageDesc: 
+    EnableAddressable: 1
+    SupportExtensionless: 0
+    LocationToLower: 0
+    IncludeAssetGUID: 0
+    AutoCollectShaders: 1
+    IgnoreRuleName: RawFileIgnoreRule
+    Groups:
+    - GroupName: LubanConfig
+      GroupDesc: 
+      AssetTags: 
+      ActiveRuleName: EnableGroup
+      Collectors:
+      - CollectPath: Assets/StreamingAssets/Config/Luban
+        CollectorGUID: e6cf7c2efcdd7e9468741beaf5391a6a
+        CollectorType: 0
+        AddressRuleName: ProjectResourceAddressRule
+        PackRuleName: PackRawFile
+        FilterRuleName: CollectAll
+        AssetTags: luban-config
+        UserData: 
+    - GroupName: LegacyRawContent
+      GroupDesc: 
+      AssetTags: 
+      ActiveRuleName: EnableGroup
+      Collectors:
+      - CollectPath: Assets/StreamingAssets/ProjectX
+        CollectorGUID: a9edf2776402ccf4b8c666c5e084bd75
+        CollectorType: 0
+        AddressRuleName: ProjectResourceAddressRule
+        PackRuleName: PackRawFile
+        FilterRuleName: CollectAll
+        AssetTags: 
+        UserData: 
+    - GroupName: GameContent
+      GroupDesc: 
+      AssetTags: 
+      ActiveRuleName: EnableGroup
+      Collectors:
+      - CollectPath: Assets/GameContent
+        CollectorGUID: 700d2c62d0f43a240a9db55aeb7efb5d
+        CollectorType: 0
+        AddressRuleName: ProjectResourceAddressRule
+        PackRuleName: PackDirectory
+        FilterRuleName: CollectAll
+        AssetTags: 
+        UserData: 

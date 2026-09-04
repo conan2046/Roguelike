@@ -1,0 +1,25 @@
+{
+  "name": "Roguelike.Architecture.PlayModeTests",
+  "rootNamespace": "Roguelike.Tests",
+  "references": [
+    "Roguelike.App",
+    "Roguelike.Core",
+    "Roguelike.Generated",
+    "Roguelike.Infrastructure",
+    "YooAsset"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": false,
+  "defineConstraints": [
+    "UNITY_INCLUDE_TESTS"
+  ],
+  "versionDefines": [],
+  "noEngineReferences": false,
+  "optionalUnityReferences": [
+    "TestAssemblies"
+  ]
+}

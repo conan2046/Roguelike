@@ -1,0 +1,19 @@
+{
+  "name": "Roguelike.App",
+  "rootNamespace": "Roguelike.App",
+  "references": [
+    "Roguelike.Core",
+    "Roguelike.Infrastructure",
+    "Roguelike.Features.Gameplay",
+    "Roguelike.Presentation"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}
