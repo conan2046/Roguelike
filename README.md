@@ -14,6 +14,7 @@ Unity 2022.3 LTS 项目，使用 ECS/DOTS、Entities Graphics 和 URP。
 - Unity `2022.3.62f3`（版本记录在 `ProjectSettings/ProjectVersion.txt`）
 - Git（Unity Package Manager 需要它拉取已固定版本的 MCP for Unity）
 - Windows、macOS 或 Linux 上对应平台的 Unity Editor 模块
+- 修改数据表并重新生成时，需要 [.NET 8 Runtime](https://dotnet.microsoft.com/download/dotnet/8.0)
 
 ## 拉取并运行
 
@@ -29,6 +30,36 @@ cd Roguelike
 
 `SampleScene` 已加入 Build Settings，构建玩家版本时可直接选择目标平台后执行 Build。
 `Assets/Scenes/MCPDemo.unity` 保留了当前 Kapai 地图移动演示，可用于检查地图、角色与输入迁移效果。
+
+## Luban 数据表
+
+Excel 是配置数据的唯一来源。表结构和源数据位于 `Config/Datas`，Luban `4.11.0` 已固定在 `Tools/Luban`。
+
+生成配置：
+
+```powershell
+# Windows
+./Tools/Config/generate.ps1
+```
+
+```bash
+# macOS/Linux
+bash ./Tools/Config/generate.sh
+```
+
+验证已提交生成物与 Excel 源一致：
+
+```powershell
+# Windows
+./Tools/Config/validate.ps1
+```
+
+```bash
+# macOS/Linux
+bash ./Tools/Config/validate.sh
+```
+
+生成的 C# 代码位于 `Assets/Scripts/Generated/Config`，二进制数据位于 `Assets/StreamingAssets/Config/Luban`，两者均已提交。新机器只需拉取仓库并打开 Unity；未修改数据表时，无需安装或运行 Luban，也无需单独执行生成脚本。
 
 ## 版本库规则
 

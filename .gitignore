@@ -23,6 +23,9 @@ UserSettings/
 # 编辑器截图与本机验证产物
 Assets/Screenshots/
 
+# Codex/本地表格预览与验收产物
+/outputs/
+
 # ===== 敏感 / 个人数据（禁止推送到公开仓库） =====
 # .workbuddy 含手机号、邮箱、子女、房产等 PII，绝不入库
 .workbuddy/

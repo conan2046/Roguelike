@@ -1,0 +1,10 @@
+*.sh text eol=lf
+Assets/Scripts/Generated/Config/*.cs text eol=lf
+*.xlsx binary
+*.bytes binary
+*.dll binary
+*.exe binary
+*.meta -whitespace
+Assets/Scripts/Generated/Config/** -whitespace
+Assets/Scripts/ThirdParty/Luban/** -whitespace
+Tools/Luban/** -whitespace

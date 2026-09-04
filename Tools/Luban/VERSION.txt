@@ -1,0 +1,4 @@
+Luban 4.11.0
+Commit: c9f282c853502946852052cd1e145b1ea4825997
+Runtime: .NET 8
+Source: https://github.com/focus-creative-games/luban
