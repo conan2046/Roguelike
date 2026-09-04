@@ -71,12 +71,12 @@
 - 死亡 / 胜利 → 结算面板（击杀数 / 等级 / 时长）→ 返回主菜单。
 - 验收：结算数据正确、可返回、Run Save 删除（见 §5.6 框架）。
 
-## 4. 数据 Schema（SO 骨架 · 数据层先立）
-- `WeaponSO`：id, name, star(1~5), baseDamage, attackInterval, animKey。
-- `EnemySO`：id, type, hp, speed, damage, expValue, animKey。
-- `WaveSO`：timeWindow, spawnTable（enemyId → weight/count）。
-- `LevelUpSO`：options[](type, payload)。
-> 数值为占位，M3 前由 game-numerical-designer 定。
+## 4. 数据 Schema（Luban 数据表 · 数据层先立）
+- 武器表：id, name, star(1~5), baseDamage, attackInterval, animKey。
+- 敌人表：id, type, hp, speed, damage, expValue, animKey。
+- 波次表：timeWindow, spawnTable（enemyId → weight/count）。
+- 升级表：options[](type, payload)。
+> 表名、主键、复合类型、生成目标与加载方式必须先完成方案讨论再落表；数据表是唯一源头，代码和 ScriptableObject 不保留重复默认值。数值为占位，M3 前由 game-numerical-designer 定。
 
 ## 5. M1 内部切分
 - **M1.1**：URP 切换 + ECS 空场景跑通（实例化 quad 渲染 1 个会动敌人）。
@@ -85,6 +85,8 @@
 - **M1.4**：手感调优（打击感 / 反馈 / 相机 / 最简音效占位）。
 
 ## 6. 验收清单（Definition of Done）
+- [ ] 相关数据表、Luban 生成配置及生成物完整，新机器可复现生成。
+- [ ] 功能代码只读取 Luban 配置，不含业务硬编码或重复默认值。
 - [ ] URP 管线生效，渲染玩家 + 敌人。
 - [ ] 移动 / 自动攻击 / 击杀 / 掉落 / 升级 / 三选一 / Boss / 结算 全链路通。
 - [ ] Seed 复现 Spawn / Card。

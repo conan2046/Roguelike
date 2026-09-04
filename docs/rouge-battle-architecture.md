@@ -19,7 +19,7 @@
 |---|---|---|---|
 | Unity.Entities ECS + Jobs + Burst | 用（同套 sim） | 必须 | **采用**，从 MVP 起作为模拟主干 |
 | Entities Graphics 实例化 quad + flipbook shader | 用 | 用 | **统一渲染方案**，PC/移动同一套 |
-| ScriptableObject 配置 | 用（武器/敌人/波次/升级） | 用 | 数据 authored in SO，运行时烘焙进 ECS 组件 |
+| Luban 数据表 | 用（武器/敌人/波次/升级） | 用 | 数据表是唯一源头，Luban 生成 C# 与运行时数据，再装载进 ECS 组件 |
 | YooAsset / Addressables | 不需要 | 需要 | 移动构建引入，PC 不引（`#if` 隔离） |
 | HybridCLR | 不需要 | 需要 | 移动构建引入（C# 热修） |
 | URP | 需要 | 需要 | 项目切 URP（Entities Graphics 前提） |
@@ -28,7 +28,7 @@
 ## 2. 分层架构
 
 ```
-[SO 配置层]  武器 / 敌人 / 波次 / 升级表  →  运行时烘焙为 ECS 组件初始值
+[Luban 数据层]  数据表 → Luban 生成代码/数据 → 统一配置入口 → ECS 组件初始值
       ↓
 [ECS 模拟层] Unity.Entities + Jobs + Burst   —— 唯一真源（确定性 seed RNG）
    Components: Position2D, Velocity2D, Health, Faction,
@@ -86,5 +86,5 @@
 
 - **ECS-from-MVP（推荐）** vs **PC-Mono-first 再转 ECS**：
   - 推荐前者——你已有移动端 ECS 经验，且移动端是硬目标，同一套 sim 避免二次重写；PC 仅作更快的验证环境。
-  - 代价：ECS 内容迭代（调数值）比 MonoBehaviour 慢，需用 SO 承载配置缓解。
+  - 代价：ECS 内容迭代需额外执行 Luban 生成，但可保证数据单一来源和跨平台一致性。
 - 确认后我开始：① 切 URP；② `CocosAniInstancedPlayer`；③ ECS 敌人/武器系统骨架。
