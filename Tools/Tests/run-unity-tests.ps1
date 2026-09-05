@@ -53,6 +53,18 @@ function Stop-OwnedProcessTree([int]$RootProcessId) {
     Stop-Process -Id $RootProcessId -Force -ErrorAction SilentlyContinue
 }
 
+function Remove-StaleProjectLock {
+    $lockPath = Join-Path $repoRoot 'Temp\UnityLockfile'
+    if (-not (Test-Path -LiteralPath $lockPath)) {
+        return
+    }
+    $activeOwner = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -eq 'Unity.exe' -and $_.CommandLine -like "*$repoRoot*" })
+    if ($activeOwner.Count -eq 0) {
+        Remove-Item -LiteralPath $lockPath -Force
+    }
+}
+
 $arguments = @(
     '-batchmode',
     '-projectPath', $repoRoot,
@@ -113,6 +125,7 @@ try {
     }
 }
 finally {
+    Remove-StaleProjectLock
     $unityProcess.Dispose()
 }
 
