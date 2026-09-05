@@ -9,6 +9,7 @@
     "Roguelike.Infrastructure",
     "Roguelike.Features.Combat",
     "Roguelike.Features.Combat.Ecs",
+    "Roguelike.Features.Combat.Runtime",
     "Roguelike.Features.Combat.Rendering",
     "Unity.Entities.Graphics",
     "Unity.Entities",

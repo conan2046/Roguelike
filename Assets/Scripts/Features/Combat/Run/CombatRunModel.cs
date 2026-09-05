@@ -90,6 +90,8 @@ namespace Roguelike.Features.Combat.Run
         public ERunResultType? Result { get; private set; }
         public double CurrentHealth { get; private set; }
         public double MaxHealth => attributes.Get(EAttributeType.MaxHealth);
+        /// <summary>获取当前基础属性与升级来源聚合后的纯值快照，供 ECS 同步且不暴露修改入口。</summary>
+        public CombatAttributeSnapshot AttributeSnapshot => CombatAttributeSnapshot.Capture(attributes);
         public ulong UpgradePanelGeneration => panelGeneration;
         public IReadOnlyList<UpgradeOptionConfig> CurrentChoices => currentChoices;
         public IReadOnlyDictionary<int, int> UpgradeRanks => upgradeRanks;

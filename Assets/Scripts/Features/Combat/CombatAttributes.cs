@@ -14,6 +14,40 @@ namespace Roguelike.Features.Combat
         public double Multiplier;
     }
 
+    /// <summary>属性聚合器导出的纯值快照；供跨程序集运行器同步 ECS，不暴露可变修改来源。</summary>
+    public struct CombatAttributeSnapshot
+    {
+        public double Attack, Defense, MaxHealth, Hit, Evasion, Critical, CriticalResistance;
+        public double AttackSpeedMultiplier, MoveSpeed, DefenseParameter, HitParameter;
+        public double EvasionParameter, CriticalParameter, CriticalResistanceParameter;
+
+        /// <summary>从当前 CombatAttributes 复制战斗运行时使用的全部属性语义。</summary>
+        /// <param name="attributes">由 TbAttributeProfile 和局内升级来源聚合的属性。</param>
+        /// <returns>不再引用聚合器的纯值快照。</returns>
+        /// <exception cref="ArgumentNullException">属性聚合器为空。</exception>
+        public static CombatAttributeSnapshot Capture(CombatAttributes attributes)
+        {
+            if (attributes == null) throw new ArgumentNullException(nameof(attributes));
+            return new CombatAttributeSnapshot
+            {
+                Attack = attributes.Get(EAttributeType.Attack),
+                Defense = attributes.Get(EAttributeType.Defense),
+                MaxHealth = attributes.Get(EAttributeType.MaxHealth),
+                Hit = attributes.Get(EAttributeType.Hit),
+                Evasion = attributes.Get(EAttributeType.Evasion),
+                Critical = attributes.Get(EAttributeType.Critical),
+                CriticalResistance = attributes.Get(EAttributeType.CriticalResistance),
+                AttackSpeedMultiplier = attributes.Get(EAttributeType.AttackSpeedMultiplier),
+                MoveSpeed = attributes.Get(EAttributeType.MoveSpeed),
+                DefenseParameter = attributes.Get(EAttributeType.DefenseParameter),
+                HitParameter = attributes.Get(EAttributeType.HitParameter),
+                EvasionParameter = attributes.Get(EAttributeType.EvasionParameter),
+                CriticalParameter = attributes.Get(EAttributeType.CriticalParameter),
+                CriticalResistanceParameter = attributes.Get(EAttributeType.CriticalResistanceParameter)
+            };
+        }
+    }
+
     /// <summary>主线程属性聚合器；仅属性变化时分配和重算，不能传入 Job。</summary>
     public sealed class CombatAttributes
     {

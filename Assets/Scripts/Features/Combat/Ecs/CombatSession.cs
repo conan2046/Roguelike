@@ -479,19 +479,51 @@ namespace Roguelike.Features.Combat.Ecs
         /// <exception cref="InvalidOperationException">新属性间隔或生命上限非法。</exception>
         public bool SynchronizeAttributes(int slot, ulong expectedLifetime, CombatAttributes attributes)
         {
+            return SynchronizeAttributes(slot, expectedLifetime, CombatAttributeSnapshot.Capture(attributes));
+        }
+
+        /// <summary>正式单局升级后以纯值快照同步玩家防守、攻击、移动和冷却比例。</summary>
+        /// <param name="slot">当前生命周期的单位槽。</param>
+        /// <param name="expectedLifetime">同步请求记录的实体生命周期。</param>
+        /// <param name="attributes">CombatRunModel 从 Luban 基础值及升级来源导出的属性快照。</param>
+        /// <returns>生命周期仍匹配且单位存活时为真。</returns>
+        /// <remarks>修改当前 ECS 单位，不改变出生模板；已起手攻击仍使用原快照。</remarks>
+        /// <exception cref="ObjectDisposedException">会话已释放。</exception>
+        /// <exception cref="InvalidOperationException">新属性值无法形成有效战斗状态。</exception>
+        public bool SynchronizeAttributes(int slot, ulong expectedLifetime, in CombatAttributeSnapshot attributes)
+        {
             EnsureAlive();
             var unit = ReadUnit(slot);
             if (unit.Target.Lifetime != expectedLifetime || unit.Target.Health <= 0) return false;
             var skill = slot == 0 ? settings.PlayerSkill.CombatProfileId_Ref :
                 settings.GetMonster(unit.ConfigId).DefaultSkillId_Ref.CombatProfileId_Ref;
-            double interval = CombatMath.AttackInterval(skill.BaseInterval, attributes.Get(EAttributeType.AttackSpeedMultiplier), rules.MinAttackInterval);
+            double interval = CombatMath.AttackInterval(skill.BaseInterval, attributes.AttackSpeedMultiplier, rules.MinAttackInterval);
             unit.Cooldown = CombatMath.RescaleCooldown(unit.Cooldown, unit.Interval, interval);
             unit.Interval = interval;
             unit.Target.Synchronize(attributes);
             unit.Attack = AttackSnapshot.Capture(attributes, unit.Target.Lifetime, 0, unit.Target.Faction);
-            unit.MoveSpeed = (float)attributes.Get(EAttributeType.MoveSpeed);
+            unit.MoveSpeed = (float)attributes.MoveSpeed;
             maximumMotion = math.max(maximumMotion, unit.MoveSpeed * (float)StepSeconds);
             manager.SetComponentData(units[slot], unit);
+            return true;
+        }
+
+        /// <summary>正式升级或重开后同步玩家属性，并将模型持有的当前生命精确写回 ECS。</summary>
+        /// <param name="expectedLifetime">UI 操作开始时的玩家生命周期。</param>
+        /// <param name="attributes">CombatRunModel 的当前属性快照。</param>
+        /// <param name="currentHealth">升级、治疗或重开后的模型生命。</param>
+        /// <returns>玩家仍为同一存活生命周期且完成同步时为真。</returns>
+        /// <remarks>会修改玩家生命；仅用于模型已经验证的正式状态，不发布伤害或死亡事件。</remarks>
+        /// <exception cref="InvalidOperationException">生命不是有限正数或超过聚合后的生命上限。</exception>
+        public bool SynchronizeRunPlayer(ulong expectedLifetime, in CombatAttributeSnapshot attributes, double currentHealth)
+        {
+            if (double.IsNaN(currentHealth) || double.IsInfinity(currentHealth) || currentHealth <= 0 ||
+                currentHealth > attributes.MaxHealth || currentHealth != Math.Floor(currentHealth))
+                throw new InvalidOperationException("Formal player health is outside the synchronized attribute range.");
+            if (!SynchronizeAttributes(0, expectedLifetime, attributes)) return false;
+            var player = ReadUnit(0);
+            player.Target.Health = (long)currentHealth;
+            manager.SetComponentData(units[0], player);
             return true;
         }
 

@@ -18,11 +18,22 @@ namespace Roguelike.Features.Combat
         /// <returns>可复制到 ECS 或弹丸的纯值结构。</returns>
         public static AttackSnapshot Capture(CombatAttributes attributes, ulong lifetime, ulong sequence, int faction)
         {
+            return Capture(CombatAttributeSnapshot.Capture(attributes), lifetime, sequence, faction);
+        }
+
+        /// <summary>从跨程序集纯值属性快照创建一次攻击出生快照。</summary>
+        /// <param name="attributes">局内升级后导出的完整属性快照。</param>
+        /// <param name="lifetime">攻击者生命周期。</param>
+        /// <param name="sequence">攻击唯一序号。</param>
+        /// <param name="faction">运行时阵营。</param>
+        /// <returns>可传入 Job 的攻击纯值。</returns>
+        public static AttackSnapshot Capture(in CombatAttributeSnapshot attributes, ulong lifetime, ulong sequence, int faction)
+        {
             return new AttackSnapshot
             {
-                Attack = attributes.Get(EAttributeType.Attack),
-                Hit = attributes.Get(EAttributeType.Hit) * attributes.Get(EAttributeType.HitParameter),
-                Critical = attributes.Get(EAttributeType.Critical) * attributes.Get(EAttributeType.CriticalParameter),
+                Attack = attributes.Attack,
+                Hit = attributes.Hit * attributes.HitParameter,
+                Critical = attributes.Critical * attributes.CriticalParameter,
                 AttackerLifetime = lifetime, Sequence = sequence, Faction = faction
             };
         }
@@ -57,14 +68,23 @@ namespace Roguelike.Features.Combat
         /// <exception cref="InvalidOperationException">生命上限不能以 long 表示。</exception>
         public void Synchronize(CombatAttributes attributes)
         {
-            double maximum = attributes.Get(EAttributeType.MaxHealth);
+            Synchronize(CombatAttributeSnapshot.Capture(attributes));
+        }
+
+        /// <summary>属性升级后从纯值快照同步防守热数据，保持当前生命的非回血语义。</summary>
+        /// <param name="attributes">CombatRunModel 导出的完整属性值。</param>
+        /// <remarks>修改本实例的生命上限、防御、闪避和抗暴快照。</remarks>
+        /// <exception cref="InvalidOperationException">生命上限无法转换为 long。</exception>
+        public void Synchronize(in CombatAttributeSnapshot attributes)
+        {
+            double maximum = attributes.MaxHealth;
             if (maximum >= 9223372036854775808d) throw new InvalidOperationException("MaxHealth overflow.");
             MaxHealth = (long)maximum;
             Health = Math.Min(Health, MaxHealth);
-            Defense = attributes.Get(EAttributeType.Defense);
-            DefenseParameter = attributes.Get(EAttributeType.DefenseParameter);
-            Evasion = attributes.Get(EAttributeType.Evasion) * attributes.Get(EAttributeType.EvasionParameter);
-            CriticalResistance = attributes.Get(EAttributeType.CriticalResistance) * attributes.Get(EAttributeType.CriticalResistanceParameter);
+            Defense = attributes.Defense;
+            DefenseParameter = attributes.DefenseParameter;
+            Evasion = attributes.Evasion * attributes.EvasionParameter;
+            CriticalResistance = attributes.CriticalResistance * attributes.CriticalResistanceParameter;
         }
 
         /// <summary>恢复入口独立于伤害；只能为尚存活单位补血，测试恢复策略也走此入口。</summary>
