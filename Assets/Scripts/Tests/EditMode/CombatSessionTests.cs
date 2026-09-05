@@ -83,7 +83,18 @@ namespace Roguelike.Tests
             var b = new ByteBuf(); b.WriteInt(source.Id); b.WriteString(source.Name); b.WriteInt(source.VisualSetId);
             b.WriteBool(true); b.WriteInt(source.CombatProfileId.Value);
             b.WriteBool(true); b.WriteInt(radius); b.WriteBool(true); b.WriteInt(x); b.WriteBool(true); b.WriteInt(y);
-            return new SkillConfig(b) { CombatProfileId_Ref = source.CombatProfileId_Ref, VisualSetId_Ref = source.VisualSetId_Ref };
+            b.WriteBool(source.ProjectileClipId.HasValue); if (source.ProjectileClipId.HasValue) b.WriteInt(source.ProjectileClipId.Value);
+            b.WriteBool(source.ImpactClipId.HasValue); if (source.ImpactClipId.HasValue) b.WriteInt(source.ImpactClipId.Value);
+            b.WriteSize(source.AreaClipIds.Count); foreach (int clipId in source.AreaClipIds) b.WriteInt(clipId);
+            b.WriteBool(source.AreaRadiusMilli.HasValue); if (source.AreaRadiusMilli.HasValue) b.WriteInt(source.AreaRadiusMilli.Value);
+            return new SkillConfig(b)
+            {
+                CombatProfileId_Ref = source.CombatProfileId_Ref,
+                VisualSetId_Ref = source.VisualSetId_Ref,
+                ProjectileClipId_Ref = source.ProjectileClipId_Ref,
+                ImpactClipId_Ref = source.ImpactClipId_Ref,
+                AreaClipIds_Ref = source.AreaClipIds_Ref
+            };
         }
 
         /// <summary>持续圆周出生并追逐静止玩家，校验活怪互不重叠且不能进入玩家圆柱。</summary>
