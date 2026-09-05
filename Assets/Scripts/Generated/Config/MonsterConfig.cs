@@ -33,6 +33,7 @@ public sealed partial class MonsterConfig : Luban.BeanBase
         if(_buf.ReadBool()){ MoveOffsetXPixelsMilli = _buf.ReadInt(); } else { MoveOffsetXPixelsMilli = null; }
         if(_buf.ReadBool()){ MoveOffsetYPixelsMilli = _buf.ReadInt(); } else { MoveOffsetYPixelsMilli = null; }
         if(_buf.ReadBool()){ MoveElevationPixelsMilli = _buf.ReadInt(); } else { MoveElevationPixelsMilli = null; }
+        if(_buf.ReadBool()){ MovementType = (EMovementType)_buf.ReadInt(); } else { MovementType = null; }
     }
 
     public static MonsterConfig DeserializeMonsterConfig(ByteBuf _buf)
@@ -64,29 +65,33 @@ public sealed partial class MonsterConfig : Luban.BeanBase
     public readonly int? DefaultSkillId;
     public SkillConfig DefaultSkillId_Ref;
     /// <summary>
-    /// 伤害判定身体半径，世界单位；独立于移动圆柱；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
+    /// <br/>        伤害判定身体半径，世界单位；独立于移动圆柱；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
     /// </summary>
     public readonly int? BodyRadiusMilli;
     /// <summary>
-    /// 移动圆柱半径，逻辑像素；由预制体导出；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
+    /// <br/>        移动圆柱半径，逻辑像素；由预制体导出；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
     /// </summary>
     public readonly int? MoveRadiusPixelsMilli;
     /// <summary>
-    /// 移动圆柱高度，逻辑像素；由预制体导出；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
+    /// <br/>        移动圆柱高度，逻辑像素；由预制体导出；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
     /// </summary>
     public readonly int? MoveHeightPixelsMilli;
     /// <summary>
-    /// 圆柱底心横向偏移，逻辑像素；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
+    /// <br/>        圆柱底心横向偏移，逻辑像素；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
     /// </summary>
     public readonly int? MoveOffsetXPixelsMilli;
     /// <summary>
-    /// 圆柱底心地面纵向偏移，逻辑像素；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
+    /// <br/>        圆柱底心地面纵向偏移，逻辑像素；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
     /// </summary>
     public readonly int? MoveOffsetYPixelsMilli;
     /// <summary>
-    /// 圆柱底面离地高度，逻辑像素；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
+    /// <br/>        圆柱底面离地高度，逻辑像素；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
     /// </summary>
     public readonly int? MoveElevationPixelsMilli;
+    /// <summary>
+    /// 移动分类；正式出战怪必填，资源目录行可空
+    /// </summary>
+    public readonly EMovementType? MovementType;
    
     public const int __ID__ = -55174244;
     public override int GetTypeId() => __ID__;
@@ -112,6 +117,7 @@ public sealed partial class MonsterConfig : Luban.BeanBase
         + "moveOffsetXPixelsMilli:" + MoveOffsetXPixelsMilli + ","
         + "moveOffsetYPixelsMilli:" + MoveOffsetYPixelsMilli + ","
         + "moveElevationPixelsMilli:" + MoveElevationPixelsMilli + ","
+        + "movementType:" + MovementType + ","
         + "}";
     }
 }

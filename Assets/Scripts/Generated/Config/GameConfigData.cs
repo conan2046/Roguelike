@@ -53,7 +53,7 @@ public sealed partial class GameConfigData : Luban.BeanBase
     public readonly System.Collections.Generic.List<int> InitialUnlockedSkillIds;
     public System.Collections.Generic.List<SkillConfig> InitialUnlockedSkillIds_Ref;
     /// <summary>
-    /// 初始关卡ID；关卡表补数据后填写
+    /// 初始关卡ID
     /// </summary>
     public readonly int? FirstStageId;
     public StageConfig FirstStageId_Ref;

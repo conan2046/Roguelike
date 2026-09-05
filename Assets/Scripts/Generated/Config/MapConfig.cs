@@ -23,6 +23,12 @@ public sealed partial class MapConfig : Luban.BeanBase
         Name = _buf.ReadString();
         if(_buf.ReadBool()){ VisualSetId = _buf.ReadInt(); } else { VisualSetId = null; }
         VisualSetId_Ref = null;
+        ArenaHalfWidthMilli = _buf.ReadInt();
+        ArenaHalfHeightMilli = _buf.ReadInt();
+        PlayerStartXMilli = _buf.ReadInt();
+        PlayerStartYMilli = _buf.ReadInt();
+        SpawnRadiusPixelsMilli = _buf.ReadInt();
+        CameraPaddingMilli = _buf.ReadInt();
     }
 
     public static MapConfig DeserializeMapConfig(ByteBuf _buf)
@@ -43,6 +49,30 @@ public sealed partial class MapConfig : Luban.BeanBase
     /// </summary>
     public readonly int? VisualSetId;
     public VisualSetConfig VisualSetId_Ref;
+    /// <summary>
+    /// 开放场地半宽，世界单位乘1000
+    /// </summary>
+    public readonly int ArenaHalfWidthMilli;
+    /// <summary>
+    /// 开放场地半高，世界单位乘1000
+    /// </summary>
+    public readonly int ArenaHalfHeightMilli;
+    /// <summary>
+    /// 玩家出生X，世界单位乘1000
+    /// </summary>
+    public readonly int PlayerStartXMilli;
+    /// <summary>
+    /// 玩家出生Y，世界单位乘1000
+    /// </summary>
+    public readonly int PlayerStartYMilli;
+    /// <summary>
+    /// 跟随角色圆周出生半径，逻辑像素乘1000
+    /// </summary>
+    public readonly int SpawnRadiusPixelsMilli;
+    /// <summary>
+    /// 正交相机边缘留白，世界单位乘1000
+    /// </summary>
+    public readonly int CameraPaddingMilli;
    
     public const int __ID__ = -1840922722;
     public override int GetTypeId() => __ID__;
@@ -58,6 +88,12 @@ public sealed partial class MapConfig : Luban.BeanBase
         + "id:" + Id + ","
         + "name:" + Name + ","
         + "visualSetId:" + VisualSetId + ","
+        + "arenaHalfWidthMilli:" + ArenaHalfWidthMilli + ","
+        + "arenaHalfHeightMilli:" + ArenaHalfHeightMilli + ","
+        + "playerStartXMilli:" + PlayerStartXMilli + ","
+        + "playerStartYMilli:" + PlayerStartYMilli + ","
+        + "spawnRadiusPixelsMilli:" + SpawnRadiusPixelsMilli + ","
+        + "cameraPaddingMilli:" + CameraPaddingMilli + ","
         + "}";
     }
 }

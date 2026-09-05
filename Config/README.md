@@ -22,10 +22,11 @@
 
 ## 当前表层级
 
-- L0：`TbResource`、`TbAttribute`、`TbItem`
-- L1：`TbAnimationClip`、`TbVisualSet`、`TbMap`
-- L2：`TbCharacter`、`TbMonster`、`TbSkill`
-- L3 预留：`TbStage`
+- L0：`TbResource`、`TbAttribute`、`TbItem`、`TbSkillCombat`
+- L1：`TbAnimationClip`、`TbVisualSet`、`TbMap`、`TbAttributeProfile`、`TbExperienceLevel`
+- L2：`TbCharacter`、`TbMonster`、`TbSkill`、`TbDropProfile`、`TbUpgradeOption`、`TbCombatUiSet`
+- L3：`TbSpawnPhase`、`TbBossEncounter`、`TbUpgradePool`
+- L4：`TbStageRule`、`TbStage`
 - 全局常量：`GameConfig`
 - 测试：`TbPerformanceScenario`
 
@@ -36,16 +37,16 @@
 | 表 | 当前配置 | 用途 |
 |---|---|---|
 | TbAttribute | ID 1–14 | 生命、攻击、防御、移速、攻速以及命中、闪避、暴击、抗暴和对应参数 |
-| TbAttributeProfile | ID 1–4 | 玩家/怪物闭环调试、玩家/怪物概率压测 |
-| TbSkillCombat | ID 1–2 | 直线弹丸、近战攻击参数 |
+| TbAttributeProfile | ID 1–9 | 玩家/怪物闭环调试、概率压测、M1 四类普通怪与独立 Boss |
+| TbSkillCombat | ID 1–3 | 直线弹丸、近战、目标位置群体释放参数 |
 | TbCombatRules | ID 1 | 随机 80%–120%、暴击 150%、零分母概率、模拟与坐标设置 |
-| TbCharacter / TbMonster | 各启用 ID 10001 | 关联属性方案、默认技能和碰撞体半径 |
-| TbSkill | 启用 ID 20001、20002 | 分别关联弹丸和近战机制，原表现引用保持不变 |
+| TbCharacter / TbMonster | 角色 10001；怪物 10001、10010–10013、10032 | 关联属性方案、默认技能、碰撞体半径和移动类型 |
+| TbSkill | 启用 ID 20001、20002、20014、20028、20032、20043 | 三个弹道、一个近战、两个目标位置群体技能 |
 | TbPerformanceScenario | 新增 ID 4、5 | 10 怪基础闭环、1000 怪概率战斗压测；旧 ID 1–3 原值保留 |
 
-`TbAttributeProfile.values` 使用 `属性ID:数值;属性ID:数值`，由 `AttributeValue` 结构解析；必需属性完整填写，不保留代码默认值。其余角色、怪物和技能条目的战斗字段为空，表示仅有资源目录数据，不能作为战斗单位使用。技能视觉用途与完整角色组装仍需在运行时阶段验收。
+`TbAttributeProfile.values` 使用 `属性ID:数值;属性ID:数值`，由 `AttributeValue` 结构解析；必需属性完整填写，不保留代码默认值。其余未启用的角色、怪物和技能战斗字段为空，表示仅有资源目录数据，不能作为战斗单位使用。完整角色组装仍需在运行时阶段验收。
 
-新增 `EAttributeType`、`EAttributeValueKind`、`ESkillDeliveryType`、`ETestHealthPolicy`、`ETestInputPolicy`，以及 `EPerformanceKind.Combat`。未增加元素属性或元素伤害分支。
+新增 `EAttributeType`、`EAttributeValueKind`、`ESkillDeliveryType`、`ETestHealthPolicy`、`ETestInputPolicy`、`EUpgradeOptionType`、`EAttributeModifyOperation`、`ERunResultType`、`EMovementType`，以及 `EPerformanceKind.Combat`。未增加元素属性或元素伤害分支。
 
 初始调试参数：玩家生命/攻击为 100/20，怪物为 40/8；默认必中且不暴击。概率压测方案使用命中/闪避 100/25、暴击/抗暴 25/100，各参数为 1，即 80% 命中、20% 暴击。所有这些值都是工程调试输入，不是最终平衡数值。
 
@@ -59,7 +60,7 @@
 ./Tools/Config/validate-combat.ps1
 ```
 
-最后一项直接编译当前生成 C#、`Assets/Scripts/Features/Combat` 正式源码和共享 ANI 解析器，读取当前 bytes，验证属性完整性、引用、数值范围、投递类型、场地与压力策略；通过独立 decimal 参考结果核对正式伤害公式，并测试来源替换/移除、生命上限、冷却、免伤顺序、生命周期与独立随机分布。当前通过 2453 项检查，其中战斗运行时断言 42 项、动画断言 1916 项，另执行 100000 次概率抽样。动画检查读取主角/怪物待机和移动四个实际片段，并检查全部角色/怪物集合的类别映射、时长兼容、边界、循环、末帧保持及采样分配。这不证明 ECS 战斗循环、画面播放、Burst 或千怪战斗性能通过。
+最后一项直接编译当前生成 C#、`Assets/Scripts/Features/Combat` 正式源码和共享 ANI 解析器，读取当前 bytes，验证属性完整性、引用、数值范围、三种投递类型、M1 关卡依赖、四阶段时间线、怪物权重、经验曲线、升级池、Boss、场地与压力策略；通过独立 decimal 参考结果核对正式伤害公式，并测试来源替换/移除、生命上限、冷却、免伤顺序、生命周期与独立随机分布。当前通过 3052 项检查，其中战斗运行时断言 42 项、动画断言 1939 项，另执行 100000 次概率抽样。这不证明正式单局运行时、画面播放、Burst 或千怪战斗性能通过。
 
 ## 战斗表现配置
 
@@ -68,16 +69,16 @@
 - `TbPerformanceScenario.presentationId`：Combat 场景 4/5 引用方案 1，旧场景 1–3 留空；新增字段改变 bytes 布局，生成 C# 和 bytes 必须一起发布。
 - `CombatAnimation` 加载时构造累计时长，以调用方提供的模拟秒数采样；`CombatDirections` 校验并归一化方向向量，静止保留历史朝向。`idleFrameIndex` 指动作内帧索引，不是 ANI 全局帧索引。
 - 最终确认：主角默认待机 `_fd`，怪物默认待机 `_zd`，两者移动均 `_pb`。此前“怪物没有站立片段”“fd 仅乘骑”“主角改用两方向 zd”的判断均不再适用；已补齐怪物待机引用并关闭移动帧占位。
-- 主角 `_zd` 及角色/怪物 `_gj`、`_bj`、`_sf1`–`_sf4` 标记 Unused，不接入本轮播放。施法不暂停移动，也不要求施法动作。死亡分类保留；不实现乘骑系统。所有源资源、ID 和集合成员保留，不删除美术文件。未识别后缀仍保留 Unknown。
+- 主角 `_zd` 及未启用的角色/怪物动作仍标记 Unused。M1 五个怪物的 `_gj` 已标记 Attack；`20001/20014/20032` 的飞行与命中片段分别标记 Projectile/Impact，`20028/20043` 的目标位置片段标记 Area。施法不暂停移动，也不要求施法动作。死亡分类保留；不实现乘骑系统。
 - 当前四个启用片段均支持已有五动作组方向映射；已撤销主角两方向适配需求。未来新增片段仍须按其真实动作结构校验，不能仅凭同类文件推断。
-- 怪物普攻另由 `TbVisualSet.attackClipId` 显式启用；目前只有已目视核验的 btm1（表现 20001、攻击片段 20002）启用，其余包括主角留空。该怪物的 `_gj` 恢复 Attack 分类，不再属于 Unused。
+- 怪物普攻由 `TbVisualSet.attackClipId` 显式启用；既有 btm1 与 M1 的 btm108、btm109、btm110、btm111、btm311 均已接入各自真实 `_gj`，主角保持留空。
 - `TbAttackDirection` 保存攻击动作组和 `facingDirectionId`，后者引用 `TbAnimationDirection` 的向量、镜像以及待机/移动动作组。表现表 `attackDirectionIds` 决定候选与等角优先顺序。右下/左下用攻击组 0、对齐组 0；右上/左上用攻击组 1、对齐组 3，左侧镜像。
 - `CombatAttackDirections` 在加载时校验三份真实动画的组号，开始攻击时按最大点积选择方向；零相对位移保留传入索引，等角按配置列表先后。调用方应锁定本次选择，不在攻击中逐帧重选。本轮未接 ECS 攻击阶段、播放状态机或命中时点。
 - 当前数据与纯采样逻辑已具备；输入、相机、UI 和实体渲染尚未消费这些新字段，不能据此认为交互战斗入口已完成。
 
 ECS 层位于独立程序集 `Features/Combat/Ecs`，由 Unity EditMode 的 `CombatSessionTests` 验证，不属于上述 .NET 检查范围。它直接使用场景 ID 4/5：固定步进、场地/输入策略、空间网格、弹丸与近战、稳定伤害排序、暂停重开和死亡补怪均消费当前表；弹丸池上界从技能寿命和规则最短间隔推导，不另存默认数量。所有隔离模拟结果均不替代 Win64 动画与帧率验收，旧性能入口仍拒绝 Combat 场景，直到正式展示与采样入口接入。
 
-本次扩展改变了角色、怪物、技能和性能场景 bytes 的布局，并新增三份表数据；生成代码与 bytes 必须一起使用。发布 Player 时重新构建完整离线资源包，不将新版 bytes 单独覆盖到旧 Player。
+本次扩展改变了关卡、地图、怪物、技能、技能战斗、动画、表现集合、属性方案、物品和游戏配置 bytes，并新增 8 张业务表；生成代码与 bytes 必须一起使用。发布 Player 时重新构建完整离线资源包，不将新版 bytes 单独覆盖到旧 Player。
 
 资源路径只能写入 `TbResource`。其他表必须引用基础表 ID。
 
@@ -88,7 +89,25 @@ ECS 层位于独立程序集 `Features/Combat/Ecs`，由 Unity EditMode 的 `Com
 - `TbSkillCombat.attackWindupSeconds`：对齐朝向后保持怪物 `_zd`，到开始 `_gj` 的基础前摇秒数。近战必填、有限且非负；当前普通普攻机制 ID 2 配 `0.2`，弹丸机制留空。Boss 后续使用独立技能战斗行，不在代码里判断 Boss 或补默认值。
 - `TbAttackDirection.hitFrameIndex`：进入 `_gj` 的动作帧时判定一次，零基索引；当前四方向映射 ID 1–4 均为 F4。不是图集帧编号，也不是前摇时长。
 - 命中基础时点 = 前摇 + ANI 中 F4 之前累计时长；完整动作时点 = 前摇 + ANI 总时长。ANI 单位换算读取 `TbCombatPresentation`。攻速按基础间隔/有效间隔推进原速进度，200 毫秒为 1 倍速基础值。
-- 改前摇、帧号或方向后运行生成和两项校验；缺配/越界拒绝入局，不回退即时伤害。当前只启用已核对的 btm1 攻击资源。
+- 改前摇、帧号或方向后运行生成、产物一致性校验和战斗配置校验；缺配/越界拒绝入局，不回退即时伤害。当前启用既有 btm1 与 M1 五个怪物的已核对攻击资源。
+
+## M1 单局配置
+
+正式单局入口为 `TbStage` ID 1，初始角色 10001、初始技能 20001。`TbStageRule` ID 1 配置 18 分钟普通怪阶段、四个连续刷新阶段、经验等级组 1、掉落方案 1、升级池 1、Boss 遭遇 1 和确定性随机种子。`TbCombatUiSet` 已建立表结构；正式 UI Prefab 尚未制作，因此当前无数据行，`TbStage.uiSetId` 留空。
+
+| 表 | 当前 ID/范围 | 关键内容 |
+|---|---|---|
+| `TbSpawnPhase` | 1–4 | 时间段 0–3、3–8、8–13、13–18 分钟；每波 5/8/12/15 只 |
+| `TbMonster` | 10010–10013 | btm108–btm111；10011 为 Flying，其余为 Ground |
+| `TbBossEncounter` | 1 | Boss 10032_btm311，死亡触发胜利 |
+| `TbExperienceLevel` | 1002–1020 | 等级组 1，目标等级 2–20，逐级显式经验值 |
+| `TbDropProfile` | 1 | 经验物品 10001、单怪经验 1、吸附/拾取参数 |
+| `TbUpgradePool` | 1 | 无放回抽取 3 项，引用选项 40001–40009 |
+| `TbUpgradeOption` | 40001–40009 | 四个技能解锁、四个属性强化、一个立即恢复 |
+
+所有 `*Milli` 字段均用整数保存原单位乘 1000 的值；`*PixelsMilli` 表示逻辑像素乘 1000，其余距离字段表示世界单位乘 1000。比例强化的 `AddPercent` 以比例乘 1000 保存，例如 5% 写 50。时间字段均以秒乘 1000 保存。
+
+2026-09-05 已验证：Luban 生成成功；重新生成的 C# 与 bytes 哈希一致；战斗配置检查通过 3052 项，覆盖三种技能投递、阶段连续性、四类普通怪、独立 Boss、经验曲线和升级池。
 
 ## ID 规范
 

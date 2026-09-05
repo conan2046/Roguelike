@@ -91,25 +91,150 @@ internal static class Program
         foreach (var skill in tables.TbSkill.DataList)
         {
             Require(!skill.CombatProfileId.HasValue || skill.CombatProfileId_Ref != null, $"TbSkill {skill.Id}: missing combat profile.");
-            if (skill.CombatProfileId_Ref?.DeliveryType == ESkillDeliveryType.Projectile)
-                Require(Positive(skill.ProjectileRadius) && skill.ProjectileOffsetX.HasValue && skill.ProjectileOffsetY.HasValue, $"TbSkill {skill.Id}: missing projectile collision.");
-            else
-                Require(!skill.ProjectileRadius.HasValue && !skill.ProjectileOffsetX.HasValue && !skill.ProjectileOffsetY.HasValue, $"TbSkill {skill.Id}: non-projectile collision must be empty.");
+            switch (skill.CombatProfileId_Ref?.DeliveryType)
+            {
+                case ESkillDeliveryType.Projectile:
+                    Require(Positive(skill.ProjectileRadius) && skill.ProjectileOffsetX.HasValue && skill.ProjectileOffsetY.HasValue,
+                        $"TbSkill {skill.Id}: missing projectile collision.");
+                    Require(skill.ProjectileClipId_Ref?.Action == EAnimationAction.Projectile,
+                        $"TbSkill {skill.Id}: missing projectile visual.");
+                    Require(!skill.ImpactClipId.HasValue || skill.ImpactClipId_Ref?.Action == EAnimationAction.Impact,
+                        $"TbSkill {skill.Id}: invalid impact visual.");
+                    Require(skill.AreaClipIds.Count == 0 && !skill.AreaRadiusMilli.HasValue,
+                        $"TbSkill {skill.Id}: projectile has target-area data.");
+                    break;
+                case ESkillDeliveryType.TargetArea:
+                    Require(!skill.ProjectileRadius.HasValue && !skill.ProjectileOffsetX.HasValue && !skill.ProjectileOffsetY.HasValue,
+                        $"TbSkill {skill.Id}: target area has projectile collision.");
+                    Require(!skill.ProjectileClipId.HasValue && !skill.ImpactClipId.HasValue,
+                        $"TbSkill {skill.Id}: target area has projectile visuals.");
+                    Require(skill.AreaRadiusMilli > 0 && skill.AreaClipIds.Count > 0 &&
+                        skill.AreaClipIds_Ref.All(x => x?.Action == EAnimationAction.Area),
+                        $"TbSkill {skill.Id}: missing target-area radius or visuals.");
+                    break;
+                default:
+                    Require(!skill.ProjectileRadius.HasValue && !skill.ProjectileOffsetX.HasValue && !skill.ProjectileOffsetY.HasValue &&
+                        !skill.ProjectileClipId.HasValue && !skill.ImpactClipId.HasValue && skill.AreaClipIds.Count == 0 && !skill.AreaRadiusMilli.HasValue,
+                        $"TbSkill {skill.Id}: inactive or melee skill has delivery-specific data.");
+                    break;
+            }
         }
         foreach (var skill in tables.TbSkillCombat.DataList)
         {
             Require(float.IsFinite(skill.BaseInterval) && skill.BaseInterval > 0 && float.IsFinite(skill.Range) && skill.Range >= 0, $"TbSkillCombat {skill.Id}: invalid interval/range.");
-            if (skill.DeliveryType == ESkillDeliveryType.Projectile)
+            switch (skill.DeliveryType)
             {
-                Require(Positive(skill.ProjectileSpeed) && Positive(skill.ProjectileLifetime), $"TbSkillCombat {skill.Id}: missing projectile dimensions.");
-                Require(skill.ProjectileSpeed * skill.ProjectileLifetime >= skill.Range, $"TbSkillCombat {skill.Id}: projectile cannot cover range.");
+                case ESkillDeliveryType.Projectile:
+                    Require(Positive(skill.ProjectileSpeed) && Positive(skill.ProjectileLifetime), $"TbSkillCombat {skill.Id}: missing projectile dimensions.");
+                    Require(skill.ProjectileSpeed * skill.ProjectileLifetime >= skill.Range, $"TbSkillCombat {skill.Id}: projectile cannot cover range.");
+                    Require(!skill.AttackWindupSeconds.HasValue, $"TbSkillCombat {skill.Id}: projectile has melee windup.");
+                    break;
+                case ESkillDeliveryType.Melee:
+                    Require(skill.AttackWindupSeconds.HasValue && float.IsFinite(skill.AttackWindupSeconds.Value) && skill.AttackWindupSeconds.Value >= 0,
+                        $"TbSkillCombat {skill.Id}: missing or invalid attack windup.");
+                    Require(!skill.ProjectileSpeed.HasValue && !skill.ProjectileLifetime.HasValue, $"TbSkillCombat {skill.Id}: melee has projectile data.");
+                    break;
+                case ESkillDeliveryType.TargetArea:
+                    Require(!skill.ProjectileSpeed.HasValue && !skill.ProjectileLifetime.HasValue && !skill.AttackWindupSeconds.HasValue,
+                        $"TbSkillCombat {skill.Id}: target area has incompatible delivery data.");
+                    break;
+                default:
+                    throw new InvalidOperationException($"TbSkillCombat {skill.Id}: unsupported delivery.");
             }
-            else
+        }
+        var projectileSkillIds = new[] { 20001, 20014, 20032 };
+        var targetAreaSkillIds = new[] { 20028, 20043 };
+        Require(projectileSkillIds.All(id => tables.TbSkill.Get(id).CombatProfileId_Ref?.DeliveryType == ESkillDeliveryType.Projectile),
+            "Approved projectile skill mapping changed.");
+        Require(targetAreaSkillIds.All(id => tables.TbSkill.Get(id).CombatProfileId_Ref?.DeliveryType == ESkillDeliveryType.TargetArea),
+            "Approved target-area skill mapping changed.");
+
+        var stage = tables.TbStage.Get(1);
+        Require(stage.MapId_Ref != null && stage.StageRuleId_Ref != null && stage.CombatRulesId_Ref != null &&
+            stage.PresentationId_Ref != null && stage.InitialCharacterId_Ref != null && stage.InitialSkillIds_Ref.All(x => x != null),
+            "TbStage 1: run-loop references must resolve.");
+        Require(!stage.UiSetId.HasValue && tables.TbCombatUiSet.DataList.Count == 0,
+            "TbStage 1: combat UI remains intentionally unassigned until its Prefabs exist.");
+        Require(stage.InitialCharacterId == 10001 && stage.InitialSkillIds.SequenceEqual(new[] { 20001 }),
+            "TbStage 1: approved initial loadout changed.");
+
+        var stageRule = stage.StageRuleId_Ref;
+        Require(stageRule.DurationMilli == 1080000 && stageRule.BossTimeMilli == stageRule.DurationMilli && stageRule.RandomSeed != 0,
+            "TbStageRule 1: duration, boss timing or deterministic seed changed.");
+        Require(stageRule.DropProfileId_Ref != null && stageRule.UpgradePoolId_Ref != null && stageRule.BossEncounterId_Ref != null,
+            "TbStageRule 1: dependent references must resolve.");
+        var phases = stageRule.SpawnPhaseIds_Ref;
+        Require(phases.Count == 4 && phases.All(x => x != null) && phases.Select(x => x.Id).Distinct().Count() == phases.Count,
+            "TbStageRule 1: four distinct spawn phases are required.");
+        Require(phases.Select(x => x.UnitsPerWave).SequenceEqual(new[] { 5, 8, 12, 15 }),
+            "TbStageRule 1: approved wave sizes changed.");
+        Require(phases[0].BeginTimeMilli == 0 && phases[^1].EndTimeMilli == stageRule.DurationMilli,
+            "TbStageRule 1: spawn phases must cover the full pre-boss duration.");
+        for (var index = 0; index < phases.Count; index++)
+        {
+            var phase = phases[index];
+            Require(phase.BeginTimeMilli < phase.EndTimeMilli && phase.UnitIntervalMilli > 0 && phase.WaveIntervalMilli > 0,
+                $"TbSpawnPhase {phase.Id}: invalid timing.");
+            Require(index == 0 || phases[index - 1].EndTimeMilli == phase.BeginTimeMilli,
+                $"TbSpawnPhase {phase.Id}: gap or overlap in phase timeline.");
+            Require(phase.MonsterWeights.Count > 0 && phase.MonsterWeights.Select(x => x.MonsterId).Distinct().Count() == phase.MonsterWeights.Count &&
+                phase.MonsterWeights.All(x => x.MonsterId_Ref != null && x.Weight > 0),
+                $"TbSpawnPhase {phase.Id}: invalid monster weights.");
+        }
+
+        var normalMonsterIds = phases.SelectMany(x => x.MonsterWeights).Select(x => x.MonsterId).Distinct().OrderBy(x => x).ToArray();
+        Require(normalMonsterIds.SequenceEqual(new[] { 10010, 10011, 10012, 10013 }),
+            "TbStageRule 1: approved normal-monster roster changed.");
+        Require(tables.TbMonster.Get(10011).MovementType == EMovementType.Flying &&
+            new[] { 10010, 10012, 10013 }.All(id => tables.TbMonster.Get(id).MovementType == EMovementType.Ground),
+            "M1 normal-monster movement types changed.");
+        Require(new[] { 10010, 10011, 10012, 10013 }.Select((id, index) =>
+                tables.TbMonster.Get(id).AttributeProfileId == index + 5 && tables.TbMonster.Get(id).DefaultSkillId == 20002).All(x => x),
+            "M1 normal-monster combat profiles changed.");
+
+        var boss = stageRule.BossEncounterId_Ref;
+        Require(boss.MonsterId == 10032 && boss.MonsterId_Ref?.AttributeProfileId == 9 &&
+            boss.MonsterId_Ref.DefaultSkillId == 20002 && boss.MonsterId_Ref.MovementType == EMovementType.Ground &&
+            boss.SpawnRadiusPixelsMilli > 0 && !string.IsNullOrWhiteSpace(boss.HealthBarText) && boss.VictoryOnDeath,
+            "TbBossEncounter 1: approved boss contract changed.");
+
+        var experienceLevels = tables.TbExperienceLevel.DataList
+            .Where(x => x.GroupId == stageRule.ExperienceLevelGroupId).OrderBy(x => x.Level).ToArray();
+        Require(experienceLevels.Select(x => x.Level).SequenceEqual(Enumerable.Range(2, 19)) &&
+            experienceLevels.All(x => x.RequiredExperience > 0) &&
+            experienceLevels.Zip(experienceLevels.Skip(1), (left, right) => left.RequiredExperience < right.RequiredExperience).All(x => x),
+            "TbExperienceLevel group 1: levels 2-20 require a strictly increasing curve.");
+
+        var drop = stageRule.DropProfileId_Ref;
+        Require(drop.ExperienceItemId_Ref != null && drop.ExperienceValue > 0 && drop.MagnetRadiusMilli > 0 &&
+            drop.PickupRadiusMilli > 0 && drop.PickupRadiusMilli <= drop.MagnetRadiusMilli && drop.MagnetSpeedMilli > 0,
+            "TbDropProfile 1: invalid experience pickup contract.");
+
+        var pool = stageRule.UpgradePoolId_Ref;
+        Require(pool.DrawCount == 3 && pool.OptionIds_Ref.Count == 9 && pool.OptionIds_Ref.All(x => x != null) &&
+            pool.OptionIds.Distinct().Count() == pool.OptionIds.Count,
+            "TbUpgradePool 1: invalid three-choice pool.");
+        foreach (var option in pool.OptionIds_Ref)
+        {
+            Require(Enum.IsDefined(option.Type) && option.MaxRank > 0 && option.Weight > 0 &&
+                (!option.IconResourceId.HasValue || option.IconResourceId_Ref != null),
+                $"TbUpgradeOption {option.Id}: invalid common fields.");
+            Require(option.Modifiers.All(x => x.AttributeId_Ref != null && Enum.IsDefined(x.Operation) && x.ValueMilli != 0),
+                $"TbUpgradeOption {option.Id}: invalid attribute modifier.");
+            switch (option.Type)
             {
-                Require(skill.DeliveryType == ESkillDeliveryType.Melee, $"TbSkillCombat {skill.Id}: unsupported delivery.");
-                Require(skill.AttackWindupSeconds.HasValue && float.IsFinite(skill.AttackWindupSeconds.Value) && skill.AttackWindupSeconds.Value >= 0,
-                    $"TbSkillCombat {skill.Id}: missing or invalid attack windup.");
-                Require(!skill.ProjectileSpeed.HasValue && !skill.ProjectileLifetime.HasValue, $"TbSkillCombat {skill.Id}: melee has projectile data.");
+                case EUpgradeOptionType.SkillUnlock:
+                    Require(option.TargetSkillId_Ref?.CombatProfileId_Ref != null && option.Modifiers.Count == 0 && !option.HealMilli.HasValue,
+                        $"TbUpgradeOption {option.Id}: invalid skill unlock.");
+                    break;
+                case EUpgradeOptionType.Attribute:
+                    Require(!option.TargetSkillId.HasValue && option.Modifiers.Count > 0 && !option.HealMilli.HasValue,
+                        $"TbUpgradeOption {option.Id}: invalid attribute upgrade.");
+                    break;
+                case EUpgradeOptionType.Heal:
+                    Require(!option.TargetSkillId.HasValue && option.Modifiers.Count == 0 && option.HealMilli > 0,
+                        $"TbUpgradeOption {option.Id}: invalid heal option.");
+                    break;
             }
         }
         foreach (var rule in tables.TbCombatRules.DataList)

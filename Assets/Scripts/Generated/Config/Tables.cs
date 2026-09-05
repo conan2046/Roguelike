@@ -89,6 +89,38 @@ public partial class Tables
     /// 神将五档武器与本体映射
     /// </summary>
     public TbHeroWeapon TbHeroWeapon {get; }
+    /// <summary>
+    /// TbStageRule generated from Excel
+    /// </summary>
+    public TbStageRule TbStageRule {get; }
+    /// <summary>
+    /// TbSpawnPhase generated from Excel
+    /// </summary>
+    public TbSpawnPhase TbSpawnPhase {get; }
+    /// <summary>
+    /// TbBossEncounter generated from Excel
+    /// </summary>
+    public TbBossEncounter TbBossEncounter {get; }
+    /// <summary>
+    /// TbExperienceLevel generated from Excel
+    /// </summary>
+    public TbExperienceLevel TbExperienceLevel {get; }
+    /// <summary>
+    /// TbDropProfile generated from Excel
+    /// </summary>
+    public TbDropProfile TbDropProfile {get; }
+    /// <summary>
+    /// TbUpgradePool generated from Excel
+    /// </summary>
+    public TbUpgradePool TbUpgradePool {get; }
+    /// <summary>
+    /// TbUpgradeOption generated from Excel
+    /// </summary>
+    public TbUpgradeOption TbUpgradeOption {get; }
+    /// <summary>
+    /// TbCombatUiSet generated from Excel
+    /// </summary>
+    public TbCombatUiSet TbCombatUiSet {get; }
 
     public Tables(System.Func<string, ByteBuf> loader)
     {
@@ -111,6 +143,14 @@ public partial class Tables
         TbCombatPresentation = new TbCombatPresentation(loader("tbcombatpresentation"));
         TbAttackDirection = new TbAttackDirection(loader("tbattackdirection"));
         TbHeroWeapon = new TbHeroWeapon(loader("tbheroweapon"));
+        TbStageRule = new TbStageRule(loader("tbstagerule"));
+        TbSpawnPhase = new TbSpawnPhase(loader("tbspawnphase"));
+        TbBossEncounter = new TbBossEncounter(loader("tbbossencounter"));
+        TbExperienceLevel = new TbExperienceLevel(loader("tbexperiencelevel"));
+        TbDropProfile = new TbDropProfile(loader("tbdropprofile"));
+        TbUpgradePool = new TbUpgradePool(loader("tbupgradepool"));
+        TbUpgradeOption = new TbUpgradeOption(loader("tbupgradeoption"));
+        TbCombatUiSet = new TbCombatUiSet(loader("tbcombatuiset"));
         ResolveRef();
     }
     
@@ -135,6 +175,14 @@ public partial class Tables
         TbCombatPresentation.ResolveRef(this);
         TbAttackDirection.ResolveRef(this);
         TbHeroWeapon.ResolveRef(this);
+        TbStageRule.ResolveRef(this);
+        TbSpawnPhase.ResolveRef(this);
+        TbBossEncounter.ResolveRef(this);
+        TbExperienceLevel.ResolveRef(this);
+        TbDropProfile.ResolveRef(this);
+        TbUpgradePool.ResolveRef(this);
+        TbUpgradeOption.ResolveRef(this);
+        TbCombatUiSet.ResolveRef(this);
     }
 }
 

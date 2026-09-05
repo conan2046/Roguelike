@@ -39,7 +39,7 @@ public sealed partial class ItemConfig : Luban.BeanBase
     /// </summary>
     public readonly string Name;
     /// <summary>
-    /// 图标资源ID；无需求前保持空表
+    /// 图标资源ID；功能资源完成后填写
     /// </summary>
     public readonly int? IconResourceId;
     public ResourceConfig IconResourceId_Ref;

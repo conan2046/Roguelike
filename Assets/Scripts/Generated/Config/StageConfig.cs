@@ -23,6 +23,17 @@ public sealed partial class StageConfig : Luban.BeanBase
         Name = _buf.ReadString();
         MapId = _buf.ReadInt();
         MapId_Ref = null;
+        StageRuleId = _buf.ReadInt();
+        StageRuleId_Ref = null;
+        CombatRulesId = _buf.ReadInt();
+        CombatRulesId_Ref = null;
+        PresentationId = _buf.ReadInt();
+        PresentationId_Ref = null;
+        if(_buf.ReadBool()){ UiSetId = _buf.ReadInt(); } else { UiSetId = null; }
+        UiSetId_Ref = null;
+        InitialCharacterId = _buf.ReadInt();
+        InitialCharacterId_Ref = null;
+        {int n0 = _buf.ReadSize(); InitialSkillIds = new System.Collections.Generic.List<int>(n0);for(var i0 = 0 ; i0 < n0 ; i0++) { int _e0;  _e0 = _buf.ReadInt(); InitialSkillIds.Add(_e0);}}
     }
 
     public static StageConfig DeserializeStageConfig(ByteBuf _buf)
@@ -39,10 +50,40 @@ public sealed partial class StageConfig : Luban.BeanBase
     /// </summary>
     public readonly string Name;
     /// <summary>
-    /// 地图ID；本轮仅预留表结构
+    /// 地图ID
     /// </summary>
     public readonly int MapId;
     public MapConfig MapId_Ref;
+    /// <summary>
+    /// 单局规则ID
+    /// </summary>
+    public readonly int StageRuleId;
+    public StageRuleConfig StageRuleId_Ref;
+    /// <summary>
+    /// 战斗规则ID
+    /// </summary>
+    public readonly int CombatRulesId;
+    public CombatRulesConfig CombatRulesId_Ref;
+    /// <summary>
+    /// 战斗表现方案ID
+    /// </summary>
+    public readonly int PresentationId;
+    public CombatPresentationConfig PresentationId_Ref;
+    /// <summary>
+    /// 正式UI方案；Prefab完成后填写
+    /// </summary>
+    public readonly int? UiSetId;
+    public CombatUiSetConfig UiSetId_Ref;
+    /// <summary>
+    /// 初始角色ID
+    /// </summary>
+    public readonly int InitialCharacterId;
+    public CharacterConfig InitialCharacterId_Ref;
+    /// <summary>
+    /// 初始技能列表
+    /// </summary>
+    public readonly System.Collections.Generic.List<int> InitialSkillIds;
+    public System.Collections.Generic.List<SkillConfig> InitialSkillIds_Ref;
    
     public const int __ID__ = 1215177664;
     public override int GetTypeId() => __ID__;
@@ -50,6 +91,14 @@ public sealed partial class StageConfig : Luban.BeanBase
     public  void ResolveRef(Tables tables)
     {
         MapId_Ref = tables.TbMap.GetOrDefault(MapId);
+        StageRuleId_Ref = tables.TbStageRule.GetOrDefault(StageRuleId);
+        CombatRulesId_Ref = tables.TbCombatRules.GetOrDefault(CombatRulesId);
+        PresentationId_Ref = tables.TbCombatPresentation.GetOrDefault(PresentationId);
+        UiSetId_Ref = UiSetId!= null ? tables.TbCombatUiSet.GetOrDefault(UiSetId.Value) : null;
+        InitialCharacterId_Ref = tables.TbCharacter.GetOrDefault(InitialCharacterId);
+        InitialSkillIds_Ref = new System.Collections.Generic.List<SkillConfig>();
+        foreach (var _v in InitialSkillIds) { InitialSkillIds_Ref.Add(tables.TbSkill.GetOrDefault(_v)); }
+
     }
 
     public override string ToString()
@@ -58,6 +107,12 @@ public sealed partial class StageConfig : Luban.BeanBase
         + "id:" + Id + ","
         + "name:" + Name + ","
         + "mapId:" + MapId + ","
+        + "stageRuleId:" + StageRuleId + ","
+        + "combatRulesId:" + CombatRulesId + ","
+        + "presentationId:" + PresentationId + ","
+        + "uiSetId:" + UiSetId + ","
+        + "initialCharacterId:" + InitialCharacterId + ","
+        + "initialSkillIds:" + Luban.StringUtil.CollectionToString(InitialSkillIds) + ","
         + "}";
     }
 }

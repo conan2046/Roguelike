@@ -28,6 +28,12 @@ public sealed partial class SkillConfig : Luban.BeanBase
         if(_buf.ReadBool()){ ProjectileRadiusMilli = _buf.ReadInt(); } else { ProjectileRadiusMilli = null; }
         if(_buf.ReadBool()){ ProjectileOffsetXMilli = _buf.ReadInt(); } else { ProjectileOffsetXMilli = null; }
         if(_buf.ReadBool()){ ProjectileOffsetYMilli = _buf.ReadInt(); } else { ProjectileOffsetYMilli = null; }
+        if(_buf.ReadBool()){ ProjectileClipId = _buf.ReadInt(); } else { ProjectileClipId = null; }
+        ProjectileClipId_Ref = null;
+        if(_buf.ReadBool()){ ImpactClipId = _buf.ReadInt(); } else { ImpactClipId = null; }
+        ImpactClipId_Ref = null;
+        {int n0 = _buf.ReadSize(); AreaClipIds = new System.Collections.Generic.List<int>(n0);for(var i0 = 0 ; i0 < n0 ; i0++) { int _e0;  _e0 = _buf.ReadInt(); AreaClipIds.Add(_e0);}}
+        if(_buf.ReadBool()){ AreaRadiusMilli = _buf.ReadInt(); } else { AreaRadiusMilli = null; }
     }
 
     public static SkillConfig DeserializeSkillConfig(ByteBuf _buf)
@@ -65,6 +71,25 @@ public sealed partial class SkillConfig : Luban.BeanBase
     /// 碰撞中心纵向偏移；技能局部前向；世界单位&#215;1000；实际值=表值/1000；最多3位小数
     /// </summary>
     public readonly int? ProjectileOffsetYMilli;
+    /// <summary>
+    /// 弹丸飞行表现；Projectile必填
+    /// </summary>
+    public readonly int? ProjectileClipId;
+    public AnimationClipConfig ProjectileClipId_Ref;
+    /// <summary>
+    /// 弹丸命中表现；可空
+    /// </summary>
+    public readonly int? ImpactClipId;
+    public AnimationClipConfig ImpactClipId_Ref;
+    /// <summary>
+    /// TargetArea在目标位置叠加播放的片段
+    /// </summary>
+    public readonly System.Collections.Generic.List<int> AreaClipIds;
+    public System.Collections.Generic.List<AnimationClipConfig> AreaClipIds_Ref;
+    /// <summary>
+    /// TargetArea群体半径，世界单位乘1000
+    /// </summary>
+    public readonly int? AreaRadiusMilli;
    
     public const int __ID__ = -844226349;
     public override int GetTypeId() => __ID__;
@@ -73,6 +98,11 @@ public sealed partial class SkillConfig : Luban.BeanBase
     {
         VisualSetId_Ref = tables.TbVisualSet.GetOrDefault(VisualSetId);
         CombatProfileId_Ref = CombatProfileId!= null ? tables.TbSkillCombat.GetOrDefault(CombatProfileId.Value) : null;
+        ProjectileClipId_Ref = ProjectileClipId!= null ? tables.TbAnimationClip.GetOrDefault(ProjectileClipId.Value) : null;
+        ImpactClipId_Ref = ImpactClipId!= null ? tables.TbAnimationClip.GetOrDefault(ImpactClipId.Value) : null;
+        AreaClipIds_Ref = new System.Collections.Generic.List<AnimationClipConfig>();
+        foreach (var _v in AreaClipIds) { AreaClipIds_Ref.Add(tables.TbAnimationClip.GetOrDefault(_v)); }
+
     }
 
     public override string ToString()
@@ -85,6 +115,10 @@ public sealed partial class SkillConfig : Luban.BeanBase
         + "projectileRadiusMilli:" + ProjectileRadiusMilli + ","
         + "projectileOffsetXMilli:" + ProjectileOffsetXMilli + ","
         + "projectileOffsetYMilli:" + ProjectileOffsetYMilli + ","
+        + "projectileClipId:" + ProjectileClipId + ","
+        + "impactClipId:" + ImpactClipId + ","
+        + "areaClipIds:" + Luban.StringUtil.CollectionToString(AreaClipIds) + ","
+        + "areaRadiusMilli:" + AreaRadiusMilli + ","
         + "}";
     }
 }

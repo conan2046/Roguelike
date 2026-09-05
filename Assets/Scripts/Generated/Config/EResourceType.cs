@@ -37,6 +37,14 @@ namespace cfg
         /// 其他二进制
         /// </summary>
         Binary = 5,
+        /// <summary>
+        /// Unity预制体
+        /// </summary>
+        Prefab = 6,
+        /// <summary>
+        /// 其他Unity资产
+        /// </summary>
+        UnityAsset = 7,
     }
 
 } 

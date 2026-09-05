@@ -57,6 +57,18 @@ namespace cfg
         /// 死亡 sw
         /// </summary>
         Death = 10,
+        /// <summary>
+        /// 弹丸飞行
+        /// </summary>
+        Projectile = 11,
+        /// <summary>
+        /// 命中表现
+        /// </summary>
+        Impact = 12,
+        /// <summary>
+        /// 目标位置范围表现
+        /// </summary>
+        Area = 13,
     }
 
 } 

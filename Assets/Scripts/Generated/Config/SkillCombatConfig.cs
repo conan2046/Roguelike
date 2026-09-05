@@ -38,7 +38,7 @@ public sealed partial class SkillCombatConfig : Luban.BeanBase
     /// </summary>
     public readonly int Id;
     /// <summary>
-    /// Projectile直线弹丸，Melee近战
+    /// Projectile直线弹丸，Melee近战，TargetArea目标位置群体释放
     /// </summary>
     public readonly ESkillDeliveryType DeliveryType;
     /// <summary>

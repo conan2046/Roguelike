@@ -21,6 +21,10 @@ namespace cfg
         /// 近战
         /// </summary>
         Melee = 2,
+        /// <summary>
+        /// 目标位置群体释放
+        /// </summary>
+        TargetArea = 3,
     }
 
 } 
