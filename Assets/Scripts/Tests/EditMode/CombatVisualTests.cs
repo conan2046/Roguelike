@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using cfg;
@@ -104,6 +105,52 @@ namespace Roguelike.Tests
                     Assert.That(assets.Read(skill.Id, clipId).Animation.ActionCount, Is.GreaterThan(0));
             }
             Assert.That(source.ActiveHandles, Is.Zero);
+        }
+
+        /// <summary>正式两种 TargetArea 释放时，一段与三段 ANI 在目标位置叠加并在各自结束后回池。</summary>
+        [Test]
+        public void FormalTargetAreaVisualsLayerAndRecycle()
+        {
+            var tables = LoadTables();
+            var definition = CombatRunDefinition.Create(tables, 1);
+            var source = new Files(tables);
+            using var world = new World("Formal target area visuals");
+            using var assets = CombatVisualResources.LoadAsync(definition, source, CancellationToken.None)
+                .GetAwaiter().GetResult();
+            using var session = CombatSessionFactory.CreateAsync(world, definition, source, CancellationToken.None)
+                .GetAwaiter().GetResult();
+            using var visuals = new CombatEntityVisuals(world, session, definition, assets);
+            session.SynchronizePlayerSkills(definition.AvailableSkills.Select(item => item.Id));
+            Assert.That(session.TrySpawnMonster(definition.Monsters[0],
+                ConfigNumber.Decode(definition.Map.SpawnRadiusPixelsMilli), 1, false, out int slot), Is.True);
+            CombatUnit monster = session.ReadUnit(slot);
+            monster.Position = new float2(2, 0);
+            monster.PreviousPosition = monster.Position;
+            monster.MoveSpeed = 0;
+            monster.Cooldown = 1000;
+            monster.Target.Evasion = 0;
+            world.EntityManager.SetComponentData(session.UnitEntity(slot), monster);
+
+            session.Advance(session.StepSeconds, float2.zero);
+            visuals.Synchronize();
+            Assert.That(session.AreaCount, Is.EqualTo(2));
+            Assert.That(visuals.VisibleAreaCount, Is.EqualTo(4));
+
+            monster = session.ReadUnit(slot);
+            monster.Target.Health = 0;
+            world.EntityManager.SetComponentData(session.UnitEntity(slot), monster);
+            double maximumDuration = definition.AvailableSkills
+                .Where(item => item.CombatProfileId_Ref.DeliveryType == ESkillDeliveryType.TargetArea)
+                .SelectMany(skill => skill.AreaClipIds.Select(clipId =>
+                    assets.Read(skill.Id, clipId).Animation.DurationSeconds(0)))
+                .Max();
+            int ticks = (int)Math.Ceiling(maximumDuration / session.StepSeconds) + 1;
+            for (int tick = 0; tick < ticks; tick++)
+            {
+                session.Advance(session.StepSeconds, float2.zero);
+                visuals.Synchronize();
+            }
+            Assert.That(visuals.VisibleAreaCount, Is.Zero);
         }
 
         /// <summary>真实弹丸在飞行期间可见，首次命中后只产生一个命中 ANI，播放结束后回收。</summary>

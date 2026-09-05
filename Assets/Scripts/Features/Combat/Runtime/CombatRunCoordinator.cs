@@ -99,6 +99,7 @@ namespace Roguelike.Features.Combat.Runtime
             var player = session.ReadUnit(0);
             if (!session.SynchronizeRunPlayer(player.Target.Lifetime, model.AttributeSnapshot, model.CurrentHealth))
                 throw new InvalidOperationException("Formal player lifecycle changed during upgrade selection.");
+            session.SynchronizePlayerSkills(model.ActiveSkills.Keys);
             session.Paused = !IsSimulationActive(model.State) || Paused;
             return true;
         }
@@ -117,6 +118,7 @@ namespace Roguelike.Features.Combat.Runtime
             var player = session.ReadUnit(0);
             if (!session.SynchronizeRunPlayer(player.Target.Lifetime, model.AttributeSnapshot, model.CurrentHealth))
                 throw new InvalidOperationException("Formal player failed to synchronize after restart.");
+            session.SynchronizePlayerSkills(model.ActiveSkills.Keys);
             return true;
         }
 

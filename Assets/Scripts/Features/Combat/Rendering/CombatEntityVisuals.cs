@@ -25,14 +25,26 @@ namespace Roguelike.Features.Combat.Rendering
         private readonly RenderMeshArray meshArray;
         private readonly RenderMeshDescription description;
         private readonly List<ImpactVisual> impacts = new List<ImpactVisual>();
+        private readonly List<AreaVisual> areas = new List<AreaVisual>();
         private readonly HashSet<ulong> seenImpacts = new HashSet<ulong>();
+        private readonly HashSet<ulong> seenAreas = new HashSet<ulong>();
         private bool disposed;
         private ulong lastTick;
         public int VisibleProjectileCount { get; private set; }
         public int VisibleImpactCount { get; private set; }
+        public int VisibleAreaCount { get; private set; }
 
         /// <summary>命中 ANI 的池化播放状态；实体只在池扩容时创建。</summary>
         private sealed class ImpactVisual
+        {
+            public Entity Entity;
+            public int SkillId, ClipId;
+            public ulong StartTick;
+            public bool Active;
+        }
+
+        /// <summary>目标位置群体技能的单片段池槽；同一释放的多段 ANI 各占一个槽并叠加播放。</summary>
+        private sealed class AreaVisual
         {
             public Entity Entity;
             public int SkillId, ClipId;
@@ -106,7 +118,9 @@ namespace Roguelike.Features.Combat.Rendering
             if (tick < lastTick)
             {
                 seenImpacts.Clear();
+                seenAreas.Clear();
                 foreach (var impact in impacts) HideImpact(impact);
+                foreach (var area in areas) HideArea(area);
             }
             lastTick = tick;
             for (int slot = 0; slot < players.Length; slot++)
@@ -124,6 +138,7 @@ namespace Roguelike.Features.Combat.Rendering
             }
             SynchronizeProjectiles();
             SynchronizeImpacts(tick);
+            SynchronizeAreas(tick);
         }
 
         /// <summary>诊断和测试读取某单位当前选帧，不转移游标所有权。</summary>
@@ -235,6 +250,62 @@ namespace Roguelike.Features.Combat.Rendering
             return created;
         }
 
+        /// <summary>消费目标位置释放事件，并让一个技能配置的全部 Area 片段在同一位置同时播放。</summary>
+        /// <param name="tick">CombatSession 已完成的模拟 tick。</param>
+        /// <remarks>同一攻击序号只创建一次表现；每段结束后独立回收到共享范围表现池。</remarks>
+        private void SynchronizeAreas(ulong tick)
+        {
+            for (int index = 0; index < session.AreaCount; index++)
+            {
+                CombatAreaEvent areaEvent = session.ReadArea(index);
+                if (!seenAreas.Add(areaEvent.AttackSequence)) continue;
+                if (!skills.TryGetValue(areaEvent.SkillId, out SkillConfig skill) ||
+                    skill.AreaClipIds_Ref == null || skill.AreaClipIds_Ref.Count == 0)
+                    throw new InvalidOperationException("Combat area event references a skill visual that was not preloaded.");
+                foreach (AnimationClipConfig clipConfig in skill.AreaClipIds_Ref)
+                {
+                    AreaVisual visual = AcquireArea();
+                    visual.Active = true;
+                    visual.SkillId = areaEvent.SkillId;
+                    visual.ClipId = clipConfig.Id;
+                    visual.StartTick = areaEvent.Tick;
+                    manager.SetComponentData(visual.Entity,
+                        LocalTransform.FromPosition(new float3(areaEvent.Position, 0)));
+                    SetVisible(visual.Entity, true);
+                }
+            }
+
+            VisibleAreaCount = 0;
+            foreach (AreaVisual visual in areas)
+            {
+                if (!visual.Active) continue;
+                CombatVisualResources.Clip clip = resources.Read(visual.SkillId, visual.ClipId);
+                double age = (tick - visual.StartTick) * session.StepSeconds;
+                if (age >= clip.Animation.DurationSeconds(0))
+                {
+                    HideArea(visual);
+                    continue;
+                }
+                ApplyFrame(visual.Entity, clip, clip.Animation.Sample(0, age), false);
+                VisibleAreaCount++;
+            }
+        }
+
+        /// <summary>从范围表现池取得空闲实体，没有空槽时按实际片段并发创建一个。</summary>
+        /// <returns>可立即设置技能、片段与开始 tick 的池槽。</returns>
+        /// <remarks>实体只存在于运行时 World，由本绑定 Dispose 销毁，不生成或保存资产。</remarks>
+        private AreaVisual AcquireArea()
+        {
+            foreach (AreaVisual visual in areas) if (!visual.Active) return visual;
+            Entity entity = manager.CreateEntity(typeof(LocalTransform), typeof(LocalToWorld));
+            RenderMeshUtility.AddComponents(entity, manager, description, meshArray,
+                MaterialMeshInfo.FromRenderMeshArrayIndices(0, 0));
+            manager.AddComponent<DisableRendering>(entity);
+            var created = new AreaVisual { Entity = entity };
+            areas.Add(created);
+            return created;
+        }
+
         /// <summary>把共享片段的材质、帧网格及包围盒写入一个表现实体。</summary>
         /// <param name="entity">已绑定 RenderMeshArray 的实体。</param>
         /// <param name="clip">CombatVisualResources 中的共享片段。</param>
@@ -266,6 +337,14 @@ namespace Roguelike.Features.Combat.Rendering
             if (world.IsCreated && manager.Exists(visual.Entity)) SetVisible(visual.Entity, false);
         }
 
+        /// <summary>结束一个目标位置片段并保留实体，供后续任意 Area 片段复用。</summary>
+        /// <param name="visual">当前范围表现池槽。</param>
+        private void HideArea(AreaVisual visual)
+        {
+            visual.Active = false;
+            if (world.IsCreated && manager.Exists(visual.Entity)) SetVisible(visual.Entity, false);
+        }
+
         /// <summary>会话销毁前解除渲染资源引用并禁用绘制，允许重复调用。</summary>
         /// <remarks>只移除本绑定使用的渲染入口；会话随后销毁实体，资源所有者再释放网格和材质。Unity 退出 Play Mode 可能先销毁 World，此时实体及 GPU 注册已随 World 回收，不再访问失效的 EntityManager。</remarks>
         public void Dispose()
@@ -288,7 +367,9 @@ namespace Roguelike.Features.Combat.Rendering
             }
             foreach (var impact in impacts)
                 if (manager.Exists(impact.Entity)) manager.DestroyEntity(impact.Entity);
-            impacts.Clear(); seenImpacts.Clear();
+            foreach (var area in areas)
+                if (manager.Exists(area.Entity)) manager.DestroyEntity(area.Entity);
+            impacts.Clear(); seenImpacts.Clear(); areas.Clear(); seenAreas.Clear();
         }
     }
 }

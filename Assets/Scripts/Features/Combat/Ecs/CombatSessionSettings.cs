@@ -17,6 +17,8 @@ namespace Roguelike.Features.Combat.Ecs
         public CharacterConfig Character { get; private set; }
         public AttributeProfileConfig CharacterProfile { get; private set; }
         public SkillConfig PlayerSkill { get; private set; }
+        public IReadOnlyList<SkillConfig> AvailablePlayerSkills { get; private set; }
+        public IReadOnlyList<int> InitialPlayerSkillIds { get; private set; }
         public IReadOnlyList<MonsterConfig> Monsters { get; private set; }
         public float2 Arena { get; private set; }
         public float2 PlayerStart { get; private set; }
@@ -55,6 +57,8 @@ namespace Roguelike.Features.Combat.Ecs
                 CharacterProfile = scenario.CharacterProfileOverrideId_Ref,
                 monsterProfileOverride = scenario.MonsterProfileOverrideId_Ref,
                 PlayerSkill = scenario.CharacterId_Ref.DefaultSkillId_Ref,
+                AvailablePlayerSkills = new[] { scenario.CharacterId_Ref.DefaultSkillId_Ref },
+                InitialPlayerSkillIds = new[] { scenario.CharacterId_Ref.DefaultSkillId_Ref.Id },
                 Monsters = scenario.MonsterIds_Ref.ToArray(),
                 Arena = new float2(scenario.ArenaHalfWidth.Value, scenario.ArenaHalfHeight.Value),
                 PlayerStart = new float2(scenario.PlayerStartX.Value, scenario.PlayerStartY.Value),
@@ -94,6 +98,8 @@ namespace Roguelike.Features.Combat.Ecs
                 Character = definition.Character,
                 CharacterProfile = definition.Character.AttributeProfileId_Ref,
                 PlayerSkill = definition.InitialSkills[0],
+                AvailablePlayerSkills = definition.AvailableSkills,
+                InitialPlayerSkillIds = definition.InitialSkills.Select(item => item.Id).ToArray(),
                 Monsters = monsters,
                 Arena = new float2(ConfigNumber.Decode(definition.Map.ArenaHalfWidthMilli), ConfigNumber.Decode(definition.Map.ArenaHalfHeightMilli)),
                 PlayerStart = new float2(ConfigNumber.Decode(definition.Map.PlayerStartXMilli), ConfigNumber.Decode(definition.Map.PlayerStartYMilli)),

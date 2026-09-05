@@ -17,12 +17,14 @@ namespace Roguelike.Features.Combat.Ecs
         [ReadOnly] public NativeArray<Entity> Projectiles;
         [ReadOnly] public NativeArray<CombatUnit> Templates;
         [ReadOnly] public NativeArray<CombatAttackOption> AttackOptions;
+        public NativeArray<CombatWeaponState> PlayerWeapons;
         public ComponentLookup<CombatUnit> UnitData;
         public ComponentLookup<CombatProjectile> ProjectileData;
         public ComponentLookup<LocalTransform> Transforms;
         public NativeParallelMultiHashMap<int2, int> Grid;
         public NativeList<CombatDamageRequest> Requests;
         public NativeList<CombatImpactEvent> Impacts;
+        public NativeList<CombatAreaEvent> Areas;
         public NativeList<CombatDeathEvent> Deaths;
         public NativeArray<CombatCounters> Counters;
         public DamageRules Rules;
@@ -30,7 +32,7 @@ namespace Roguelike.Features.Combat.Ecs
         public float Delta, CellSize, MaximumRadius, MaximumMotion;
         public double Time, TargetRefresh;
         public ulong Seed;
-        public bool Replenish, RestorePlayer, AllowMonstersOutsideArena;
+        public bool Replenish, RestorePlayer, AllowMonstersOutsideArena, UsePlayerWeapons;
 
         /// <summary>由会话固定步进调用：移动、建网格、收集攻击、扫掠、排序结算、回收及变换同步。</summary>
         /// <remarks>同步修改会话拥有的 ECS 组件与原生容器；调用方必须等待任务完成后再读或释放。</remarks>
@@ -45,7 +47,9 @@ namespace Roguelike.Features.Combat.Ecs
             Grid.Clear();
             MoveAndIndex();
             // 全部攻击先生成，伤害最后统一结算，允许同 tick 双方互杀。
-            for (int slot = 0; slot < Units.Length; slot++)
+            if (UsePlayerWeapons) CollectPlayerWeapons(ref counters);
+            else CollectAttack(0, ref counters);
+            for (int slot = 1; slot < Units.Length; slot++)
                 CollectAttack(slot, ref counters);
             SweepProjectiles(ref counters);
             Requests.AsArray().Sort();
@@ -150,9 +154,9 @@ namespace Roguelike.Features.Combat.Ecs
         /// <summary>对范围内网格候选做精确距离与阵营筛选；等距使用生成序号。</summary>
         /// <param name="unit">寻敌单位。</param>
         /// <returns>最近合法目标的池槽，找不到返回无效索引。</returns>
-        private int FindNearest(in CombatUnit unit)
+        private int FindNearest(in CombatUnit unit, float configuredRange)
         {
-            float search = unit.Range + unit.Radius + MaximumRadius;
+            float search = configuredRange + unit.Radius + MaximumRadius;
             int2 lower = (int2)math.floor((unit.Position - search) / CellSize);
             int2 upper = (int2)math.floor((unit.Position + search) / CellSize);
             int selected = -1;
@@ -167,13 +171,113 @@ namespace Roguelike.Features.Combat.Ecs
                         var target = UnitData[Units[slot]];
                         if (target.Target.Health <= 0 || target.Target.Faction == unit.Target.Faction) continue;
                         float distance = math.lengthsq(target.Position - unit.Position);
-                        float range = unit.Range + unit.Radius + target.Radius;
+                        float range = configuredRange + unit.Radius + target.Radius;
                         if (!CombatGeometry.WithinReach(target.Position - unit.Position, range)) continue;
                         if (distance < best || (distance == best && target.Target.Lifetime < lifetime))
                         { selected = slot; best = distance; lifetime = target.Target.Lifetime; }
                     } while (Grid.TryGetNextValue(out slot, ref iterator));
                 }
             return selected;
+        }
+
+        /// <summary>正式玩家逐把推进独立冷却；Projectile 发射池化弹丸，TargetArea 在锁定位置生成一次范围请求。</summary>
+        /// <param name="counters">本局攻击、弹丸、范围释放和唯一序号计数。</param>
+        /// <remarks>全部武器共享当前玩家属性快照，但冷却、投递参数和表现 ID 独立读取各自 TbSkill。</remarks>
+        private void CollectPlayerWeapons(ref CombatCounters counters)
+        {
+            CombatUnit player = UnitData[Units[0]];
+            if (player.Target.Health <= 0) return;
+            for (int index = 0; index < PlayerWeapons.Length; index++)
+            {
+                CombatWeaponState weapon = PlayerWeapons[index];
+                if (!weapon.Active) continue;
+                weapon.Cooldown = math.max(0, weapon.Cooldown - Delta);
+                int targetSlot = FindNearest(player, weapon.Range);
+                if (weapon.Cooldown <= 0 && targetSlot >= 0)
+                {
+                    CombatUnit target = UnitData[Units[targetSlot]];
+                    AttackSnapshot attack = weapon.Attack;
+                    attack.Sequence = ++counters.NextAttack;
+                    attack.AttackerLifetime = player.Target.Lifetime;
+                    if (weapon.Delivery == ESkillDeliveryType.Projectile)
+                        SpawnPlayerProjectile(player, target, weapon, attack, ref counters);
+                    else
+                        CastTargetArea(player, target, weapon, attack, ref counters);
+                    weapon.Attack = attack;
+                    weapon.Cooldown = weapon.Interval;
+                    counters.Attacks++;
+                }
+                PlayerWeapons[index] = weapon;
+            }
+        }
+
+        /// <summary>从共享实体池取得一个空槽，按当前技能参数和锁定方向创建弹丸。</summary>
+        /// <param name="player">发射时玩家位置和朝向。</param>
+        /// <param name="target">锁定时目标位置。</param>
+        /// <param name="weapon">TbSkill 转换的弹丸参数。</param>
+        /// <param name="attack">本次唯一攻击快照。</param>
+        /// <param name="counters">弹丸并发与生成统计。</param>
+        /// <exception cref="InvalidOperationException">表驱动并发容量计算不足。</exception>
+        private void SpawnPlayerProjectile(in CombatUnit player, in CombatUnit target, in CombatWeaponState weapon,
+            in AttackSnapshot attack, ref CombatCounters counters)
+        {
+            for (int index = 0; index < Projectiles.Length; index++)
+            {
+                if (ProjectileData[Projectiles[index]].Active) continue;
+                float2 direction = math.normalizesafe(target.Position - player.Position,
+                    math.normalizesafe(player.Facing));
+                ProjectileData[Projectiles[index]] = new CombatProjectile
+                {
+                    Active = true,
+                    BornThisTick = true,
+                    Attack = attack,
+                    Position = player.Position,
+                    Velocity = direction * weapon.ProjectileSpeed,
+                    SkillId = weapon.SkillId,
+                    CollisionOffset = new float2(direction.y, -direction.x) * weapon.ProjectileOffset.x +
+                        direction * weapon.ProjectileOffset.y,
+                    Remaining = weapon.ProjectileLifetime,
+                    Radius = weapon.ProjectileRadius
+                };
+                counters.ProjectileSpawns++;
+                counters.ActiveProjectiles++;
+                counters.PeakProjectiles = math.max(counters.PeakProjectiles, counters.ActiveProjectiles);
+                return;
+            }
+            throw new InvalidOperationException("Combat projectile pool capacity invariant failed.");
+        }
+
+        /// <summary>锁定最近目标当前位置，对配置半径内每个敌方生命周期生成一次同序号伤害请求。</summary>
+        /// <param name="player">释放者阵营和身体数据。</param>
+        /// <param name="target">触发时锁定的最近合法目标。</param>
+        /// <param name="weapon">TbSkill.areaRadiusMilli 转换的范围技能。</param>
+        /// <param name="attack">所有受击者共享的单次释放快照。</param>
+        /// <param name="counters">范围释放统计。</param>
+        /// <remarks>目标随后死亡或池槽复用时由请求中的 TargetLifetime 拒绝陈旧结算。</remarks>
+        private void CastTargetArea(in CombatUnit player, in CombatUnit target, in CombatWeaponState weapon,
+            in AttackSnapshot attack, ref CombatCounters counters)
+        {
+            float2 center = target.Position;
+            for (int slot = 1; slot < Units.Length; slot++)
+            {
+                CombatUnit candidate = UnitData[Units[slot]];
+                if (candidate.Target.Health <= 0 || candidate.Target.Faction == player.Target.Faction) continue;
+                if (!CombatGeometry.WithinReach(candidate.Position - center, weapon.AreaRadius + candidate.Radius)) continue;
+                Requests.Add(new CombatDamageRequest
+                {
+                    Attack = attack,
+                    TargetSlot = slot,
+                    TargetLifetime = candidate.Target.Lifetime
+                });
+            }
+            Areas.Add(new CombatAreaEvent
+            {
+                SkillId = weapon.SkillId,
+                Position = center,
+                AttackSequence = attack.Sequence,
+                Tick = counters.Tick + 1
+            });
+            counters.AreaCasts++;
         }
 
         /// <summary>校验缓存目标的生命、代际与范围；近战采用圆边缘距离。</summary>
@@ -209,7 +313,7 @@ namespace Roguelike.Features.Combat.Ecs
             bool valid = TargetValid(unit);
             if (!valid || Time >= unit.NextTargetRefresh)
             {
-                int targetSlot = slot == 0 ? FindNearest(unit) : 0;
+                int targetSlot = slot == 0 ? FindNearest(unit, unit.Range) : 0;
                 unit.TargetSlot = targetSlot;
                 unit.TargetLifetime = targetSlot < 0 ? 0 : UnitData[Units[targetSlot]].Target.Lifetime;
                 unit.NextTargetRefresh = Time + TargetRefresh;

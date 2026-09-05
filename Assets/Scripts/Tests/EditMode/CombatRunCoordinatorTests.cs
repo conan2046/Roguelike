@@ -39,6 +39,49 @@ namespace Roguelike.Tests
                 Does.Contain(fixture.Session.ReadUnit(1).ConfigId));
         }
 
+        /// <summary>验证五个正式技能拥有独立状态，三枚弹丸与两次目标位置范围释放在同 tick 分别产生。</summary>
+        [Test]
+        public void AllConfiguredWeaponsCastProjectileAndTargetAreaIndependently()
+        {
+            using var fixture = CreateFixture("Coordinator all player weapons");
+            fixture.Session.SynchronizePlayerSkills(fixture.Definition.AvailableSkills.Select(item => item.Id));
+            Assert.That(fixture.Session.PlayerWeaponCount, Is.EqualTo(5));
+            Assert.That(Enumerable.Range(0, fixture.Session.PlayerWeaponCount)
+                .Count(index => fixture.Session.ReadPlayerWeapon(index).Active), Is.EqualTo(5));
+
+            int[] slots = new int[3];
+            for (int index = 0; index < slots.Length; index++)
+                Assert.That(fixture.Session.TrySpawnMonster(fixture.Definition.Monsters[index],
+                    ConfigNumber.Decode(fixture.Definition.Map.SpawnRadiusPixelsMilli), (ulong)(index + 1), false,
+                    out slots[index]), Is.True);
+            float2[] positions = { new float2(2, 0), new float2(2.4f, 0), new float2(5.5f, 0) };
+            long[] health = new long[slots.Length];
+            for (int index = 0; index < slots.Length; index++)
+            {
+                CombatUnit monster = fixture.Session.ReadUnit(slots[index]);
+                monster.Position = positions[index];
+                monster.PreviousPosition = positions[index];
+                monster.MoveSpeed = 0;
+                monster.Cooldown = 1000;
+                monster.Target.Evasion = 0;
+                health[index] = monster.Target.Health;
+                fixture.World.EntityManager.SetComponentData(fixture.Session.UnitEntity(slots[index]), monster);
+            }
+
+            Assert.That(fixture.Coordinator.Advance(fixture.Session.StepSeconds, float2.zero), Is.EqualTo(1));
+            Assert.That(fixture.Session.Statistics.Attacks, Is.EqualTo(5));
+            Assert.That(fixture.Session.Statistics.ProjectileSpawns, Is.EqualTo(3));
+            Assert.That(fixture.Session.Statistics.AreaCasts, Is.EqualTo(2));
+            Assert.That(fixture.Session.AreaCount, Is.EqualTo(2));
+            Assert.That(Enumerable.Range(0, fixture.Session.AreaCount)
+                .Select(index => fixture.Session.ReadArea(index).SkillId), Is.EquivalentTo(new[] { 20028, 20043 }));
+            Assert.That(fixture.Session.ReadUnit(slots[0]).Target.Health, Is.LessThan(health[0]));
+            Assert.That(fixture.Session.ReadUnit(slots[1]).Target.Health, Is.LessThan(health[1]));
+            Assert.That(fixture.Session.ReadUnit(slots[2]).Target.Health, Is.EqualTo(health[2]));
+            Assert.That(Enumerable.Range(0, fixture.Session.PlayerWeaponCount)
+                .All(index => fixture.Session.ReadPlayerWeapon(index).Cooldown > 0), Is.True);
+        }
+
         /// <summary>验证怪物 ECS 死亡只创建一份掉落，吸附拾取后经验只结算一次。</summary>
         [Test]
         public void MonsterDeathCreatesOneDropAndPickupOnce()
@@ -86,6 +129,33 @@ namespace Roguelike.Tests
             Assert.That(player.Interval, Is.EqualTo(CombatMath.AttackInterval(
                 fixture.Definition.InitialSkills[0].CombatProfileId_Ref.BaseInterval,
                 expected.AttackSpeedMultiplier, fixture.Definition.CombatRules.MinAttackInterval)).Within(1e-9));
+        }
+
+        /// <summary>验证三选一解锁技能后，协调器只激活对应独立武器且不重置已有武器。</summary>
+        [Test]
+        public void SkillUnlockActivatesOneFormalWeapon()
+        {
+            using var fixture = CreateFixture("Coordinator skill unlock");
+            Assert.That(Enumerable.Range(0, fixture.Session.PlayerWeaponCount)
+                .Count(index => fixture.Session.ReadPlayerWeapon(index).Active), Is.EqualTo(1));
+            UpgradeOptionConfig unlock = null;
+            for (int attempt = 0; attempt < 5 && unlock == null; attempt++)
+            {
+                GrantNextLevel(fixture.Model);
+                unlock = fixture.Model.CurrentChoices.FirstOrDefault(item =>
+                    item.Type == EUpgradeOptionType.SkillUnlock);
+                if (unlock == null)
+                    Assert.That(fixture.Coordinator.ChooseUpgrade(fixture.Model.UpgradePanelGeneration,
+                        fixture.Model.CurrentChoices[0].Id), Is.True);
+            }
+            Assert.That(unlock, Is.Not.Null);
+
+            Assert.That(fixture.Coordinator.ChooseUpgrade(fixture.Model.UpgradePanelGeneration, unlock.Id), Is.True);
+            Assert.That(Enumerable.Range(0, fixture.Session.PlayerWeaponCount)
+                .Count(index => fixture.Session.ReadPlayerWeapon(index).Active), Is.EqualTo(2));
+            int weaponIndex = Enumerable.Range(0, fixture.Session.PlayerWeaponCount)
+                .Single(index => fixture.Session.ReadPlayerWeapon(index).SkillId == unlock.TargetSkillId.Value);
+            Assert.That(fixture.Session.ReadPlayerWeapon(weaponIndex).Active, Is.True);
         }
 
         /// <summary>验证 18 分钟边界只生成一只 Boss，死亡胜利后重开清空所有运行态。</summary>

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using cfg;
 using Roguelike.Features.Combat.Run;
 using Unity.Collections;
@@ -25,9 +26,13 @@ namespace Roguelike.Features.Combat.Ecs
         private NativeParallelMultiHashMap<int2, int> grid;
         private NativeList<CombatDamageRequest> requests;
         private NativeList<CombatImpactEvent> impacts;
+        private NativeList<CombatAreaEvent> areas;
         private NativeList<CombatDeathEvent> deaths;
         private NativeList<CombatAttackOption> attackOptions;
+        private NativeArray<CombatWeaponState> playerWeapons;
+        private NativeArray<CombatWeaponState> playerWeaponTemplates;
         private float maximumRadius, maximumMotion;
+        private int requestCapacityMultiplier;
         private bool disposed;
         private readonly bool timedSpawn;
         private readonly Dictionary<int, int> attackOffsets = new Dictionary<int, int>();
@@ -43,6 +48,7 @@ namespace Roguelike.Features.Combat.Ecs
         public double StepSeconds { get; }
         public int UnitCount => units.Length;
         public int ProjectileCapacity => projectiles.Length;
+        public int PlayerWeaponCount => playerWeapons.IsCreated ? playerWeapons.Length : 0;
         public CombatCounters Statistics => counters[0];
 
         /// <summary>配置就绪后验证 TbPerformanceScenario 引用，创建本局 ECS 实体及由表推导容量的池。</summary>
@@ -80,6 +86,8 @@ namespace Roguelike.Features.Combat.Ecs
             this.world = world;
             manager = world.EntityManager;
             this.settings = settings;
+            requestCapacityMultiplier = checked(1 + settings.AvailablePlayerSkills.Count(item =>
+                item.CombatProfileId_Ref.DeliveryType == ESkillDeliveryType.TargetArea));
             timedSpawn = settings.UseLegacyTimedSpawn;
             rules = settings.Rules;
             damageRules = DamageRules.Capture(rules);
@@ -120,6 +128,17 @@ namespace Roguelike.Features.Combat.Ecs
                 playerTemplate.ConfigId = player.Id;
                 playerTemplate.VisualSetId = player.VisualSetId;
                 templates[0] = playerTemplate;
+                playerWeapons = new NativeArray<CombatWeaponState>(settings.IsFormalRun ? settings.AvailablePlayerSkills.Count : 0,
+                    Allocator.Persistent);
+                playerWeaponTemplates = new NativeArray<CombatWeaponState>(playerWeapons.Length, Allocator.Persistent);
+                for (int index = 0; index < playerWeapons.Length; index++)
+                {
+                    SkillConfig skill = settings.AvailablePlayerSkills[index];
+                    CombatWeaponState weapon = BuildWeapon(skill, playerTemplate.Attack,
+                        settings.InitialPlayerSkillIds.Contains(skill.Id));
+                    playerWeapons[index] = weapon;
+                    playerWeaponTemplates[index] = weapon;
+                }
                 int rows = (settings.InitialMonsterCount + settings.SpawnColumns - 1) / settings.SpawnColumns;
                 for (int slot = 1; slot < count; slot++)
                 {
@@ -142,15 +161,25 @@ namespace Roguelike.Features.Combat.Ecs
                     maximumMotion = math.max(maximumMotion, template.MoveSpeed * (float)StepSeconds);
                     units[slot] = manager.CreateEntity(typeof(CombatUnit), typeof(LocalTransform), typeof(LocalToWorld));
                 }
-                // 唯一弹丸发射者的最短间隔与寿命推导上界；加一覆盖同 tick 出生先于旧弹丸过期。
-                double capacity = Math.Ceiling(templates[0].ProjectileLifetime / rules.MinAttackInterval) + 1;
-                if (capacity > int.MaxValue - count) throw new InvalidOperationException("TbSkillCombat: projectile capacity overflow.");
-                projectiles = new NativeArray<Entity>((int)capacity, Allocator.Persistent);
+                // 每个可解锁弹丸按最短攻击间隔推导并发上界；加一覆盖同 tick 出生先于旧弹丸过期。
+                long projectileCapacity = settings.IsFormalRun ? 0 :
+                    checked((long)Math.Ceiling(templates[0].ProjectileLifetime / rules.MinAttackInterval) + 1);
+                if (settings.IsFormalRun)
+                    foreach (SkillConfig skill in settings.AvailablePlayerSkills)
+                        if (skill.CombatProfileId_Ref.DeliveryType == ESkillDeliveryType.Projectile)
+                            projectileCapacity = checked(projectileCapacity +
+                                (long)Math.Ceiling(skill.CombatProfileId_Ref.ProjectileLifetime.Value /
+                                    rules.MinAttackInterval) + 1);
+                if (projectileCapacity > int.MaxValue - count)
+                    throw new InvalidOperationException("TbSkillCombat: projectile capacity overflow.");
+                projectiles = new NativeArray<Entity>((int)projectileCapacity, Allocator.Persistent);
                 for (int index = 0; index < projectiles.Length; index++)
                     projectiles[index] = manager.CreateEntity(typeof(CombatProjectile), typeof(LocalTransform), typeof(LocalToWorld));
                 grid = new NativeParallelMultiHashMap<int2, int>(count, Allocator.Persistent);
-                requests = new NativeList<CombatDamageRequest>(count + projectiles.Length, Allocator.Persistent);
+                requests = new NativeList<CombatDamageRequest>(checked(count * requestCapacityMultiplier + projectiles.Length),
+                    Allocator.Persistent);
                 impacts = new NativeList<CombatImpactEvent>(Allocator.Persistent);
+                areas = new NativeList<CombatAreaEvent>(Allocator.Persistent);
                 deaths = new NativeList<CombatDeathEvent>(Allocator.Persistent);
                 Restart();
             }
@@ -170,6 +199,7 @@ namespace Roguelike.Features.Combat.Ecs
             CombatMath.NonNegative(elapsedSeconds);
             if (!math.all(math.isfinite(movement))) throw new InvalidOperationException("Combat input must be finite.");
             impacts.Clear();
+            areas.Clear();
             deaths.Clear();
             if (Paused || Statistics.PlayerDead) return 0;
             double debt = BacklogSeconds + elapsedSeconds;
@@ -185,14 +215,17 @@ namespace Roguelike.Features.Combat.Ecs
                     Units = units.AsArray(), Projectiles = projectiles, Templates = templates.AsArray(), Counters = counters,
                     Grid = grid, Requests = requests, Rules = damageRules, Input = movement,
                     Impacts = impacts,
+                    Areas = areas,
                     Deaths = deaths,
+                    PlayerWeapons = playerWeapons,
                     AttackOptions = attackOptions.AsArray(),
                     Arena = settings.Arena,
                     Delta = (float)StepSeconds, Time = Statistics.Tick * StepSeconds, TargetRefresh = rules.TargetRefreshSeconds,
                     CellSize = rules.SpatialCellSize, MaximumRadius = maximumRadius, MaximumMotion = maximumMotion,
                     Seed = unchecked((ulong)(uint)settings.RandomSeed), Replenish = settings.ReplenishOnDeath,
                     AllowMonstersOutsideArena = timedSpawn,
-                    RestorePlayer = settings.RestorePlayerAfterDamage
+                    RestorePlayer = settings.RestorePlayerAfterDamage,
+                    UsePlayerWeapons = settings.IsFormalRun
                 });
                 // Job 已完成后才允许结构变更；每只怪物取此刻的角色圆心，下一 tick 开始追踪。
                 if (timedSpawn && !Statistics.PlayerDead)
@@ -233,10 +266,16 @@ namespace Roguelike.Features.Combat.Ecs
                 manager.SetComponentData(projectiles[index], new CombatProjectile());
                 manager.SetComponentData(projectiles[index], LocalTransform.FromScale(0));
             }
+            for (int index = 0; index < playerWeapons.Length; index++)
+            {
+                CombatWeaponState weapon = playerWeaponTemplates[index];
+                weapon.Attack.AttackerLifetime = ReadUnit(0).Target.Lifetime;
+                playerWeapons[index] = weapon;
+            }
             counters[0] = new CombatCounters { NextLifetime = nextLifetime, AliveMonsters = timedSpawn || settings.IsFormalRun ? 0 : settings.InitialMonsterCount };
             nextSpawnTick = timedSpawn ? SpawnDelayTicks(settings.SpawnIntervalSeconds) : 0;
             WaveNumber = 0; SpawnedInWave = 0; SpawnedMonsters = 0;
-            grid.Clear(); requests.Clear(); impacts.Clear();
+            grid.Clear(); requests.Clear(); impacts.Clear(); areas.Clear();
             deaths.Clear();
             Paused = false;
             BacklogSeconds = PeakBacklogSeconds = 0;
@@ -390,7 +429,8 @@ namespace Roguelike.Features.Combat.Ecs
             units.Capacity = Math.Max(units.Capacity, count);
             templates.Capacity = Math.Max(templates.Capacity, count);
             grid.Capacity = Math.Max(grid.Capacity, count);
-            requests.Capacity = Math.Max(requests.Capacity, checked(count + projectiles.Length));
+            requests.Capacity = Math.Max(requests.Capacity,
+                checked(count * requestCapacityMultiplier + projectiles.Length));
             while (units.Length < count)
             {
                 var monster = settings.Monsters[(units.Length - 1) % settings.Monsters.Count];
@@ -423,7 +463,8 @@ namespace Roguelike.Features.Combat.Ecs
             maximumRadius = math.max(maximumRadius, template.Radius);
             maximumMotion = math.max(maximumMotion, template.MoveSpeed * (float)StepSeconds);
             grid.Capacity = Math.Max(grid.Capacity, units.Length);
-            requests.Capacity = Math.Max(requests.Capacity, checked(units.Length + projectiles.Length));
+            requests.Capacity = Math.Max(requests.Capacity,
+                checked(units.Length * requestCapacityMultiplier + projectiles.Length));
             return slot;
         }
 
@@ -451,6 +492,12 @@ namespace Roguelike.Features.Combat.Ecs
         /// <exception cref="ObjectDisposedException">会话已释放。</exception>
         public CombatProjectile ReadProjectile(int slot) { EnsureAlive(); return manager.GetComponentData<CombatProjectile>(projectiles[slot]); }
 
+        /// <summary>读取正式玩家指定武器的独立冷却、投递和攻击快照。</summary>
+        /// <param name="index">按 CombatRunDefinition.availableSkills 排列的武器索引。</param>
+        /// <returns>当前武器纯值状态。</returns>
+        /// <exception cref="ObjectDisposedException">会话已释放。</exception>
+        public CombatWeaponState ReadPlayerWeapon(int index) { EnsureAlive(); return playerWeapons[index]; }
+
         /// <summary>获取本次 Advance 内首次接触事件数量；下一次 Advance 开始时清空。</summary>
         public int ImpactCount { get { EnsureAlive(); return impacts.Length; } }
 
@@ -459,6 +506,15 @@ namespace Roguelike.Features.Combat.Ecs
         /// <returns>包含技能、位置、攻击序号和 tick 的事件副本。</returns>
         /// <exception cref="ObjectDisposedException">会话已释放。</exception>
         public CombatImpactEvent ReadImpact(int index) { EnsureAlive(); return impacts[index]; }
+
+        /// <summary>获取本次 Advance 内目标位置群体技能释放事件数量。</summary>
+        public int AreaCount { get { EnsureAlive(); return areas.Length; } }
+
+        /// <summary>表现层按稳定攻击序号读取一次目标位置释放事件。</summary>
+        /// <param name="index">零起始事件索引。</param>
+        /// <returns>技能、锁定位置、攻击序号和 tick。</returns>
+        /// <exception cref="ObjectDisposedException">会话已释放。</exception>
+        public CombatAreaEvent ReadArea(int index) { EnsureAlive(); return areas[index]; }
 
         /// <summary>获取本次 Advance 内首次死亡事件数量；下一次 Advance 开始时清空。</summary>
         public int DeathCount { get { EnsureAlive(); return deaths.Length; } }
@@ -503,9 +559,49 @@ namespace Roguelike.Features.Combat.Ecs
             unit.Target.Synchronize(attributes);
             unit.Attack = AttackSnapshot.Capture(attributes, unit.Target.Lifetime, 0, unit.Target.Faction);
             unit.MoveSpeed = (float)attributes.MoveSpeed;
+            if (slot == 0 && settings.IsFormalRun)
+            {
+                for (int index = 0; index < playerWeapons.Length; index++)
+                {
+                    CombatWeaponState weapon = playerWeapons[index];
+                    SkillCombatConfig weaponConfig = settings.AvailablePlayerSkills[index].CombatProfileId_Ref;
+                    double weaponInterval = CombatMath.AttackInterval(weaponConfig.BaseInterval,
+                        attributes.AttackSpeedMultiplier, rules.MinAttackInterval);
+                    weapon.Cooldown = CombatMath.RescaleCooldown(weapon.Cooldown, weapon.Interval, weaponInterval);
+                    weapon.Interval = weaponInterval;
+                    weapon.Attack = AttackSnapshot.Capture(attributes, unit.Target.Lifetime, 0, unit.Target.Faction);
+                    playerWeapons[index] = weapon;
+                }
+            }
             maximumMotion = math.max(maximumMotion, unit.MoveSpeed * (float)StepSeconds);
             manager.SetComponentData(units[slot], unit);
             return true;
+        }
+
+        /// <summary>升级选择后以 CombatRunModel.activeSkills 切换正式玩家武器；每把武器保留独立冷却。</summary>
+        /// <param name="skillIds">当前模型已解锁的 TbSkill.id 集合。</param>
+        /// <remarks>新解锁武器立即 Ready；已有武器不重置冷却。只修改正式会话自有原生状态。</remarks>
+        /// <exception cref="InvalidOperationException">测试会话调用、技能重复或包含本关目录外技能。</exception>
+        public void SynchronizePlayerSkills(IEnumerable<int> skillIds)
+        {
+            EnsureAlive();
+            if (!settings.IsFormalRun) throw new InvalidOperationException("Player weapon synchronization requires a formal run.");
+            if (skillIds == null) throw new InvalidOperationException("Formal active skill collection is required.");
+            int[] ids = skillIds.ToArray();
+            if (ids.Distinct().Count() != ids.Length)
+                throw new InvalidOperationException("Formal active skill collection contains duplicates.");
+            var requested = new HashSet<int>(ids);
+            var known = new HashSet<int>(settings.AvailablePlayerSkills.Select(item => item.Id));
+            if (requested.Any(id => !known.Contains(id)))
+                throw new InvalidOperationException("Formal active skill is outside the stage catalog.");
+            for (int index = 0; index < playerWeapons.Length; index++)
+            {
+                CombatWeaponState weapon = playerWeapons[index];
+                bool active = requested.Contains(weapon.SkillId);
+                if (active && !weapon.Active) weapon.Cooldown = 0;
+                weapon.Active = active;
+                playerWeapons[index] = weapon;
+            }
         }
 
         /// <summary>正式升级或重开后同步玩家属性，并将模型持有的当前生命精确写回 ECS。</summary>
@@ -525,6 +621,53 @@ namespace Roguelike.Features.Combat.Ecs
             player.Target.Health = (long)currentHealth;
             manager.SetComponentData(units[0], player);
             return true;
+        }
+
+        /// <summary>把一条正式 TbSkill 转换为独立武器纯值；数值全部来自技能战斗表和玩家属性快照。</summary>
+        /// <param name="skillConfig">CombatRunDefinition.availableSkills 中的技能。</param>
+        /// <param name="attack">玩家当前基础攻击快照。</param>
+        /// <param name="active">是否属于 TbStage.initialSkillIds。</param>
+        /// <returns>冷却就绪的 Projectile 或 TargetArea 武器。</returns>
+        /// <exception cref="InvalidOperationException">技能投递类型或对应字段不完整。</exception>
+        private CombatWeaponState BuildWeapon(SkillConfig skillConfig, in AttackSnapshot attack, bool active)
+        {
+            SkillCombatConfig combat = skillConfig?.CombatProfileId_Ref ??
+                throw new InvalidOperationException("Formal player weapon requires TbSkillCombat.");
+            CombatMath.NonNegative(combat.Range);
+            CombatMath.Positive(combat.BaseInterval);
+            var weapon = new CombatWeaponState
+            {
+                Attack = attack,
+                SkillId = skillConfig.Id,
+                Delivery = combat.DeliveryType,
+                Range = combat.Range,
+                BaseInterval = combat.BaseInterval,
+                Interval = CombatMath.AttackInterval(combat.BaseInterval,
+                    new CombatAttributes(settings.CharacterProfile).Get(EAttributeType.AttackSpeedMultiplier),
+                    rules.MinAttackInterval),
+                Active = active
+            };
+            if (combat.DeliveryType == ESkillDeliveryType.Projectile)
+            {
+                if (!combat.ProjectileSpeed.HasValue || !combat.ProjectileLifetime.HasValue ||
+                    !skillConfig.ProjectileRadius.HasValue || !skillConfig.ProjectileOffsetX.HasValue ||
+                    !skillConfig.ProjectileOffsetY.HasValue)
+                    throw new InvalidOperationException($"TbSkill {skillConfig.Id}: incomplete projectile weapon.");
+                CombatMath.Positive(combat.ProjectileSpeed.Value);
+                CombatMath.Positive(combat.ProjectileLifetime.Value);
+                CombatMath.Positive(skillConfig.ProjectileRadius.Value);
+                weapon.ProjectileSpeed = combat.ProjectileSpeed.Value;
+                weapon.ProjectileLifetime = combat.ProjectileLifetime.Value;
+                weapon.ProjectileRadius = skillConfig.ProjectileRadius.Value;
+                weapon.ProjectileOffset = new float2(skillConfig.ProjectileOffsetX.Value,
+                    skillConfig.ProjectileOffsetY.Value);
+                return weapon;
+            }
+            if (combat.DeliveryType != ESkillDeliveryType.TargetArea || !skillConfig.AreaRadiusMilli.HasValue)
+                throw new InvalidOperationException($"TbSkill {skillConfig.Id}: incomplete target-area weapon.");
+            weapon.AreaRadius = ConfigNumber.Decode(skillConfig.AreaRadiusMilli.Value);
+            CombatMath.Positive(weapon.AreaRadius);
+            return weapon;
         }
 
         /// <summary>入局时将 TbAttributeProfile、TbSkillCombat 与身体半径转为非托管模板。</summary>
@@ -600,8 +743,11 @@ namespace Roguelike.Features.Combat.Ecs
             if (grid.IsCreated) grid.Dispose();
             if (requests.IsCreated) requests.Dispose();
             if (impacts.IsCreated) impacts.Dispose();
+            if (areas.IsCreated) areas.Dispose();
             if (deaths.IsCreated) deaths.Dispose();
             if (attackOptions.IsCreated) attackOptions.Dispose();
+            if (playerWeapons.IsCreated) playerWeapons.Dispose();
+            if (playerWeaponTemplates.IsCreated) playerWeaponTemplates.Dispose();
         }
     }
 }

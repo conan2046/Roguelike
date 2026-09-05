@@ -45,8 +45,28 @@ namespace Roguelike.Features.Combat.Ecs
         public bool Active, BornThisTick;
     }
 
+    /// <summary>正式玩家的一把独立武器状态；配置在创建会话时转为纯值，固定 tick 内不访问托管表。</summary>
+    public struct CombatWeaponState
+    {
+        public AttackSnapshot Attack;
+        public float2 ProjectileOffset;
+        public int SkillId;
+        public float Range, ProjectileSpeed, ProjectileLifetime, ProjectileRadius, AreaRadius;
+        public double BaseInterval, Interval, Cooldown;
+        public ESkillDeliveryType Delivery;
+        public bool Active;
+    }
+
     /// <summary>弹丸首次有效几何接触后写入的单帧表现事件；超时与越界回收不会产生该事件。</summary>
     public struct CombatImpactEvent
+    {
+        public int SkillId;
+        public float2 Position;
+        public ulong AttackSequence, Tick;
+    }
+
+    /// <summary>目标位置群体技能触发时写入的单帧表现事件；同一攻击序号只对应一次释放。</summary>
+    public struct CombatAreaEvent
     {
         public int SkillId;
         public float2 Position;
@@ -66,7 +86,7 @@ namespace Roguelike.Features.Combat.Ecs
     public struct CombatCounters
     {
         public ulong Tick, NextAttack, NextLifetime;
-        public long Attacks, ProjectileSpawns, Candidates, Hits, Evades, Criticals, Invulnerable, Immunities;
+        public long Attacks, ProjectileSpawns, AreaCasts, Candidates, Hits, Evades, Criticals, Invulnerable, Immunities;
         public long DamageEvents, HealthLost, Deaths, Replenished;
         public long MeleeJudgements, MeleeWhiffs;
         public int AliveMonsters, ActiveProjectiles, PeakProjectiles;
