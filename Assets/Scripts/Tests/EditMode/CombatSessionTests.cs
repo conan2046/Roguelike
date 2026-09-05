@@ -297,11 +297,33 @@ namespace Roguelike.Tests
                 $"invulnerable={stats.Invulnerable} peakProjectiles={stats.PeakProjectiles} burst={stats.UsedBurst}");
         }
 
-        /// <summary>两个隔离世界以相同种子和输入推进，组件与事件统计必须一致。</summary>
+        /// <summary>普通回归使用小规模隔离夹具验证相同种子和输入的确定性，保留完整状态比较。</summary>
+        /// <remarks>从 TbPerformanceScenario 读取战斗配置，仅缩小测试副本的 EntityCount；不修改源表或运行时默认值。</remarks>
         [Test]
+        [Category("Quick")]
         public void SameSeedAndInputProduceSameEcsState()
         {
             var scenario = LoadTables().TbPerformanceScenario.Get(5);
+            typeof(PerformanceScenarioConfig).GetField("EntityCount").SetValue(scenario, 12);
+            AssertDeterministicState(scenario);
+        }
+
+        /// <summary>性能专项保留原千怪双世界确定性覆盖，普通回归不执行。</summary>
+        /// <remarks>使用 TbPerformanceScenario 的原始 EntityCount；创建并释放两个隔离 World。</remarks>
+        [Test]
+        [Category("Stress")]
+        [Explicit("千怪确定性专项，性能验收时单独运行。")]
+        public void ThousandEntitySameSeedAndInputProduceSameEcsState()
+        {
+            var scenario = LoadTables().TbPerformanceScenario.Get(5);
+            AssertDeterministicState(scenario);
+        }
+
+        /// <summary>由快速或压力测试调用，以相同输入推进双世界并比较统计与全部单位状态。</summary>
+        /// <param name="scenario">来自 TbPerformanceScenario 的隔离测试配置。</param>
+        /// <remarks>模拟步数仅为测试工作量；两个 World 和会话在退出时释放。</remarks>
+        private static void AssertDeterministicState(PerformanceScenarioConfig scenario)
+        {
             using var worldA = new World("Combat deterministic A");
             using var worldB = new World("Combat deterministic B");
             using var a = CreateSession(worldA, scenario);
