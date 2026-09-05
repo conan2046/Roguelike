@@ -21,6 +21,7 @@ namespace Roguelike.Features.Combat.Runtime
         private CombatPresentationConfig presentation;
         private CombatVisualResources assets;
         private CombatEntityVisuals visuals;
+        private CombatTilemapBackground mapBackground;
         private CombatUiRuntime ui;
         private ICombatInput input;
         private World world;
@@ -37,6 +38,7 @@ namespace Roguelike.Features.Combat.Runtime
         public Camera ViewCamera { get; private set; }
         public string StatusText => status;
         public CombatEntityVisuals Visuals => visuals;
+        public CombatTilemapBackground MapBackground => mapBackground;
         public GameObject FormalUiRoot => ui?.Root;
 
         /// <summary>配置和资源服务就绪后加载 TbPerformanceScenario 战斗测试入口。</summary>
@@ -63,6 +65,9 @@ namespace Roguelike.Features.Combat.Runtime
                 this.input = input;
                 ValidateScenarioPresentation();
                 assets = await CombatVisualResources.LoadAsync(scenario, resources, linked.Token);
+                CombatMapDefinition mapDefinition = CombatMapDefinition.Create(scenario.MapId_Ref);
+                mapBackground = await CombatTilemapBackground.CreateAsync(mapDefinition, scenario.CombatRulesId_Ref,
+                    resources, transform, linked.Token);
                 CreateWorld();
                 Session = await CombatSessionFactory.CreateAsync(world, scenario, resources, linked.Token);
                 linked.Token.ThrowIfCancellationRequested();
@@ -101,6 +106,8 @@ namespace Roguelike.Features.Combat.Runtime
                 definition.RequireUiReady();
                 ValidateCameraPresentation();
                 assets = await CombatVisualResources.LoadAsync(definition, resources, linked.Token);
+                mapBackground = await CombatTilemapBackground.CreateAsync(definition.MapLayout, definition.CombatRules,
+                    resources, transform, linked.Token);
                 CreateWorld();
                 Session = await CombatSessionFactory.CreateAsync(world, definition, resources, linked.Token);
                 linked.Token.ThrowIfCancellationRequested();
@@ -153,6 +160,7 @@ namespace Roguelike.Features.Combat.Runtime
             ViewCamera.farClipPlane = presentation.CameraFar;
             ViewCamera.transform.localPosition = new Vector3(0, 0, -presentation.CameraDepth);
             UpdateCameraFit();
+            UpdateCameraFollow();
         }
 
         /// <summary>初始化测试入口时检查 OnGUI、输入帮助与相机参数。</summary>
@@ -160,6 +168,9 @@ namespace Roguelike.Features.Combat.Runtime
         private void ValidateScenarioPresentation()
         {
             ValidateCameraPresentation();
+            if (scenario.MapId_Ref == null || scenario.CombatRulesId_Ref == null)
+                throw new InvalidOperationException("Combat scenario requires TbMap and TbCombatRules references.");
+            _ = CombatMapDefinition.Create(scenario.MapId_Ref);
             CombatMath.Positive(presentation.PanelWidth);
             CombatMath.Positive(presentation.PanelHeight);
             CombatMath.Positive(presentation.FontSize);
@@ -248,6 +259,7 @@ namespace Roguelike.Features.Combat.Runtime
             try
             {
                 UpdateCameraFit();
+                UpdateCameraFollow();
                 world.Update();
             }
             catch (Exception exception)
@@ -257,14 +269,40 @@ namespace Roguelike.Features.Combat.Runtime
             }
         }
 
-        /// <summary>按测试场景或 TbMap 的场地、留白和当前宽高比计算正交视野。</summary>
-        /// <remarks>正式字段均由 Luban 千分整数解码，不保留代码默认地图尺寸。</remarks>
+        /// <summary>按 TbMap 配置的逻辑像素高度和当前屏幕宽高比计算正交视野。</summary>
+        /// <remarks>视口高度来自 TbMap.cameraViewportHeightPixels，像素到世界单位比例来自 TbCombatRules.worldUnitsPerPixelMilli；横向视野由 Camera.aspect 自动适配。</remarks>
         private void UpdateCameraFit()
         {
-            float halfWidth = scenario != null ? scenario.ArenaHalfWidth.Value : ConfigNumber.Decode(runDefinition.Map.ArenaHalfWidthMilli);
-            float halfHeight = scenario != null ? scenario.ArenaHalfHeight.Value : ConfigNumber.Decode(runDefinition.Map.ArenaHalfHeightMilli);
-            float padding = scenario != null ? scenario.CameraPadding : ConfigNumber.Decode(runDefinition.Map.CameraPaddingMilli);
-            ViewCamera.orthographicSize = Mathf.Max(halfHeight + padding, (halfWidth + padding) / ViewCamera.aspect);
+            MapConfig map = scenario != null ? scenario.MapId_Ref : runDefinition.Map;
+            CombatRulesConfig rules = scenario != null ? scenario.CombatRulesId_Ref : runDefinition.CombatRules;
+            ViewCamera.orthographicSize = map.CameraViewportHeightPixels * rules.WorldUnitsPerPixel * 0.5f;
+        }
+
+        /// <summary>在每帧模拟结束后将相机中心移动到玩家位置，并限制在程序化地图边界内。</summary>
+        /// <remarks>玩家位置来自当前 CombatSession；地图像素尺寸来自 TbMap，比例来自 TbCombatRules。该函数只移动本局临时相机，不修改 Scene、Prefab 或 ECS 数据。</remarks>
+        private void UpdateCameraFollow()
+        {
+            MapConfig map = scenario != null ? scenario.MapId_Ref : runDefinition.Map;
+            CombatRulesConfig rules = scenario != null ? scenario.CombatRulesId_Ref : runDefinition.CombatRules;
+            CombatUnit player = Session.ReadUnit(0);
+            float mapHalfWidth = map.MapWidthPixels * rules.WorldUnitsPerPixel * 0.5f;
+            float mapHalfHeight = map.MapHeightPixels * rules.WorldUnitsPerPixel * 0.5f;
+            float viewportHalfWidth = ViewCamera.orthographicSize * ViewCamera.aspect;
+            float viewportHalfHeight = ViewCamera.orthographicSize;
+            float x = ClampCameraAxis(player.Position.x, mapHalfWidth, viewportHalfWidth);
+            float y = ClampCameraAxis(player.Position.y, mapHalfHeight, viewportHalfHeight);
+            ViewCamera.transform.localPosition = new Vector3(x, y, -presentation.CameraDepth);
+        }
+
+        /// <summary>将单轴相机中心限制在地图内；当视口大于地图时固定在地图中心。</summary>
+        /// <param name="target">玩家在该轴上的世界坐标。</param>
+        /// <param name="mapHalfExtent">由 TbMap 像素尺寸换算的地图半尺寸。</param>
+        /// <param name="viewportHalfExtent">当前正交相机在该轴上的半视野。</param>
+        /// <returns>不会使视口露出地图外的相机中心坐标。</returns>
+        private static float ClampCameraAxis(float target, float mapHalfExtent, float viewportHalfExtent)
+        {
+            float limit = mapHalfExtent - viewportHalfExtent;
+            return limit > 0f ? Mathf.Clamp(target, -limit, limit) : 0f;
         }
 
         /// <summary>按键或测试调用时切换当前入口的主动暂停。</summary>
@@ -370,6 +408,8 @@ namespace Roguelike.Features.Combat.Runtime
                 Destroy(ViewCamera.gameObject);
                 ViewCamera = null;
             }
+            mapBackground?.Dispose();
+            mapBackground = null;
             visuals?.Dispose();
             visuals = null;
             Session?.Dispose();

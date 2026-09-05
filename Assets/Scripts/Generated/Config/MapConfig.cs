@@ -29,6 +29,13 @@ public sealed partial class MapConfig : Luban.BeanBase
         PlayerStartYMilli = _buf.ReadInt();
         SpawnRadiusPixelsMilli = _buf.ReadInt();
         CameraPaddingMilli = _buf.ReadInt();
+        TileSizePixels = _buf.ReadInt();
+        MapWidthPixels = _buf.ReadInt();
+        MapHeightPixels = _buf.ReadInt();
+        GenerationSeed = _buf.ReadInt();
+        {int n0 = _buf.ReadSize(); TileTextureResourceIds = new System.Collections.Generic.List<int>(n0);for(var i0 = 0 ; i0 < n0 ; i0++) { int _e0;  _e0 = _buf.ReadInt(); TileTextureResourceIds.Add(_e0);}}
+        {int n0 = _buf.ReadSize(); TileWeights = new System.Collections.Generic.List<int>(n0);for(var i0 = 0 ; i0 < n0 ; i0++) { int _e0;  _e0 = _buf.ReadInt(); TileWeights.Add(_e0);}}
+        CameraViewportHeightPixels = _buf.ReadInt();
     }
 
     public static MapConfig DeserializeMapConfig(ByteBuf _buf)
@@ -73,6 +80,35 @@ public sealed partial class MapConfig : Luban.BeanBase
     /// 正交相机边缘留白，世界单位乘1000
     /// </summary>
     public readonly int CameraPaddingMilli;
+    /// <summary>
+    /// 单格边长，像素
+    /// </summary>
+    public readonly int TileSizePixels;
+    /// <summary>
+    /// 地图总宽，像素
+    /// </summary>
+    public readonly int MapWidthPixels;
+    /// <summary>
+    /// 地图总高，像素
+    /// </summary>
+    public readonly int MapHeightPixels;
+    /// <summary>
+    /// 程序化生成随机种子
+    /// </summary>
+    public readonly int GenerationSeed;
+    /// <summary>
+    /// 地块纹理资源ID列表，引用TbResource
+    /// </summary>
+    public readonly System.Collections.Generic.List<int> TileTextureResourceIds;
+    public System.Collections.Generic.List<ResourceConfig> TileTextureResourceIds_Ref;
+    /// <summary>
+    /// 地块权重列表，与纹理资源一一对应
+    /// </summary>
+    public readonly System.Collections.Generic.List<int> TileWeights;
+    /// <summary>
+    /// 跟随相机视口高度，逻辑像素
+    /// </summary>
+    public readonly int CameraViewportHeightPixels;
    
     public const int __ID__ = -1840922722;
     public override int GetTypeId() => __ID__;
@@ -80,6 +116,9 @@ public sealed partial class MapConfig : Luban.BeanBase
     public  void ResolveRef(Tables tables)
     {
         VisualSetId_Ref = VisualSetId!= null ? tables.TbVisualSet.GetOrDefault(VisualSetId.Value) : null;
+        TileTextureResourceIds_Ref = new System.Collections.Generic.List<ResourceConfig>();
+        foreach (var _v in TileTextureResourceIds) { TileTextureResourceIds_Ref.Add(tables.TbResource.GetOrDefault(_v)); }
+
     }
 
     public override string ToString()
@@ -94,6 +133,13 @@ public sealed partial class MapConfig : Luban.BeanBase
         + "playerStartYMilli:" + PlayerStartYMilli + ","
         + "spawnRadiusPixelsMilli:" + SpawnRadiusPixelsMilli + ","
         + "cameraPaddingMilli:" + CameraPaddingMilli + ","
+        + "tileSizePixels:" + TileSizePixels + ","
+        + "mapWidthPixels:" + MapWidthPixels + ","
+        + "mapHeightPixels:" + MapHeightPixels + ","
+        + "generationSeed:" + GenerationSeed + ","
+        + "tileTextureResourceIds:" + Luban.StringUtil.CollectionToString(TileTextureResourceIds) + ","
+        + "tileWeights:" + Luban.StringUtil.CollectionToString(TileWeights) + ","
+        + "cameraViewportHeightPixels:" + CameraViewportHeightPixels + ","
         + "}";
     }
 }

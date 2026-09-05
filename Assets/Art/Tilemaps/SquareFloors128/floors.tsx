@@ -1,0 +1,2 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<tileset version="1.10" tiledversion="1.10.2" name="square_floors_128" tilewidth="128" tileheight="128" tilecount="36" columns="6" spacing="0" margin="0"><image source="正方形地板图集_128x128.png" width="768" height="768" /></tileset>

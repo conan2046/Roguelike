@@ -112,6 +112,13 @@ namespace Roguelike.Tests
                 {
                     yield return Wait(runner.InitializeAsync(scenario, resources, input, CancellationToken.None));
                     Assert.That(runner.Ready, Is.True); Assert.That(runner.ViewCamera, Is.Not.Null);
+                    Assert.That(runner.MapBackground, Is.Not.Null);
+                    Assert.That(runner.MapBackground.TileCount, Is.EqualTo(1024));
+                    Assert.That(runner.MapBackground.Tilemap.GetComponent<UnityEngine.Tilemaps.TilemapRenderer>().mode,
+                        Is.EqualTo(UnityEngine.Tilemaps.TilemapRenderer.Mode.Chunk));
+                    float expectedOrthographicSize = scenario.MapId_Ref.CameraViewportHeightPixels *
+                                                     scenario.CombatRulesId_Ref.WorldUnitsPerPixel * 0.5f;
+                    Assert.That(runner.ViewCamera.orthographicSize, Is.EqualTo(expectedOrthographicSize).Within(0.001f));
                     // 固定阵列夹具原点有怪物；移至玩家左侧，避免移动圆柱把本输入用例锁在出生点。
                     var inputWorld = FindCombatWorld();
                     for (int slot = 1; slot < runner.Session.UnitCount; slot++)
@@ -121,9 +128,11 @@ namespace Roguelike.Tests
                         inputWorld.EntityManager.SetComponentData(runner.Session.UnitEntity(slot), unit);
                     }
                     var start = runner.Session.ReadUnit(0).Position;
+                    float cameraStartX = runner.ViewCamera.transform.localPosition.x;
                     input.Frame = new CombatInputFrame { Movement = new float2(1, 0) };
                     for (int frame = 0; frame < 12; frame++) yield return null;
                     Assert.That(runner.Session.ReadUnit(0).Position.x, Is.GreaterThan(start.x));
+                    Assert.That(runner.ViewCamera.transform.localPosition.x, Is.GreaterThan(cameraStartX));
                     input.Frame = new CombatInputFrame { PausePressed = true };
                     yield return null;
                     Assert.That(runner.Session.Paused, Is.True);
@@ -195,6 +204,8 @@ namespace Roguelike.Tests
                 yield return Wait(runner.InitializeAsync(definition, resources,
                     new UnityCombatInput(definition.Presentation), CancellationToken.None));
                 Assert.That(runner.Ready, Is.True);
+                Assert.That(runner.MapBackground, Is.Not.Null);
+                Assert.That(runner.MapBackground.TileCount, Is.EqualTo(1024));
                 Assert.That(runner.FormalUiRoot, Is.Not.Null);
                 Assert.That(runner.FormalUiRoot.GetComponent<CombatHudView>(), Is.Not.Null);
                 Canvas formalCanvas = runner.FormalUiRoot.GetComponent<Canvas>();

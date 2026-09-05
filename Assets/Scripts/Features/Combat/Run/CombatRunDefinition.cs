@@ -12,6 +12,8 @@ namespace Roguelike.Features.Combat.Run
         public StageConfig Stage { get; private set; }
         /// <summary>获取开放战场配置。</summary>
         public MapConfig Map { get; private set; }
+        /// <summary>获取由 TbMap 尺寸、纹理资源和权重创建的程序化地图定义。</summary>
+        public CombatMapDefinition MapLayout { get; private set; }
         /// <summary>获取单局时序、掉落、升级和 Boss 聚合规则。</summary>
         public StageRuleConfig Rule { get; private set; }
         /// <summary>获取战斗固定步进及伤害规则。</summary>
@@ -74,6 +76,7 @@ namespace Roguelike.Features.Combat.Run
                 UpgradePool = stage.StageRuleId_Ref.UpgradePoolId_Ref,
                 Boss = stage.StageRuleId_Ref.BossEncounterId_Ref
             };
+            definition.MapLayout = CombatMapDefinition.Create(definition.Map);
             definition.ValidateStage();
 
             definition.SpawnPhases = definition.Rule.SpawnPhaseIds_Ref.ToArray();

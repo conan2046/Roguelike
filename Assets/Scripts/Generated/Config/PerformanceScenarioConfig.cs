@@ -65,6 +65,8 @@ public sealed partial class PerformanceScenarioConfig : Luban.BeanBase
         if(_buf.ReadBool()){ SpawnIntervalSecondsMilli = _buf.ReadInt(); } else { SpawnIntervalSecondsMilli = null; }
         if(_buf.ReadBool()){ SpawnBatchCount = _buf.ReadInt(); } else { SpawnBatchCount = null; }
         if(_buf.ReadBool()){ SpawnUnitIntervalSecondsMilli = _buf.ReadInt(); } else { SpawnUnitIntervalSecondsMilli = null; }
+        if(_buf.ReadBool()){ MapId = _buf.ReadInt(); } else { MapId = null; }
+        MapId_Ref = null;
     }
 
     public static PerformanceScenarioConfig DeserializePerformanceScenarioConfig(ByteBuf _buf)
@@ -243,6 +245,11 @@ public sealed partial class PerformanceScenarioConfig : Luban.BeanBase
     /// 波内每只生成间隔，模拟秒；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
     /// </summary>
     public readonly int? SpawnUnitIntervalSecondsMilli;
+    /// <summary>
+    /// Combat测试使用的地图；非Combat场景留空
+    /// </summary>
+    public readonly int? MapId;
+    public MapConfig MapId_Ref;
    
     public const int __ID__ = 1968250658;
     public override int GetTypeId() => __ID__;
@@ -260,6 +267,7 @@ public sealed partial class PerformanceScenarioConfig : Luban.BeanBase
         CharacterProfileOverrideId_Ref = CharacterProfileOverrideId!= null ? tables.TbAttributeProfile.GetOrDefault(CharacterProfileOverrideId.Value) : null;
         MonsterProfileOverrideId_Ref = MonsterProfileOverrideId!= null ? tables.TbAttributeProfile.GetOrDefault(MonsterProfileOverrideId.Value) : null;
         PresentationId_Ref = PresentationId!= null ? tables.TbCombatPresentation.GetOrDefault(PresentationId.Value) : null;
+        MapId_Ref = MapId!= null ? tables.TbMap.GetOrDefault(MapId.Value) : null;
     }
 
     public override string ToString()
@@ -306,6 +314,7 @@ public sealed partial class PerformanceScenarioConfig : Luban.BeanBase
         + "spawnIntervalSecondsMilli:" + SpawnIntervalSecondsMilli + ","
         + "spawnBatchCount:" + SpawnBatchCount + ","
         + "spawnUnitIntervalSecondsMilli:" + SpawnUnitIntervalSecondsMilli + ","
+        + "mapId:" + MapId + ","
         + "}";
     }
 }
