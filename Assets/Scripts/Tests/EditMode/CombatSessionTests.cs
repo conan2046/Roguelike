@@ -7,6 +7,7 @@ using Luban;
 using NUnit.Framework;
 using Roguelike.Features.Combat;
 using Roguelike.Features.Combat.Ecs;
+using Roguelike.Features.Combat.Run;
 using Roguelike.Core.Resources;
 using Unity.Entities;
 using Unity.Mathematics;
@@ -20,6 +21,42 @@ namespace Roguelike.Tests
         /// <summary>每个用例进入时立即写明名称，避免编辑器进度窗口未重绘时误判实际运行点。</summary>
         [SetUp]
         public void TraceTestStart() => Debug.Log("COMBAT_TEST_BEGIN " + TestContext.CurrentContext.Test.Name);
+
+        /// <summary>正式会话不创建测试阵列，并按生成请求的真实怪物与 Boss 配置建立可追踪实体。</summary>
+        [Test]
+        public void FormalSessionSpawnsConfiguredMonsterCatalogAndUniqueBoss()
+        {
+            var tables = LoadTables();
+            var definition = CombatRunDefinition.Create(tables, 1);
+            using var world = new World("Formal dynamic spawn test");
+            using var session = CreateSession(world, definition, tables);
+            Assert.That(session.UnitCount, Is.EqualTo(1));
+            Assert.That(session.Statistics.AliveMonsters, Is.Zero);
+            Assert.That(session.ReadUnit(0).ConfigId, Is.EqualTo(definition.Character.Id));
+
+            ulong sequence = 1;
+            foreach (var monster in definition.Monsters)
+            {
+                Assert.That(session.TrySpawnMonster(monster, ConfigNumber.Decode(definition.Map.SpawnRadiusPixelsMilli),
+                    sequence++, false, out int slot), Is.True);
+                var unit = session.ReadUnit(slot);
+                Assert.That(unit.ConfigId, Is.EqualTo(monster.Id));
+                Assert.That(unit.VisualSetId, Is.EqualTo(monster.VisualSetId));
+                Assert.That(unit.IsBoss, Is.False);
+                Assert.That(unit.Target.MaxHealth,
+                    Is.EqualTo((long)new CombatAttributes(monster.AttributeProfileId_Ref).Get(EAttributeType.MaxHealth)));
+                Assert.That(math.distance(unit.Position, session.ReadUnit(0).Position),
+                    Is.EqualTo(ConfigNumber.Decode(definition.Map.SpawnRadiusPixelsMilli) * definition.CombatRules.WorldUnitsPerPixel).Within(1e-5));
+            }
+
+            Assert.That(session.TrySpawnMonster(definition.Boss.MonsterId_Ref,
+                ConfigNumber.Decode(definition.Boss.SpawnRadiusPixelsMilli), sequence, true, out int bossSlot), Is.True);
+            var boss = session.ReadUnit(bossSlot);
+            Assert.That(boss.ConfigId, Is.EqualTo(definition.Boss.MonsterId));
+            Assert.That(boss.IsBoss, Is.True);
+            Assert.Throws<InvalidOperationException>(() => session.TrySpawnMonster(definition.Boss.MonsterId_Ref,
+                ConfigNumber.Decode(definition.Boss.SpawnRadiusPixelsMilli), sequence + 1, true, out _));
+        }
 
         /// <summary>两种技能共享同一机制时，表内各自半径必须传到正式 ECS 扫掠并改变擦边命中结果。</summary>
         /// <param name="radiusMilli">TbSkill 半径千分整数。</param><param name="hit">横向间距为 0.4 的目标是否应命中。</param>
@@ -810,6 +847,14 @@ namespace Roguelike.Tests
         /// <remarks>替身同步完成加载，不等待 Unity 同步上下文；会话创建实体。</remarks>
         private static CombatSession CreateSession(World world, PerformanceScenarioConfig scenario) =>
             CombatSessionFactory.CreateAsync(world, scenario, new TestResources(LoadTables()), CancellationToken.None).GetAwaiter().GetResult();
+
+        /// <summary>正式动态生成测试通过同一资源工厂加载全部普通怪与 Boss 攻击时序。</summary>
+        /// <param name="world">测试拥有的隔离世界。</param>
+        /// <param name="definition">真实 TbStage 聚合定义。</param>
+        /// <param name="tables">与定义来自同一次 bytes 解析的资源映射。</param>
+        /// <returns>初始只包含玩家的正式会话。</returns>
+        private static CombatSession CreateSession(World world, CombatRunDefinition definition, Tables tables) =>
+            CombatSessionFactory.CreateAsync(world, definition, new TestResources(tables), CancellationToken.None).GetAwaiter().GetResult();
 
         /// <summary>测试专用文件资源替身；正式代码不使用本地路径。</summary>
         private sealed class TestResources : IResourceService

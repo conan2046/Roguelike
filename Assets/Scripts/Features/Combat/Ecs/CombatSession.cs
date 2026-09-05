@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using cfg;
+using Roguelike.Features.Combat.Run;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
@@ -14,7 +15,7 @@ namespace Roguelike.Features.Combat.Ecs
         private readonly World world;
         private readonly EntityManager manager;
         private readonly CombatTickSystem system;
-        private readonly PerformanceScenarioConfig scenario;
+        private readonly CombatSessionSettings settings;
         private readonly CombatRulesConfig rules;
         private readonly DamageRules damageRules;
         private NativeList<Entity> units;
@@ -51,20 +52,42 @@ namespace Roguelike.Features.Combat.Ecs
         /// <remarks>创建并持有实体/原生容器，必须先 Dispose 会话再销毁世界；部分失败会回收已创建资源。</remarks>
         /// <exception cref="InvalidOperationException">配置不完整、范围非法或不是本期支持的单玩家弹丸/近战怪组合。</exception>
         public CombatSession(World world, PerformanceScenarioConfig scenario, IReadOnlyDictionary<int, CombatAttackOption[]> attacksByVisual)
+            : this(world, CombatSessionSettings.FromScenario(scenario), attacksByVisual)
+        {
+        }
+
+        /// <summary>从正式 TbStage 聚合定义创建动态生成会话，不读取 TbPerformanceScenario。</summary>
+        /// <param name="world">调用者拥有的存活 ECS 世界。</param>
+        /// <param name="definition">已完成跨表验证的正式单局定义。</param>
+        /// <param name="attacksByVisual">全部普通怪与 Boss 的预加载攻击时序。</param>
+        /// <remarks>初始只创建玩家；怪物由 CombatRunModel 的生成请求进入 SpawnMonster。</remarks>
+        /// <exception cref="InvalidOperationException">世界或预加载攻击数据不可用。</exception>
+        public CombatSession(World world, CombatRunDefinition definition, IReadOnlyDictionary<int, CombatAttackOption[]> attacksByVisual)
+            : this(world, CombatSessionSettings.FromRun(definition), attacksByVisual)
+        {
+        }
+
+        /// <summary>使用统一只读设置创建 ECS 容器并保留正式、测试各自的生成策略。</summary>
+        /// <param name="world">调用者拥有的存活 ECS 世界。</param>
+        /// <param name="settings">从正式关卡或测试场景转换的设置。</param>
+        /// <param name="attacksByVisual">怪物表现对应的真实 ANI 攻击时序。</param>
+        /// <remarks>创建并持有实体和原生容器；调用方必须先释放会话再销毁世界。</remarks>
+        /// <exception cref="InvalidOperationException">世界或攻击资源不完整。</exception>
+        private CombatSession(World world, CombatSessionSettings settings, IReadOnlyDictionary<int, CombatAttackOption[]> attacksByVisual)
         {
             if (world == null || !world.IsCreated) throw new InvalidOperationException("Combat requires a live ECS World.");
-            ValidateScenario(scenario);
+            if (settings == null) throw new InvalidOperationException("Combat session settings are required.");
             this.world = world;
             manager = world.EntityManager;
-            this.scenario = scenario;
-            timedSpawn = scenario.SpawnIntervalSeconds.HasValue;
-            rules = scenario.CombatRulesId_Ref;
+            this.settings = settings;
+            timedSpawn = settings.UseLegacyTimedSpawn;
+            rules = settings.Rules;
             damageRules = DamageRules.Capture(rules);
             StepSeconds = 1d / rules.SimulationHz;
             system = world.GetOrCreateSystemManaged<CombatTickSystem>();
             try
             {
-                int count = checked(scenario.EntityCount + 1);
+                int count = checked(settings.InitialMonsterCount + 1);
                 templates = new NativeList<CombatUnit>(count, Allocator.Persistent);
                 templates.Resize(count, NativeArrayOptions.ClearMemory);
                 units = new NativeList<Entity>(count, Allocator.Persistent);
@@ -72,7 +95,7 @@ namespace Roguelike.Features.Combat.Ecs
                 counters = new NativeArray<CombatCounters>(1, Allocator.Persistent);
                 attackOptions = new NativeList<CombatAttackOption>(Allocator.Persistent);
                 var offsets = new Dictionary<int, int>();
-                foreach (var monster in scenario.MonsterIds_Ref)
+                foreach (var monster in settings.Monsters)
                 {
                     int id = monster.VisualSetId;
                     if (offsets.ContainsKey(id)) continue;
@@ -90,20 +113,20 @@ namespace Roguelike.Features.Combat.Ecs
                         attackOptions.Add(option);
                     }
                 }
-                var player = scenario.CharacterId_Ref;
-                templates[0] = BuildUnit(scenario.CharacterProfileOverrideId_Ref, player.DefaultSkillId_Ref,
-                    player.BodyRadius.Value, CombatCylinder.FromConfig(player.MoveRadiusPixels, player.MoveHeightPixels, player.MoveOffsetXPixels, player.MoveOffsetYPixels, player.MoveElevationPixels, rules.WorldUnitsPerPixel), new float2(scenario.PlayerStartX.Value, scenario.PlayerStartY.Value), true);
+                var player = settings.Character;
+                templates[0] = BuildUnit(settings.CharacterProfile, settings.PlayerSkill,
+                    player.BodyRadius.Value, CombatCylinder.FromConfig(player.MoveRadiusPixels, player.MoveHeightPixels, player.MoveOffsetXPixels, player.MoveOffsetYPixels, player.MoveElevationPixels, rules.WorldUnitsPerPixel), settings.PlayerStart, true);
                 var playerTemplate = templates[0];
                 playerTemplate.ConfigId = player.Id;
                 playerTemplate.VisualSetId = player.VisualSetId;
                 templates[0] = playerTemplate;
-                int rows = (scenario.EntityCount + scenario.SpawnColumns - 1) / scenario.SpawnColumns;
+                int rows = (settings.InitialMonsterCount + settings.SpawnColumns - 1) / settings.SpawnColumns;
                 for (int slot = 1; slot < count; slot++)
                 {
-                    var monster = scenario.MonsterIds_Ref[(slot - 1) % scenario.MonsterIds_Ref.Count];
-                    var position = new float2(((slot - 1) % scenario.SpawnColumns - (scenario.SpawnColumns - 1) * 0.5f) * scenario.HorizontalSpacing,
-                        ((slot - 1) / scenario.SpawnColumns - (rows - 1) * 0.5f) * scenario.VerticalSpacing);
-                    templates[slot] = BuildUnit(scenario.MonsterProfileOverrideId_Ref, monster.DefaultSkillId_Ref,
+                    var monster = settings.Monsters[(slot - 1) % settings.Monsters.Count];
+                    var position = new float2(((slot - 1) % settings.SpawnColumns - (settings.SpawnColumns - 1) * 0.5f) * settings.HorizontalSpacing,
+                        ((slot - 1) / settings.SpawnColumns - (rows - 1) * 0.5f) * settings.VerticalSpacing);
+                    templates[slot] = BuildUnit(settings.GetMonsterProfile(monster), monster.DefaultSkillId_Ref,
                         monster.BodyRadius.Value, CombatCylinder.FromConfig(monster.MoveRadiusPixels, monster.MoveHeightPixels, monster.MoveOffsetXPixels, monster.MoveOffsetYPixels, monster.MoveElevationPixels, rules.WorldUnitsPerPixel), position, false);
                     var template = templates[slot];
                     template.ConfigId = monster.Id;
@@ -152,7 +175,7 @@ namespace Roguelike.Features.Combat.Ecs
             double debt = BacklogSeconds + elapsedSeconds;
             CombatMath.NonNegative(debt);
             BacklogSeconds = debt;
-            if (scenario.PlayerInputPolicy == ETestInputPolicy.Stationary) movement = float2.zero;
+            if (settings.StationaryInput) movement = float2.zero;
             else if (math.lengthsq(movement) > 1) movement = math.normalizesafe(movement);
             int steps = 0;
             while (BacklogSeconds >= StepSeconds && steps < rules.MaxCatchUpSteps && !Statistics.PlayerDead)
@@ -164,23 +187,23 @@ namespace Roguelike.Features.Combat.Ecs
                     Impacts = impacts,
                     Deaths = deaths,
                     AttackOptions = attackOptions.AsArray(),
-                    Arena = new float2(scenario.ArenaHalfWidth.Value, scenario.ArenaHalfHeight.Value),
+                    Arena = settings.Arena,
                     Delta = (float)StepSeconds, Time = Statistics.Tick * StepSeconds, TargetRefresh = rules.TargetRefreshSeconds,
                     CellSize = rules.SpatialCellSize, MaximumRadius = maximumRadius, MaximumMotion = maximumMotion,
-                    Seed = unchecked((ulong)(uint)scenario.RandomSeed), Replenish = scenario.ReplenishOnDeath.Value,
+                    Seed = unchecked((ulong)(uint)settings.RandomSeed), Replenish = settings.ReplenishOnDeath,
                     AllowMonstersOutsideArena = timedSpawn,
-                    RestorePlayer = scenario.PlayerHealthPolicy == ETestHealthPolicy.RestoreAfterDamage
+                    RestorePlayer = settings.RestorePlayerAfterDamage
                 });
                 // Job 已完成后才允许结构变更；每只怪物取此刻的角色圆心，下一 tick 开始追踪。
                 if (timedSpawn && !Statistics.PlayerDead)
                     while (Statistics.Tick >= nextSpawnTick)
                     {
-                        if (WaveNumber == 0 || SpawnedInWave == scenario.SpawnBatchCount.Value)
+                        if (WaveNumber == 0 || SpawnedInWave == settings.SpawnBatchCount)
                         { WaveNumber = checked(WaveNumber + 1); SpawnedInWave = 0; }
                         if (!SpawnOne()) { nextSpawnTick = checked(Statistics.Tick + 1); break; }
                         SpawnedInWave++;
-                        nextSpawnTick = checked(nextSpawnTick + SpawnDelayTicks(SpawnedInWave == scenario.SpawnBatchCount.Value
-                            ? scenario.SpawnIntervalSeconds.Value : scenario.SpawnUnitIntervalSeconds.Value));
+                        nextSpawnTick = checked(nextSpawnTick + SpawnDelayTicks(SpawnedInWave == settings.SpawnBatchCount
+                            ? settings.SpawnIntervalSeconds : settings.SpawnUnitIntervalSeconds));
                     }
                 BacklogSeconds -= StepSeconds;
                 steps++;
@@ -199,7 +222,7 @@ namespace Roguelike.Features.Combat.Ecs
             for (int slot = 0; slot < units.Length; slot++)
             {
                 var unit = templates[slot];
-                if (timedSpawn && slot != 0) unit.Target.Health = 0;
+                if ((timedSpawn || settings.IsFormalRun) && slot != 0) unit.Target.Health = 0;
                 unit.Target.Lifetime = ++nextLifetime;
                 unit.Attack.AttackerLifetime = nextLifetime;
                 manager.SetComponentData(units[slot], unit);
@@ -210,8 +233,8 @@ namespace Roguelike.Features.Combat.Ecs
                 manager.SetComponentData(projectiles[index], new CombatProjectile());
                 manager.SetComponentData(projectiles[index], LocalTransform.FromScale(0));
             }
-            counters[0] = new CombatCounters { NextLifetime = nextLifetime, AliveMonsters = timedSpawn ? 0 : scenario.EntityCount };
-            nextSpawnTick = timedSpawn ? SpawnDelayTicks(scenario.SpawnIntervalSeconds.Value) : 0;
+            counters[0] = new CombatCounters { NextLifetime = nextLifetime, AliveMonsters = timedSpawn || settings.IsFormalRun ? 0 : settings.InitialMonsterCount };
+            nextSpawnTick = timedSpawn ? SpawnDelayTicks(settings.SpawnIntervalSeconds) : 0;
             WaveNumber = 0; SpawnedInWave = 0; SpawnedMonsters = 0;
             grid.Clear(); requests.Clear(); impacts.Clear();
             deaths.Clear();
@@ -228,7 +251,7 @@ namespace Roguelike.Features.Combat.Ecs
             const int batch = 1; // 单次调度恰好一个出生事件；每波数量仍从表读取。
             int free = units.Length - 1 - Statistics.AliveMonsters;
             if (free < batch) GrowUnits(checked(units.Length + batch - free));
-            float radius = scenario.SpawnRadiusPixels.Value * rules.WorldUnitsPerPixel;
+            float radius = settings.SpawnRadiusPixels * rules.WorldUnitsPerPixel;
             float2 center = ReadUnit(0).Position;
             var stats = counters[0];
             for (int slot = 1, remaining = batch; remaining > 0 && slot < units.Length; slot++)
@@ -236,7 +259,7 @@ namespace Roguelike.Features.Combat.Ecs
                 if (ReadUnit(slot).Target.Health > 0) continue;
                 var unit = templates[slot];
                 // int.MaxValue 是抽样精度技术边界；2π 是整圆换算，不承载策划参数。
-                int sample = CombatRandom.Inclusive(unchecked((ulong)(uint)scenario.RandomSeed), checked((ulong)SpawnedMonsters), 0, CombatRandomPurpose.SpawnAngle, 0, int.MaxValue);
+                int sample = CombatRandom.Inclusive(unchecked((ulong)(uint)settings.RandomSeed), checked((ulong)SpawnedMonsters), 0, CombatRandomPurpose.SpawnAngle, 0, int.MaxValue);
                 double angle = sample / ((double)int.MaxValue + 1) * (2 * Math.PI);
                 if (!FindSpawnPosition(unit.Movement, center, radius, angle, out var position)) return false;
                 unit.Position = position;
@@ -249,6 +272,72 @@ namespace Roguelike.Features.Combat.Ecs
                 SpawnedMonsters = checked(SpawnedMonsters + 1); stats.AliveMonsters++; remaining--;
             }
             counters[0] = stats;
+            return true;
+        }
+
+        /// <summary>消费正式单局的一条怪物生成请求，在玩家当前位置的配置圆周创建普通怪或唯一 Boss。</summary>
+        /// <param name="monster">请求携带的 TbMonster 引用。</param>
+        /// <param name="spawnRadiusPixels">TbMap 或 TbBossEncounter 配置的逻辑像素半径。</param>
+        /// <param name="spawnSequence">CombatRunModel 在本代次内分配的稳定生成序号。</param>
+        /// <param name="isBoss">请求是否来自 TbBossEncounter。</param>
+        /// <param name="slot">成功时返回实体池槽；圆周暂时没有空位时为无效槽。</param>
+        /// <returns>成功生成时为真；圆周被占时返回假，由运行器保留原请求后续重试。</returns>
+        /// <remarks>只允许正式会话调用；复用相同怪物类型的死亡槽，生命周期递增以拒绝旧伤害和 UI 事件。</remarks>
+        /// <exception cref="InvalidOperationException">测试会话调用、怪物不属于本关、Boss 重复存活或配置几何非法。</exception>
+        public bool TrySpawnMonster(MonsterConfig monster, float spawnRadiusPixels, ulong spawnSequence, bool isBoss, out int slot)
+        {
+            EnsureAlive();
+            if (!settings.IsFormalRun) throw new InvalidOperationException("Dynamic run spawning requires a formal combat session.");
+            if (monster == null) throw new InvalidOperationException("Combat spawn request is missing TbMonster.");
+            monster = settings.GetMonster(monster.Id);
+            CombatMath.Positive(spawnRadiusPixels);
+            if (spawnSequence == 0) throw new InvalidOperationException("Combat spawn sequence must be positive.");
+            if (isBoss)
+            {
+                for (int index = 1; index < units.Length; index++)
+                {
+                    var existing = ReadUnit(index);
+                    if (existing.IsBoss && existing.Target.Health > 0)
+                        throw new InvalidOperationException("Formal combat cannot spawn a second living Boss.");
+                }
+            }
+
+            slot = -1;
+            for (int index = 1; index < units.Length; index++)
+            {
+                var candidate = ReadUnit(index);
+                if (candidate.Target.Health <= 0 && candidate.ConfigId == monster.Id)
+                {
+                    slot = index;
+                    break;
+                }
+            }
+            if (slot < 0) slot = AddMonsterSlot(monster);
+
+            float radius = spawnRadiusPixels * rules.WorldUnitsPerPixel;
+            float2 center = ReadUnit(0).Position;
+            int sample = CombatRandom.Inclusive(unchecked((ulong)(uint)settings.RandomSeed), spawnSequence, 0,
+                CombatRandomPurpose.SpawnAngle, 0, int.MaxValue);
+            double angle = sample / ((double)int.MaxValue + 1) * (2 * Math.PI);
+            var template = templates[slot];
+            if (!FindSpawnPosition(template.Movement, center, radius, angle, out var position))
+            {
+                slot = -1;
+                return false;
+            }
+
+            var stats = counters[0];
+            template.Position = position;
+            template.PreviousPosition = template.SpawnPosition = position;
+            template.Facing = math.normalizesafe(center - position);
+            template.IsBoss = isBoss;
+            template.Target.Lifetime = checked(++stats.NextLifetime);
+            template.Attack.AttackerLifetime = template.Target.Lifetime;
+            manager.SetComponentData(units[slot], template);
+            manager.SetComponentData(units[slot], LocalTransform.FromPosition(new float3(position, 0)));
+            stats.AliveMonsters++;
+            counters[0] = stats;
+            SpawnedMonsters = checked(SpawnedMonsters + 1);
             return true;
         }
 
@@ -295,7 +384,7 @@ namespace Roguelike.Features.Combat.Ecs
 
         /// <summary>刷怪批次缺少空闲槽时扩展单位、模板和空间索引容量，弹丸仍按唯一发射者寿命上界独立持有。</summary>
         /// <param name="count">本批存活数加所需空槽的总量，包含玩家槽。</param>
-        /// <remarks>只在同步 Job 完成后创建 ECS 实体；怪物类型按 TbPerformanceScenario.monsterIds 槽位轮转，与渲染绑定保持一致。新增实体由本会话退出时释放。</remarks>
+        /// <remarks>只供旧测试定时生成模式调用；按该场景怪物目录轮转类型。新增实体由本会话退出时释放。</remarks>
         private void GrowUnits(int count)
         {
             units.Capacity = Math.Max(units.Capacity, count);
@@ -304,21 +393,38 @@ namespace Roguelike.Features.Combat.Ecs
             requests.Capacity = Math.Max(requests.Capacity, checked(count + projectiles.Length));
             while (units.Length < count)
             {
-                var monster = scenario.MonsterIds_Ref[(units.Length - 1) % scenario.MonsterIds_Ref.Count];
-                var template = BuildUnit(scenario.MonsterProfileOverrideId_Ref, monster.DefaultSkillId_Ref,
-                    monster.BodyRadius.Value, CombatCylinder.FromConfig(monster.MoveRadiusPixels, monster.MoveHeightPixels, monster.MoveOffsetXPixels, monster.MoveOffsetYPixels, monster.MoveElevationPixels, rules.WorldUnitsPerPixel), float2.zero, false);
-                template.ConfigId = monster.Id;
-                template.VisualSetId = monster.VisualSetId;
-                template.AttackOptionStart = attackOffsets[monster.VisualSetId];
-                template.AttackOptionCount = attackCounts[monster.VisualSetId];
-                var entity = manager.CreateEntity(typeof(CombatUnit), typeof(LocalTransform), typeof(LocalToWorld));
-                units.Add(entity); templates.Add(template);
-                var inactive = template; inactive.Target.Health = 0;
-                manager.SetComponentData(entity, inactive);
-                manager.SetComponentData(entity, LocalTransform.FromScale(0));
-                maximumRadius = math.max(maximumRadius, template.Radius);
-                maximumMotion = math.max(maximumMotion, template.MoveSpeed * (float)StepSeconds);
+                var monster = settings.Monsters[(units.Length - 1) % settings.Monsters.Count];
+                AddMonsterSlot(monster);
             }
+        }
+
+        /// <summary>为指定真实怪物追加一个固定表现类型的池槽，初始保持失活。</summary>
+        /// <param name="monster">本会话目录中的 TbMonster。</param>
+        /// <returns>新槽在单位数组中的索引。</returns>
+        /// <remarks>只在固定 Job 完成后的主线程调用；槽位后续仅复用同一 ConfigId，表现绑定无需重建。</remarks>
+        private int AddMonsterSlot(MonsterConfig monster)
+        {
+            var template = BuildUnit(settings.GetMonsterProfile(monster), monster.DefaultSkillId_Ref,
+                monster.BodyRadius.Value, CombatCylinder.FromConfig(monster.MoveRadiusPixels, monster.MoveHeightPixels,
+                    monster.MoveOffsetXPixels, monster.MoveOffsetYPixels, monster.MoveElevationPixels, rules.WorldUnitsPerPixel),
+                float2.zero, false);
+            template.ConfigId = monster.Id;
+            template.VisualSetId = monster.VisualSetId;
+            template.AttackOptionStart = attackOffsets[monster.VisualSetId];
+            template.AttackOptionCount = attackCounts[monster.VisualSetId];
+            var entity = manager.CreateEntity(typeof(CombatUnit), typeof(LocalTransform), typeof(LocalToWorld));
+            int slot = units.Length;
+            units.Add(entity);
+            templates.Add(template);
+            var inactive = template;
+            inactive.Target.Health = 0;
+            manager.SetComponentData(entity, inactive);
+            manager.SetComponentData(entity, LocalTransform.FromScale(0));
+            maximumRadius = math.max(maximumRadius, template.Radius);
+            maximumMotion = math.max(maximumMotion, template.MoveSpeed * (float)StepSeconds);
+            grid.Capacity = Math.Max(grid.Capacity, units.Length);
+            requests.Capacity = Math.Max(requests.Capacity, checked(units.Length + projectiles.Length));
+            return slot;
         }
 
         /// <summary>表现与诊断在 tick 完成后读取单位组件副本，不暴露原生容器所有权。</summary>
@@ -376,8 +482,8 @@ namespace Roguelike.Features.Combat.Ecs
             EnsureAlive();
             var unit = ReadUnit(slot);
             if (unit.Target.Lifetime != expectedLifetime || unit.Target.Health <= 0) return false;
-            var skill = slot == 0 ? scenario.CharacterId_Ref.DefaultSkillId_Ref.CombatProfileId_Ref :
-                scenario.MonsterIds_Ref[(slot - 1) % scenario.MonsterIds_Ref.Count].DefaultSkillId_Ref.CombatProfileId_Ref;
+            var skill = slot == 0 ? settings.PlayerSkill.CombatProfileId_Ref :
+                settings.GetMonster(unit.ConfigId).DefaultSkillId_Ref.CombatProfileId_Ref;
             double interval = CombatMath.AttackInterval(skill.BaseInterval, attributes.Get(EAttributeType.AttackSpeedMultiplier), rules.MinAttackInterval);
             unit.Cooldown = CombatMath.RescaleCooldown(unit.Cooldown, unit.Interval, interval);
             unit.Interval = interval;
@@ -394,7 +500,7 @@ namespace Roguelike.Features.Combat.Ecs
         /// <param name="skillConfig">TbSkill 技能，碰撞半径与偏移独立于其 TbSkillCombat 引用。</param>
         /// <param name="radius">TbCharacter/TbMonster.bodyRadius。</param>
         /// <param name="movement">TbCharacter/TbMonster 导出的独立移动圆柱。</param>
-        /// <param name="position">TbPerformanceScenario 生成位置。</param>
+        /// <param name="position">入口配置转换后的出生位置。</param>
         /// <param name="player">区分玩家弹丸与怪物近战角色。</param>
         /// <returns>冷却就绪且目标为空的出生模板。</returns>
         /// <exception cref="InvalidOperationException">属性、几何或技能配置不合法。</exception>
@@ -403,9 +509,9 @@ namespace Roguelike.Features.Combat.Ecs
             var skill = skillConfig.CombatProfileId_Ref ?? throw new InvalidOperationException("Missing skill combat profile.");
             var attributes = new CombatAttributes(profile);
             CombatMath.Positive(radius);
-            if (!math.all(math.isfinite(position)) || math.abs(position.x) + radius > scenario.ArenaHalfWidth.Value ||
-                math.abs(position.y) + radius > scenario.ArenaHalfHeight.Value)
-                throw new InvalidOperationException($"TbPerformanceScenario {scenario.Id}: unit outside arena.");
+            if (!math.all(math.isfinite(position)) || math.abs(position.x) + radius > settings.Arena.x ||
+                math.abs(position.y) + radius > settings.Arena.y)
+                throw new InvalidOperationException("Combat unit is outside the configured arena.");
             CombatMath.NonNegative(skill.Range);
             if (skill.DeliveryType != (player ? ESkillDeliveryType.Projectile : ESkillDeliveryType.Melee))
                 throw new InvalidOperationException($"TbSkillCombat {skill.Id}: unsupported actor delivery role.");
@@ -429,46 +535,12 @@ namespace Roguelike.Features.Combat.Ecs
                 Delivery = skill.DeliveryType, TargetSlot = -1,
                 BaseInterval = skill.BaseInterval,
                 WindupSeconds = player ? 0 : skill.AttackWindupSeconds.Value,
-                Facing = new float2(scenario.PresentationId_Ref.InitialDirectionId_Ref.X, scenario.PresentationId_Ref.InitialDirectionId_Ref.Y),
+                Facing = new float2(settings.Presentation.InitialDirectionId_Ref.X, settings.Presentation.InitialDirectionId_Ref.Y),
                 // 近战不消费弹丸字段；零仅为空布局，不作为弹丸参数兜底。
                 SkillId = skillConfig.Id,
                 ProjectileOffset = player ? new float2(skillConfig.ProjectileOffsetX.Value, skillConfig.ProjectileOffsetY.Value) : float2.zero,
                 ProjectileSpeed = player ? skill.ProjectileSpeed.Value : 0,
                 ProjectileLifetime = player ? skill.ProjectileLifetime.Value : 0, ProjectileRadius = player ? skillConfig.ProjectileRadius.Value : 0 };
-        }
-
-        /// <summary>实体创建前验证必须的场景引用与固定步进参数，旧移动场景不能误入战斗。</summary>
-        /// <param name="value">统一配置入口提供的场景。</param>
-        /// <exception cref="InvalidOperationException">任何必需引用或数值非法。</exception>
-        private static void ValidateScenario(PerformanceScenarioConfig value)
-        {
-            if (value == null || value.Kind != EPerformanceKind.Combat || value.CombatRulesId_Ref == null || value.PresentationId_Ref?.InitialDirectionId_Ref == null ||
-                value.CharacterId_Ref?.DefaultSkillId_Ref?.CombatProfileId_Ref == null || !value.CharacterId_Ref.BodyRadius.HasValue ||
-                value.CharacterProfileOverrideId_Ref == null || value.MonsterProfileOverrideId_Ref == null ||
-                value.MonsterIds_Ref == null || value.MonsterIds_Ref.Count == 0 || value.EntityCount <= 0 || value.SpawnColumns <= 0 ||
-                !value.ArenaHalfWidth.HasValue || !value.ArenaHalfHeight.HasValue || !value.PlayerStartX.HasValue || !value.PlayerStartY.HasValue ||
-                !value.ReplenishOnDeath.HasValue || !value.PlayerHealthPolicy.HasValue || !value.PlayerInputPolicy.HasValue)
-                throw new InvalidOperationException("TbPerformanceScenario: incomplete combat configuration.");
-            CombatMath.Positive(value.ArenaHalfWidth.Value); CombatMath.Positive(value.ArenaHalfHeight.Value);
-            CombatMath.NonNegative(value.HorizontalSpacing); CombatMath.NonNegative(value.VerticalSpacing);
-            bool anySpawn = value.SpawnRadiusPixels.HasValue || value.SpawnIntervalSeconds.HasValue || value.SpawnBatchCount.HasValue || value.SpawnUnitIntervalSeconds.HasValue;
-            if (anySpawn)
-            {
-                if (!value.SpawnRadiusPixels.HasValue || !value.SpawnIntervalSeconds.HasValue || !value.SpawnBatchCount.HasValue || !value.SpawnUnitIntervalSeconds.HasValue || value.SpawnBatchCount.Value <= 0 || value.ReplenishOnDeath.Value)
-                    throw new InvalidOperationException("Timed spawn requires complete parameters and cannot replenish on death.");
-                CombatMath.Positive(value.SpawnRadiusPixels.Value); CombatMath.Positive(value.SpawnIntervalSeconds.Value);
-                CombatMath.Positive(value.SpawnUnitIntervalSeconds.Value);
-                CombatMath.Positive(value.CombatRulesId_Ref.WorldUnitsPerPixel);
-                CombatMath.Positive(value.SpawnRadiusPixels.Value * value.CombatRulesId_Ref.WorldUnitsPerPixel);
-            }
-            if (!Enum.IsDefined(typeof(ETestHealthPolicy), value.PlayerHealthPolicy.Value) || !Enum.IsDefined(typeof(ETestInputPolicy), value.PlayerInputPolicy.Value))
-                throw new InvalidOperationException($"TbPerformanceScenario {value.Id}: unknown policy.");
-            foreach (var monster in value.MonsterIds_Ref)
-                if (monster?.DefaultSkillId_Ref?.CombatProfileId_Ref == null || !monster.BodyRadius.HasValue)
-                    throw new InvalidOperationException($"TbPerformanceScenario {value.Id}: monster is not combat-ready.");
-            var rules = value.CombatRulesId_Ref;
-            if (rules.SimulationHz <= 0 || rules.MaxCatchUpSteps <= 0) throw new InvalidOperationException($"TbCombatRules {rules.Id}: invalid tick limits.");
-            CombatMath.Positive(rules.MinAttackInterval); CombatMath.Positive(rules.SpatialCellSize); CombatMath.Positive(rules.TargetRefreshSeconds);
         }
 
         /// <summary>所有公开变更入口先验证生命周期，避免访问已释放原生内存。</summary>

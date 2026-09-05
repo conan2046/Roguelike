@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using cfg;
 using Roguelike.Features.Combat.Ecs;
+using Roguelike.Features.Combat.Run;
 using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Rendering;
@@ -18,10 +20,10 @@ namespace Roguelike.Features.Combat.Rendering
         private readonly CombatSession session;
         private readonly CombatVisualResources resources;
         private CombatVisualPlayer[] players;
-        private readonly PerformanceScenarioConfig scenario;
+        private readonly IReadOnlyDictionary<int, VisualSetConfig> visualSets;
+        private readonly IReadOnlyDictionary<int, SkillConfig> skills;
         private readonly RenderMeshArray meshArray;
         private readonly RenderMeshDescription description;
-        private readonly SkillConfig projectileSkill;
         private readonly List<ImpactVisual> impacts = new List<ImpactVisual>();
         private readonly HashSet<ulong> seenImpacts = new HashSet<ulong>();
         private bool disposed;
@@ -45,11 +47,43 @@ namespace Roguelike.Features.Combat.Rendering
         /// <param name="resources">调用方拥有的共享资源。</param>
         /// <remarks>修改会话单位渲染组件；自有世界退出顺序为本绑定、会话、世界、共享资源，先清理 GPU 注册。不修改 Scene/Prefab。</remarks>
         public CombatEntityVisuals(World world, CombatSession session, PerformanceScenarioConfig scenario, CombatVisualResources resources)
+            : this(world, session, resources,
+                new[] { scenario.CharacterId_Ref.VisualSetId_Ref }.Concat(scenario.MonsterIds_Ref.Select(item => item.VisualSetId_Ref)),
+                new[] { scenario.CharacterId_Ref.DefaultSkillId_Ref })
+        {
+        }
+
+        /// <summary>为正式关卡绑定角色、四类普通怪、Boss 和全部可解锁技能的共享表现。</summary>
+        /// <param name="world">必须与会话相同的存活世界。</param>
+        /// <param name="session">正式单局实体所有者。</param>
+        /// <param name="definition">TbStage 聚合的单位与技能目录。</param>
+        /// <param name="resources">调用方拥有的共享资源。</param>
+        /// <remarks>槽位根据 CombatUnit.VisualSetId 选择表现，动态扩容不会依赖生成顺序。</remarks>
+        public CombatEntityVisuals(World world, CombatSession session, CombatRunDefinition definition, CombatVisualResources resources)
+            : this(world, session, resources,
+                new[] { definition.Character.VisualSetId_Ref }
+                    .Concat(definition.Monsters.Select(item => item.VisualSetId_Ref))
+                    .Concat(new[] { definition.Boss.MonsterId_Ref.VisualSetId_Ref }),
+                definition.AvailableSkills)
+        {
+        }
+
+        /// <summary>建立按真实配置 ID 查询的表现绑定并为既有实体附加渲染组件。</summary>
+        /// <param name="world">会话所属世界。</param>
+        /// <param name="session">实体与事件读取入口。</param>
+        /// <param name="resources">已经完成共享加载的 ANI 资源。</param>
+        /// <param name="visualCatalog">本会话允许出现的 TbVisualSet。</param>
+        /// <param name="skillCatalog">本会话允许发射的 TbSkill。</param>
+        /// <remarks>只保存配置引用与 GPU 注册；不加载资源、不保存资产。</remarks>
+        private CombatEntityVisuals(World world, CombatSession session, CombatVisualResources resources,
+            IEnumerable<VisualSetConfig> visualCatalog, IEnumerable<SkillConfig> skillCatalog)
         {
             this.world = world;
             manager = world.EntityManager; this.session = session; this.resources = resources;
-            this.scenario = scenario;
-            projectileSkill = scenario.CharacterId_Ref.DefaultSkillId_Ref;
+            visualSets = visualCatalog.Where(item => item != null).GroupBy(item => item.Id)
+                .ToDictionary(group => group.Key, group => group.First());
+            skills = skillCatalog.Where(item => item != null).GroupBy(item => item.Id)
+                .ToDictionary(group => group.Key, group => group.First());
             players = Array.Empty<CombatVisualPlayer>();
             meshArray = new RenderMeshArray(resources.Materials, resources.Meshes);
             description = new RenderMeshDescription(ShadowCastingMode.Off, receiveShadows: false);
@@ -98,7 +132,7 @@ namespace Roguelike.Features.Combat.Rendering
         public CombatVisualPlayer Read(int slot) => players[slot];
 
         /// <summary>会话按批扩容后，为新增槽位建立播放器并绑定已加载的共享美术。</summary>
-        /// <remarks>怪物类型依照 TbPerformanceScenario.monsterIds 槽位轮转；只在容量增长时分配播放器数组，不重复加载纹理、材质或网格。旧槽复用由生命周期变化重置动画。</remarks>
+        /// <remarks>单位类型读取 CombatUnit.VisualSetId；只在容量增长时分配播放器数组，不重复加载纹理、材质或网格。旧槽复用由生命周期变化重置动画。</remarks>
         private void BindNewUnits()
         {
             if (players.Length == session.UnitCount) return;
@@ -106,8 +140,9 @@ namespace Roguelike.Features.Combat.Rendering
             Array.Resize(ref players, session.UnitCount);
             for (int slot = previous; slot < players.Length; slot++)
             {
-                var visual = slot == 0 ? scenario.CharacterId_Ref.VisualSetId_Ref :
-                    scenario.MonsterIds_Ref[(slot - 1) % scenario.MonsterIds_Ref.Count].VisualSetId_Ref;
+                int visualId = session.ReadUnit(slot).VisualSetId;
+                if (!visualSets.TryGetValue(visualId, out var visual))
+                    throw new InvalidOperationException("Combat unit references a visual that was not preloaded: " + visualId);
                 players[slot] = new CombatVisualPlayer(visual, resources);
                 RenderMeshUtility.AddComponents(session.UnitEntity(slot), manager, description, meshArray,
                     MaterialMeshInfo.FromRenderMeshArrayIndices(0, 0));
@@ -138,7 +173,7 @@ namespace Roguelike.Features.Combat.Rendering
                 var entity = session.ProjectileEntity(slot);
                 SetVisible(entity, projectile.Active);
                 if (!projectile.Active) continue;
-                if (projectile.SkillId != projectileSkill.Id || projectileSkill.ProjectileClipId_Ref == null)
+                if (!skills.TryGetValue(projectile.SkillId, out var projectileSkill) || projectileSkill.ProjectileClipId_Ref == null)
                     throw new InvalidOperationException("Combat projectile references a skill visual that was not preloaded.");
                 var clip = resources.Read(projectile.SkillId, projectileSkill.ProjectileClipId.Value);
                 int frame = clip.Animation.Sample(0, projectile.Age);
@@ -159,7 +194,7 @@ namespace Roguelike.Features.Combat.Rendering
             {
                 var impactEvent = session.ReadImpact(index);
                 if (!seenImpacts.Add(impactEvent.AttackSequence)) continue;
-                if (impactEvent.SkillId != projectileSkill.Id || projectileSkill.ImpactClipId_Ref == null) continue;
+                if (!skills.TryGetValue(impactEvent.SkillId, out var projectileSkill) || projectileSkill.ImpactClipId_Ref == null) continue;
                 var visual = AcquireImpact();
                 visual.Active = true;
                 visual.SkillId = impactEvent.SkillId;
