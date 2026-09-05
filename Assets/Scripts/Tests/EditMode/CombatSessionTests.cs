@@ -274,6 +274,7 @@ namespace Roguelike.Tests
 
         /// <summary>以实际千怪配置执行完整预热加采样时长的模拟，检查负载而非渲染性能。</summary>
         [Test]
+        [Category("Stress")]
         [Explicit("千怪持续负载需单独授权；普通交互验收不运行。")]
         public void ThousandMonsterSimulationMaintainsCombatWorkload()
         {
@@ -501,8 +502,9 @@ namespace Roguelike.Tests
         [Test]
         public void EcsAllowsMutualKillsInOneTick()
         {
+            var scenario = LoadTables().TbPerformanceScenario.Get(4);
             using var world = new World("Combat simultaneous death test");
-            using var session = CreateSession(world, LoadTables().TbPerformanceScenario.Get(4));
+            using var session = CreateSession(world, scenario);
             var player = session.ReadUnit(0);
             player.Target.Health = 1;
             player.Cooldown = 100;
@@ -529,6 +531,25 @@ namespace Roguelike.Tests
             Assert.That(session.ReadUnit(1).Target.Health, Is.Zero);
             Assert.That(session.Statistics.Deaths, Is.EqualTo(2));
             Assert.That(session.Statistics.Attacks, Is.EqualTo(2));
+            Assert.That(session.DeathCount, Is.EqualTo(2));
+            CombatDeathEvent playerDeath = default;
+            CombatDeathEvent monsterDeath = default;
+            for (int index = 0; index < session.DeathCount; index++)
+            {
+                var death = session.ReadDeath(index);
+                if (death.IsPlayer) playerDeath = death;
+                else monsterDeath = death;
+            }
+            Assert.That(playerDeath.ConfigId, Is.EqualTo(scenario.CharacterId));
+            Assert.That(playerDeath.VisualSetId, Is.EqualTo(scenario.CharacterId_Ref.VisualSetId));
+            Assert.That(playerDeath.Lifetime, Is.EqualTo(session.ReadUnit(0).Target.Lifetime));
+            Assert.That(monsterDeath.ConfigId, Is.EqualTo(scenario.MonsterIds_Ref[0].Id));
+            Assert.That(monsterDeath.VisualSetId, Is.EqualTo(scenario.MonsterIds_Ref[0].VisualSetId));
+            Assert.That(monsterDeath.Position, Is.EqualTo(session.ReadUnit(1).Position));
+            Assert.That(monsterDeath.IsBoss, Is.False);
+            session.Restart();
+            session.Advance(session.StepSeconds, float2.zero);
+            Assert.That(session.DeathCount, Is.Zero);
         }
 
         /// <summary>实际死亡补怪复用实体而更换生命周期，清除生命/冷却/目标并拒绝旧属性变更。</summary>

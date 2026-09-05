@@ -11,6 +11,8 @@ namespace Roguelike.Features.Combat.Ecs
     /// <summary>战斗实体热数据；所有属性与技能数值由 Luban 转换，失活状态由生命决定。</summary>
     public struct CombatUnit : IComponentData
     {
+        public int ConfigId, VisualSetId;
+        public bool IsBoss;
         public DamageTarget Target;
         public CombatCylinder Movement;
         public AttackSnapshot Attack;
@@ -49,6 +51,15 @@ namespace Roguelike.Features.Combat.Ecs
         public int SkillId;
         public float2 Position;
         public ulong AttackSequence, Tick;
+    }
+
+    /// <summary>单位生命首次降至零时写入的单帧事件；配置身份随生命周期固定，不通过池槽反推。</summary>
+    public struct CombatDeathEvent
+    {
+        public int Slot, ConfigId, VisualSetId;
+        public float2 Position;
+        public ulong Lifetime, Tick;
+        public bool IsPlayer, IsBoss;
     }
 
     /// <summary>每局计数，不将无敌拒绝、命中零伤害混作有效扣血。</summary>

@@ -24,6 +24,7 @@ namespace Roguelike.Features.Combat.Ecs
         private NativeParallelMultiHashMap<int2, int> grid;
         private NativeList<CombatDamageRequest> requests;
         private NativeList<CombatImpactEvent> impacts;
+        private NativeList<CombatDeathEvent> deaths;
         private NativeList<CombatAttackOption> attackOptions;
         private float maximumRadius, maximumMotion;
         private bool disposed;
@@ -92,6 +93,10 @@ namespace Roguelike.Features.Combat.Ecs
                 var player = scenario.CharacterId_Ref;
                 templates[0] = BuildUnit(scenario.CharacterProfileOverrideId_Ref, player.DefaultSkillId_Ref,
                     player.BodyRadius.Value, CombatCylinder.FromConfig(player.MoveRadiusPixels, player.MoveHeightPixels, player.MoveOffsetXPixels, player.MoveOffsetYPixels, player.MoveElevationPixels, rules.WorldUnitsPerPixel), new float2(scenario.PlayerStartX.Value, scenario.PlayerStartY.Value), true);
+                var playerTemplate = templates[0];
+                playerTemplate.ConfigId = player.Id;
+                playerTemplate.VisualSetId = player.VisualSetId;
+                templates[0] = playerTemplate;
                 int rows = (scenario.EntityCount + scenario.SpawnColumns - 1) / scenario.SpawnColumns;
                 for (int slot = 1; slot < count; slot++)
                 {
@@ -101,6 +106,8 @@ namespace Roguelike.Features.Combat.Ecs
                     templates[slot] = BuildUnit(scenario.MonsterProfileOverrideId_Ref, monster.DefaultSkillId_Ref,
                         monster.BodyRadius.Value, CombatCylinder.FromConfig(monster.MoveRadiusPixels, monster.MoveHeightPixels, monster.MoveOffsetXPixels, monster.MoveOffsetYPixels, monster.MoveElevationPixels, rules.WorldUnitsPerPixel), position, false);
                     var template = templates[slot];
+                    template.ConfigId = monster.Id;
+                    template.VisualSetId = monster.VisualSetId;
                     template.AttackOptionStart = offsets[monster.VisualSetId];
                     template.AttackOptionCount = attacksByVisual[monster.VisualSetId].Length;
                     templates[slot] = template;
@@ -121,6 +128,7 @@ namespace Roguelike.Features.Combat.Ecs
                 grid = new NativeParallelMultiHashMap<int2, int>(count, Allocator.Persistent);
                 requests = new NativeList<CombatDamageRequest>(count + projectiles.Length, Allocator.Persistent);
                 impacts = new NativeList<CombatImpactEvent>(Allocator.Persistent);
+                deaths = new NativeList<CombatDeathEvent>(Allocator.Persistent);
                 Restart();
             }
             catch { Dispose(); throw; }
@@ -139,6 +147,7 @@ namespace Roguelike.Features.Combat.Ecs
             CombatMath.NonNegative(elapsedSeconds);
             if (!math.all(math.isfinite(movement))) throw new InvalidOperationException("Combat input must be finite.");
             impacts.Clear();
+            deaths.Clear();
             if (Paused || Statistics.PlayerDead) return 0;
             double debt = BacklogSeconds + elapsedSeconds;
             CombatMath.NonNegative(debt);
@@ -153,6 +162,7 @@ namespace Roguelike.Features.Combat.Ecs
                     Units = units.AsArray(), Projectiles = projectiles, Templates = templates.AsArray(), Counters = counters,
                     Grid = grid, Requests = requests, Rules = damageRules, Input = movement,
                     Impacts = impacts,
+                    Deaths = deaths,
                     AttackOptions = attackOptions.AsArray(),
                     Arena = new float2(scenario.ArenaHalfWidth.Value, scenario.ArenaHalfHeight.Value),
                     Delta = (float)StepSeconds, Time = Statistics.Tick * StepSeconds, TargetRefresh = rules.TargetRefreshSeconds,
@@ -204,6 +214,7 @@ namespace Roguelike.Features.Combat.Ecs
             nextSpawnTick = timedSpawn ? SpawnDelayTicks(scenario.SpawnIntervalSeconds.Value) : 0;
             WaveNumber = 0; SpawnedInWave = 0; SpawnedMonsters = 0;
             grid.Clear(); requests.Clear(); impacts.Clear();
+            deaths.Clear();
             Paused = false;
             BacklogSeconds = PeakBacklogSeconds = 0;
         }
@@ -296,6 +307,8 @@ namespace Roguelike.Features.Combat.Ecs
                 var monster = scenario.MonsterIds_Ref[(units.Length - 1) % scenario.MonsterIds_Ref.Count];
                 var template = BuildUnit(scenario.MonsterProfileOverrideId_Ref, monster.DefaultSkillId_Ref,
                     monster.BodyRadius.Value, CombatCylinder.FromConfig(monster.MoveRadiusPixels, monster.MoveHeightPixels, monster.MoveOffsetXPixels, monster.MoveOffsetYPixels, monster.MoveElevationPixels, rules.WorldUnitsPerPixel), float2.zero, false);
+                template.ConfigId = monster.Id;
+                template.VisualSetId = monster.VisualSetId;
                 template.AttackOptionStart = attackOffsets[monster.VisualSetId];
                 template.AttackOptionCount = attackCounts[monster.VisualSetId];
                 var entity = manager.CreateEntity(typeof(CombatUnit), typeof(LocalTransform), typeof(LocalToWorld));
@@ -340,6 +353,15 @@ namespace Roguelike.Features.Combat.Ecs
         /// <returns>包含技能、位置、攻击序号和 tick 的事件副本。</returns>
         /// <exception cref="ObjectDisposedException">会话已释放。</exception>
         public CombatImpactEvent ReadImpact(int index) { EnsureAlive(); return impacts[index]; }
+
+        /// <summary>获取本次 Advance 内首次死亡事件数量；下一次 Advance 开始时清空。</summary>
+        public int DeathCount { get { EnsureAlive(); return deaths.Length; } }
+
+        /// <summary>正式单局按稳定伤害顺序读取死亡事件，供经验、Boss 和结算逻辑消费。</summary>
+        /// <param name="index">零起始事件索引。</param>
+        /// <returns>包含真实配置身份、位置、生命周期和模拟 tick 的事件副本。</returns>
+        /// <exception cref="ObjectDisposedException">会话已释放。</exception>
+        public CombatDeathEvent ReadDeath(int index) { EnsureAlive(); return deaths[index]; }
 
         /// <summary>属性来源改变后同步防守、后续攻击与移动数据，保留冷却比例和当前攻击原速进度；已起手攻击快照不变。</summary>
         /// <param name="slot">当前生命周期的单位槽。</param>
@@ -474,6 +496,7 @@ namespace Roguelike.Features.Combat.Ecs
             if (grid.IsCreated) grid.Dispose();
             if (requests.IsCreated) requests.Dispose();
             if (impacts.IsCreated) impacts.Dispose();
+            if (deaths.IsCreated) deaths.Dispose();
             if (attackOptions.IsCreated) attackOptions.Dispose();
         }
     }

@@ -51,6 +51,7 @@ namespace Roguelike.Tests
             using var grid = new NativeParallelMultiHashMap<int2,int>(2, Allocator.TempJob);
             using var requests = new NativeList<CombatDamageRequest>(Allocator.TempJob);
             using var impacts = new NativeList<CombatImpactEvent>(Allocator.TempJob);
+            using var deaths = new NativeList<CombatDeathEvent>(Allocator.TempJob);
             var unitSlots = units;
             for (int slot = 0; slot < 2; slot++)
             {
@@ -61,7 +62,7 @@ namespace Roguelike.Tests
                 manager.SetComponentData(units[slot], u);
             }
             var job = new CombatTickJob { Units=units, Projectiles=projectiles, Templates=templates, AttackOptions=options,
-                Counters=counters, Grid=grid, Requests=requests, Impacts=impacts, Arena=new float2(10), Input=new float2(1,0), Delta=1f/60,
+                Counters=counters, Grid=grid, Requests=requests, Impacts=impacts, Deaths=deaths, Arena=new float2(10), Input=new float2(1,0), Delta=1f/60,
                 CellSize=1, MaximumRadius=0.2f, MaximumMotion=4, TargetRefresh=1 };
             var system = world.GetOrCreateSystemManaged<CombatTickSystem>();
             system.RunTick(job);

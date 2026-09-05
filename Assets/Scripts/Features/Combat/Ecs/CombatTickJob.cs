@@ -23,6 +23,7 @@ namespace Roguelike.Features.Combat.Ecs
         public NativeParallelMultiHashMap<int2, int> Grid;
         public NativeList<CombatDamageRequest> Requests;
         public NativeList<CombatImpactEvent> Impacts;
+        public NativeList<CombatDeathEvent> Deaths;
         public NativeArray<CombatCounters> Counters;
         public DamageRules Rules;
         public float2 Input, Arena;
@@ -362,7 +363,21 @@ namespace Roguelike.Features.Combat.Ecs
                 counters.HealthLost += result.HealthLost;
                 if (RestorePlayer && unit.Target.IsPlayer) unit.Target.Heal(unit.Target.MaxHealth);
             }
-            if (result.Killed) counters.Deaths++;
+            if (result.Killed)
+            {
+                counters.Deaths++;
+                Deaths.Add(new CombatDeathEvent
+                {
+                    Slot = request.TargetSlot,
+                    ConfigId = unit.ConfigId,
+                    VisualSetId = unit.VisualSetId,
+                    Position = unit.Position,
+                    Lifetime = unit.Target.Lifetime,
+                    Tick = counters.Tick + 1,
+                    IsPlayer = unit.Target.IsPlayer,
+                    IsBoss = unit.IsBoss
+                });
+            }
             UnitData[Units[request.TargetSlot]] = unit;
         }
 
