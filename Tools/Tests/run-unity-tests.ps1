@@ -138,6 +138,9 @@ if ($null -eq $run) {
     throw "Unity wrote an invalid test result. Result: $resultPath"
 }
 Write-Output "UNITY_TEST_FINISHED result=$($run.result) total=$($run.total) passed=$($run.passed) failed=$($run.failed) skipped=$($run.skipped) duration=$($run.duration)s"
+if ([int]$run.total -le 0) {
+    throw "Unity executed zero tests. Check the test filter. Result: $resultPath"
+}
 if ($run.failed -ne '0' -or $run.result -ne 'Passed') {
     throw "Unity tests failed. Result: $resultPath"
 }
