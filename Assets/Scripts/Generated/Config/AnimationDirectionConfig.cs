@@ -21,8 +21,8 @@ public sealed partial class AnimationDirectionConfig : Luban.BeanBase
     {
         Id = _buf.ReadInt();
         Name = _buf.ReadString();
-        X = _buf.ReadFloat();
-        Y = _buf.ReadFloat();
+        XMilli = _buf.ReadInt();
+        YMilli = _buf.ReadInt();
         ActionIndex = _buf.ReadInt();
         FlipX = _buf.ReadBool();
     }
@@ -41,13 +41,13 @@ public sealed partial class AnimationDirectionConfig : Luban.BeanBase
     /// </summary>
     public readonly string Name;
     /// <summary>
-    /// 方向向量X
+    /// 方向向量X；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
     /// </summary>
-    public readonly float X;
+    public readonly int XMilli;
     /// <summary>
-    /// 方向向量Y
+    /// 方向向量Y；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
     /// </summary>
-    public readonly float Y;
+    public readonly int YMilli;
     /// <summary>
     /// 旧 FaceActionIndex 映射
     /// </summary>
@@ -69,8 +69,8 @@ public sealed partial class AnimationDirectionConfig : Luban.BeanBase
         return "{ "
         + "id:" + Id + ","
         + "name:" + Name + ","
-        + "x:" + X + ","
-        + "y:" + Y + ","
+        + "xMilli:" + XMilli + ","
+        + "yMilli:" + YMilli + ","
         + "actionIndex:" + ActionIndex + ","
         + "flipX:" + FlipX + ","
         + "}";

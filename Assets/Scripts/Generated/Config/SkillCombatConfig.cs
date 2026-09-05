@@ -21,12 +21,11 @@ public sealed partial class SkillCombatConfig : Luban.BeanBase
     {
         Id = _buf.ReadInt();
         DeliveryType = (ESkillDeliveryType)_buf.ReadInt();
-        BaseInterval = _buf.ReadFloat();
-        Range = _buf.ReadFloat();
-        if(_buf.ReadBool()){ ProjectileSpeed = _buf.ReadFloat(); } else { ProjectileSpeed = null; }
-        if(_buf.ReadBool()){ ProjectileLifetime = _buf.ReadFloat(); } else { ProjectileLifetime = null; }
-        if(_buf.ReadBool()){ ProjectileRadius = _buf.ReadFloat(); } else { ProjectileRadius = null; }
-        if(_buf.ReadBool()){ AttackWindupSeconds = _buf.ReadFloat(); } else { AttackWindupSeconds = null; }
+        BaseIntervalMilli = _buf.ReadInt();
+        RangeMilli = _buf.ReadInt();
+        if(_buf.ReadBool()){ ProjectileSpeedMilli = _buf.ReadInt(); } else { ProjectileSpeedMilli = null; }
+        if(_buf.ReadBool()){ ProjectileLifetimeMilli = _buf.ReadInt(); } else { ProjectileLifetimeMilli = null; }
+        if(_buf.ReadBool()){ AttackWindupSecondsMilli = _buf.ReadInt(); } else { AttackWindupSecondsMilli = null; }
     }
 
     public static SkillCombatConfig DeserializeSkillCombatConfig(ByteBuf _buf)
@@ -43,29 +42,25 @@ public sealed partial class SkillCombatConfig : Luban.BeanBase
     /// </summary>
     public readonly ESkillDeliveryType DeliveryType;
     /// <summary>
-    /// 基础攻击间隔，秒
+    /// 基础攻击间隔，秒；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
     /// </summary>
-    public readonly float BaseInterval;
+    public readonly int BaseIntervalMilli;
     /// <summary>
-    /// 攻击范围，按碰撞体边缘，世界单位
+    /// 攻击范围，按碰撞体边缘，世界单位；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
     /// </summary>
-    public readonly float Range;
+    public readonly int RangeMilli;
     /// <summary>
-    /// 弹丸速度，世界单位每秒
+    /// 弹丸速度，世界单位每秒；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
     /// </summary>
-    public readonly float? ProjectileSpeed;
+    public readonly int? ProjectileSpeedMilli;
     /// <summary>
-    /// 弹丸寿命，秒
+    /// 弹丸寿命，秒；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
     /// </summary>
-    public readonly float? ProjectileLifetime;
+    public readonly int? ProjectileLifetimeMilli;
     /// <summary>
-    /// 弹丸半径，世界单位
+    /// 普通近战 zd→gj 前摇秒数；弹丸留空；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
     /// </summary>
-    public readonly float? ProjectileRadius;
-    /// <summary>
-    /// 普通近战 zd→gj 前摇秒数；弹丸留空
-    /// </summary>
-    public readonly float? AttackWindupSeconds;
+    public readonly int? AttackWindupSecondsMilli;
    
     public const int __ID__ = 1481233447;
     public override int GetTypeId() => __ID__;
@@ -79,12 +74,11 @@ public sealed partial class SkillCombatConfig : Luban.BeanBase
         return "{ "
         + "id:" + Id + ","
         + "deliveryType:" + DeliveryType + ","
-        + "baseInterval:" + BaseInterval + ","
-        + "range:" + Range + ","
-        + "projectileSpeed:" + ProjectileSpeed + ","
-        + "projectileLifetime:" + ProjectileLifetime + ","
-        + "projectileRadius:" + ProjectileRadius + ","
-        + "attackWindupSeconds:" + AttackWindupSeconds + ","
+        + "baseIntervalMilli:" + BaseIntervalMilli + ","
+        + "rangeMilli:" + RangeMilli + ","
+        + "projectileSpeedMilli:" + ProjectileSpeedMilli + ","
+        + "projectileLifetimeMilli:" + ProjectileLifetimeMilli + ","
+        + "attackWindupSecondsMilli:" + AttackWindupSecondsMilli + ","
         + "}";
     }
 }

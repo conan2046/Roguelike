@@ -38,7 +38,7 @@ public sealed partial class AttributeProfileConfig : Luban.BeanBase
     /// </summary>
     public readonly string Name;
     /// <summary>
-    /// 属性ID:数值；分号分隔，必需属性全量填写
+    /// 属性ID:放大1000倍的整数值，以分号分隔；实际属性值=表值/1000；最多3位小数
     /// </summary>
     public readonly System.Collections.Generic.List<AttributeValue> Values;
    

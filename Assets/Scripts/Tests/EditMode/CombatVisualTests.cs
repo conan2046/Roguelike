@@ -18,6 +18,26 @@ namespace Roguelike.Tests
     /// <summary>真实配置与美术驱动的播放、共享资源和实体绑定回归。</summary>
     public sealed class CombatVisualTests
     {
+        /// <summary>模拟编辑器先回收 ECS World，再触发入口关闭；表现和会话必须安全释放且可重复关闭。</summary>
+        /// <remarks>使用真实配置与内存美术资源；finally 清理测试独占世界，不保存 Scene 或 Prefab。</remarks>
+        [Test]
+        public void DisposeAfterWorldShutdownDoesNotAccessEntityManager()
+        {
+            var tables = LoadTables(); var scenario = tables.TbPerformanceScenario.Get(4); var source = new Files(tables);
+            using var assets = CombatVisualResources.LoadAsync(scenario, source, CancellationToken.None).GetAwaiter().GetResult();
+            var world = new World("World shutdown before visuals");
+            try
+            {
+                using var session = CombatSessionFactory.CreateAsync(world, scenario, source, CancellationToken.None).GetAwaiter().GetResult();
+                using var visuals = new CombatEntityVisuals(world, session, scenario, assets);
+                world.Dispose();
+                Assert.DoesNotThrow(() => visuals.Dispose());
+                Assert.DoesNotThrow(() => visuals.Dispose());
+                Assert.DoesNotThrow(() => session.Dispose());
+            }
+            finally { if (world.IsCreated) world.Dispose(); }
+        }
+
         /// <summary>真实定时刷怪扩容后绑定新增槽，复用共享网格，并在重开后隐藏全部旧怪物。</summary>
         [Test]
         public void TimedSpawnBindsGrowingEntitiesAndHidesOnRestart()
@@ -185,7 +205,7 @@ namespace Roguelike.Tests
             var tables = new Tables(name => new ByteBuf(File.ReadAllBytes(Path.Combine(Application.streamingAssetsPath, "Config", "Luban", name + ".bytes"))));
             // 固定选帧夹具保留出生目标；动态绑定测试显式消费真实定时配置。
             if (!timedSpawn)
-                foreach (string field in new[] { "SpawnRadiusPixels", "SpawnIntervalSeconds", "SpawnBatchCount", "SpawnUnitIntervalSeconds" })
+                foreach (string field in new[] { "SpawnRadiusPixelsMilli", "SpawnIntervalSecondsMilli", "SpawnBatchCount", "SpawnUnitIntervalSecondsMilli" })
                     typeof(PerformanceScenarioConfig).GetField(field).SetValue(tables.TbPerformanceScenario.Get(4), null);
             return tables;
         }

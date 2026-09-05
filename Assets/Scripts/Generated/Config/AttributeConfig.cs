@@ -25,8 +25,8 @@ public sealed partial class AttributeConfig : Luban.BeanBase
         AttributeType = (EAttributeType)_buf.ReadInt();
         ValueKind = (EAttributeValueKind)_buf.ReadInt();
         Unit = _buf.ReadString();
-        MinValue = _buf.ReadDouble();
-        MaxValue = _buf.ReadDouble();
+        MinValueMilli = _buf.ReadLong();
+        MaxValueMilli = _buf.ReadLong();
     }
 
     public static AttributeConfig DeserializeAttributeConfig(ByteBuf _buf)
@@ -59,13 +59,13 @@ public sealed partial class AttributeConfig : Luban.BeanBase
     /// </summary>
     public readonly string Unit;
     /// <summary>
-    /// 合法下限；调试值
+    /// 合法下限；调试值；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
     /// </summary>
-    public readonly double MinValue;
+    public readonly long MinValueMilli;
     /// <summary>
-    /// 合法上限；调试值
+    /// 合法上限；调试值；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
     /// </summary>
-    public readonly double MaxValue;
+    public readonly long MaxValueMilli;
    
     public const int __ID__ = 1818455262;
     public override int GetTypeId() => __ID__;
@@ -83,8 +83,8 @@ public sealed partial class AttributeConfig : Luban.BeanBase
         + "attributeType:" + AttributeType + ","
         + "valueKind:" + ValueKind + ","
         + "unit:" + Unit + ","
-        + "minValue:" + MinValue + ","
-        + "maxValue:" + MaxValue + ","
+        + "minValueMilli:" + MinValueMilli + ","
+        + "maxValueMilli:" + MaxValueMilli + ","
         + "}";
     }
 }

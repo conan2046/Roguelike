@@ -39,18 +39,18 @@ public sealed partial class CombatPresentationConfig : Luban.BeanBase
         StatusFormat = _buf.ReadString();
         DeadText = _buf.ReadString();
         HelpText = _buf.ReadString();
-        PanelWidth = _buf.ReadFloat();
-        PanelHeight = _buf.ReadFloat();
+        PanelWidthMilli = _buf.ReadInt();
+        PanelHeightMilli = _buf.ReadInt();
         FontSize = _buf.ReadInt();
-        CameraDepth = _buf.ReadFloat();
-        CameraNear = _buf.ReadFloat();
-        CameraFar = _buf.ReadFloat();
-        BackgroundR = _buf.ReadFloat();
-        BackgroundG = _buf.ReadFloat();
-        BackgroundB = _buf.ReadFloat();
-        ProjectileR = _buf.ReadFloat();
-        ProjectileG = _buf.ReadFloat();
-        ProjectileB = _buf.ReadFloat();
+        CameraDepthMilli = _buf.ReadInt();
+        CameraNearMilli = _buf.ReadInt();
+        CameraFarMilli = _buf.ReadInt();
+        BackgroundRMilli = _buf.ReadInt();
+        BackgroundGMilli = _buf.ReadInt();
+        BackgroundBMilli = _buf.ReadInt();
+        ProjectileRMilli = _buf.ReadInt();
+        ProjectileGMilli = _buf.ReadInt();
+        ProjectileBMilli = _buf.ReadInt();
         {int n0 = _buf.ReadSize(); AttackDirectionIds = new System.Collections.Generic.List<int>(n0);for(var i0 = 0 ; i0 < n0 ; i0++) { int _e0;  _e0 = _buf.ReadInt(); AttackDirectionIds.Add(_e0);}}
         ShaderName = _buf.ReadString();
         TextureFilterMode = _buf.ReadString();
@@ -140,53 +140,53 @@ public sealed partial class CombatPresentationConfig : Luban.BeanBase
     /// </summary>
     public readonly string HelpText;
     /// <summary>
-    /// 调试面板像素宽
+    /// 调试面板像素宽；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
     /// </summary>
-    public readonly float PanelWidth;
+    public readonly int PanelWidthMilli;
     /// <summary>
-    /// 调试面板像素高
+    /// 调试面板像素高；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
     /// </summary>
-    public readonly float PanelHeight;
+    public readonly int PanelHeightMilli;
     /// <summary>
     /// 调试文字字号
     /// </summary>
     public readonly int FontSize;
     /// <summary>
-    /// 相机距XY平面距离
+    /// 相机距XY平面距离；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
     /// </summary>
-    public readonly float CameraDepth;
+    public readonly int CameraDepthMilli;
     /// <summary>
-    /// 相机近裁面
+    /// 相机近裁面；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
     /// </summary>
-    public readonly float CameraNear;
+    public readonly int CameraNearMilli;
     /// <summary>
-    /// 相机远裁面
+    /// 相机远裁面；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
     /// </summary>
-    public readonly float CameraFar;
+    public readonly int CameraFarMilli;
     /// <summary>
-    /// 背景红
+    /// 背景红；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
     /// </summary>
-    public readonly float BackgroundR;
+    public readonly int BackgroundRMilli;
     /// <summary>
-    /// 背景绿
+    /// 背景绿；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
     /// </summary>
-    public readonly float BackgroundG;
+    public readonly int BackgroundGMilli;
     /// <summary>
-    /// 背景蓝
+    /// 背景蓝；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
     /// </summary>
-    public readonly float BackgroundB;
+    public readonly int BackgroundBMilli;
     /// <summary>
-    /// 调试弹丸红
+    /// 调试弹丸红；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
     /// </summary>
-    public readonly float ProjectileR;
+    public readonly int ProjectileRMilli;
     /// <summary>
-    /// 调试弹丸绿
+    /// 调试弹丸绿；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
     /// </summary>
-    public readonly float ProjectileG;
+    public readonly int ProjectileGMilli;
     /// <summary>
-    /// 调试弹丸蓝
+    /// 调试弹丸蓝；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
     /// </summary>
-    public readonly float ProjectileB;
+    public readonly int ProjectileBMilli;
     /// <summary>
     /// 最近夹角；等角按列表先后
     /// </summary>
@@ -237,18 +237,18 @@ public sealed partial class CombatPresentationConfig : Luban.BeanBase
         + "statusFormat:" + StatusFormat + ","
         + "deadText:" + DeadText + ","
         + "helpText:" + HelpText + ","
-        + "panelWidth:" + PanelWidth + ","
-        + "panelHeight:" + PanelHeight + ","
+        + "panelWidthMilli:" + PanelWidthMilli + ","
+        + "panelHeightMilli:" + PanelHeightMilli + ","
         + "fontSize:" + FontSize + ","
-        + "cameraDepth:" + CameraDepth + ","
-        + "cameraNear:" + CameraNear + ","
-        + "cameraFar:" + CameraFar + ","
-        + "backgroundR:" + BackgroundR + ","
-        + "backgroundG:" + BackgroundG + ","
-        + "backgroundB:" + BackgroundB + ","
-        + "projectileR:" + ProjectileR + ","
-        + "projectileG:" + ProjectileG + ","
-        + "projectileB:" + ProjectileB + ","
+        + "cameraDepthMilli:" + CameraDepthMilli + ","
+        + "cameraNearMilli:" + CameraNearMilli + ","
+        + "cameraFarMilli:" + CameraFarMilli + ","
+        + "backgroundRMilli:" + BackgroundRMilli + ","
+        + "backgroundGMilli:" + BackgroundGMilli + ","
+        + "backgroundBMilli:" + BackgroundBMilli + ","
+        + "projectileRMilli:" + ProjectileRMilli + ","
+        + "projectileGMilli:" + ProjectileGMilli + ","
+        + "projectileBMilli:" + ProjectileBMilli + ","
         + "attackDirectionIds:" + Luban.StringUtil.CollectionToString(AttackDirectionIds) + ","
         + "shaderName:" + ShaderName + ","
         + "textureFilterMode:" + TextureFilterMode + ","

@@ -15,6 +15,8 @@ namespace Roguelike.Features.Combat.Ecs
         public CombatCylinder Movement;
         public AttackSnapshot Attack;
         public float2 Position, PreviousPosition, SpawnPosition;
+        public float2 ProjectileOffset;
+        public int SkillId;
         public float Radius, MoveSpeed, Range, ProjectileSpeed, ProjectileLifetime, ProjectileRadius;
         public double Interval, Cooldown, NextTargetRefresh;
         public int TargetSlot;
@@ -34,6 +36,8 @@ namespace Roguelike.Features.Combat.Ecs
     {
         public AttackSnapshot Attack;
         public float2 Position, Velocity;
+        public float2 CollisionOffset;
+        public int SkillId;
         public double Remaining;
         public float Radius;
         public bool Active, BornThisTick;

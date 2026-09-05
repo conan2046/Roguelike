@@ -89,13 +89,19 @@ internal static class Program
             ValidateCylinder(actor.MoveRadiusPixels, actor.MoveHeightPixels, actor.MoveOffsetXPixels, actor.MoveOffsetYPixels, actor.MoveElevationPixels);
         }
         foreach (var skill in tables.TbSkill.DataList)
+        {
             Require(!skill.CombatProfileId.HasValue || skill.CombatProfileId_Ref != null, $"TbSkill {skill.Id}: missing combat profile.");
+            if (skill.CombatProfileId_Ref?.DeliveryType == ESkillDeliveryType.Projectile)
+                Require(Positive(skill.ProjectileRadius) && skill.ProjectileOffsetX.HasValue && skill.ProjectileOffsetY.HasValue, $"TbSkill {skill.Id}: missing projectile collision.");
+            else
+                Require(!skill.ProjectileRadius.HasValue && !skill.ProjectileOffsetX.HasValue && !skill.ProjectileOffsetY.HasValue, $"TbSkill {skill.Id}: non-projectile collision must be empty.");
+        }
         foreach (var skill in tables.TbSkillCombat.DataList)
         {
             Require(float.IsFinite(skill.BaseInterval) && skill.BaseInterval > 0 && float.IsFinite(skill.Range) && skill.Range >= 0, $"TbSkillCombat {skill.Id}: invalid interval/range.");
             if (skill.DeliveryType == ESkillDeliveryType.Projectile)
             {
-                Require(Positive(skill.ProjectileSpeed) && Positive(skill.ProjectileLifetime) && Positive(skill.ProjectileRadius), $"TbSkillCombat {skill.Id}: missing projectile dimensions.");
+                Require(Positive(skill.ProjectileSpeed) && Positive(skill.ProjectileLifetime), $"TbSkillCombat {skill.Id}: missing projectile dimensions.");
                 Require(skill.ProjectileSpeed * skill.ProjectileLifetime >= skill.Range, $"TbSkillCombat {skill.Id}: projectile cannot cover range.");
             }
             else
@@ -103,7 +109,7 @@ internal static class Program
                 Require(skill.DeliveryType == ESkillDeliveryType.Melee, $"TbSkillCombat {skill.Id}: unsupported delivery.");
                 Require(skill.AttackWindupSeconds.HasValue && float.IsFinite(skill.AttackWindupSeconds.Value) && skill.AttackWindupSeconds.Value >= 0,
                     $"TbSkillCombat {skill.Id}: missing or invalid attack windup.");
-                Require(!skill.ProjectileSpeed.HasValue && !skill.ProjectileLifetime.HasValue && !skill.ProjectileRadius.HasValue, $"TbSkillCombat {skill.Id}: melee has projectile data.");
+                Require(!skill.ProjectileSpeed.HasValue && !skill.ProjectileLifetime.HasValue, $"TbSkillCombat {skill.Id}: melee has projectile data.");
             }
         }
         foreach (var rule in tables.TbCombatRules.DataList)

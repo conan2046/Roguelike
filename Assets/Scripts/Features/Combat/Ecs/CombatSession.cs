@@ -89,7 +89,7 @@ namespace Roguelike.Features.Combat.Ecs
                     }
                 }
                 var player = scenario.CharacterId_Ref;
-                templates[0] = BuildUnit(scenario.CharacterProfileOverrideId_Ref, player.DefaultSkillId_Ref.CombatProfileId_Ref,
+                templates[0] = BuildUnit(scenario.CharacterProfileOverrideId_Ref, player.DefaultSkillId_Ref,
                     player.BodyRadius.Value, CombatCylinder.FromConfig(player.MoveRadiusPixels, player.MoveHeightPixels, player.MoveOffsetXPixels, player.MoveOffsetYPixels, player.MoveElevationPixels, rules.WorldUnitsPerPixel), new float2(scenario.PlayerStartX.Value, scenario.PlayerStartY.Value), true);
                 int rows = (scenario.EntityCount + scenario.SpawnColumns - 1) / scenario.SpawnColumns;
                 for (int slot = 1; slot < count; slot++)
@@ -97,7 +97,7 @@ namespace Roguelike.Features.Combat.Ecs
                     var monster = scenario.MonsterIds_Ref[(slot - 1) % scenario.MonsterIds_Ref.Count];
                     var position = new float2(((slot - 1) % scenario.SpawnColumns - (scenario.SpawnColumns - 1) * 0.5f) * scenario.HorizontalSpacing,
                         ((slot - 1) / scenario.SpawnColumns - (rows - 1) * 0.5f) * scenario.VerticalSpacing);
-                    templates[slot] = BuildUnit(scenario.MonsterProfileOverrideId_Ref, monster.DefaultSkillId_Ref.CombatProfileId_Ref,
+                    templates[slot] = BuildUnit(scenario.MonsterProfileOverrideId_Ref, monster.DefaultSkillId_Ref,
                         monster.BodyRadius.Value, CombatCylinder.FromConfig(monster.MoveRadiusPixels, monster.MoveHeightPixels, monster.MoveOffsetXPixels, monster.MoveOffsetYPixels, monster.MoveElevationPixels, rules.WorldUnitsPerPixel), position, false);
                     var template = templates[slot];
                     template.AttackOptionStart = offsets[monster.VisualSetId];
@@ -290,7 +290,7 @@ namespace Roguelike.Features.Combat.Ecs
             while (units.Length < count)
             {
                 var monster = scenario.MonsterIds_Ref[(units.Length - 1) % scenario.MonsterIds_Ref.Count];
-                var template = BuildUnit(scenario.MonsterProfileOverrideId_Ref, monster.DefaultSkillId_Ref.CombatProfileId_Ref,
+                var template = BuildUnit(scenario.MonsterProfileOverrideId_Ref, monster.DefaultSkillId_Ref,
                     monster.BodyRadius.Value, CombatCylinder.FromConfig(monster.MoveRadiusPixels, monster.MoveHeightPixels, monster.MoveOffsetXPixels, monster.MoveOffsetYPixels, monster.MoveElevationPixels, rules.WorldUnitsPerPixel), float2.zero, false);
                 template.AttackOptionStart = attackOffsets[monster.VisualSetId];
                 template.AttackOptionCount = attackCounts[monster.VisualSetId];
@@ -350,15 +350,16 @@ namespace Roguelike.Features.Combat.Ecs
 
         /// <summary>入局时将 TbAttributeProfile、TbSkillCombat 与身体半径转为非托管模板。</summary>
         /// <param name="profile">完整属性方案。</param>
-        /// <param name="skill">默认技能战斗引用。</param>
+        /// <param name="skillConfig">TbSkill 技能，碰撞半径与偏移独立于其 TbSkillCombat 引用。</param>
         /// <param name="radius">TbCharacter/TbMonster.bodyRadius。</param>
         /// <param name="movement">TbCharacter/TbMonster 导出的独立移动圆柱。</param>
         /// <param name="position">TbPerformanceScenario 生成位置。</param>
         /// <param name="player">区分玩家弹丸与怪物近战角色。</param>
         /// <returns>冷却就绪且目标为空的出生模板。</returns>
         /// <exception cref="InvalidOperationException">属性、几何或技能配置不合法。</exception>
-        private CombatUnit BuildUnit(AttributeProfileConfig profile, SkillCombatConfig skill, float radius, CombatCylinder movement, float2 position, bool player)
+        private CombatUnit BuildUnit(AttributeProfileConfig profile, SkillConfig skillConfig, float radius, CombatCylinder movement, float2 position, bool player)
         {
+            var skill = skillConfig.CombatProfileId_Ref ?? throw new InvalidOperationException("Missing skill combat profile.");
             var attributes = new CombatAttributes(profile);
             CombatMath.Positive(radius);
             if (!math.all(math.isfinite(position)) || math.abs(position.x) + radius > scenario.ArenaHalfWidth.Value ||
@@ -369,9 +370,9 @@ namespace Roguelike.Features.Combat.Ecs
                 throw new InvalidOperationException($"TbSkillCombat {skill.Id}: unsupported actor delivery role.");
             if (player)
             {
-                if (!skill.ProjectileSpeed.HasValue || !skill.ProjectileRadius.HasValue || !skill.ProjectileLifetime.HasValue)
+                if (!skill.ProjectileSpeed.HasValue || !skillConfig.ProjectileRadius.HasValue || !skill.ProjectileLifetime.HasValue || !skillConfig.ProjectileOffsetX.HasValue || !skillConfig.ProjectileOffsetY.HasValue)
                     throw new InvalidOperationException($"TbSkillCombat {skill.Id}: missing projectile fields.");
-                CombatMath.Positive(skill.ProjectileSpeed.Value); CombatMath.Positive(skill.ProjectileRadius.Value); CombatMath.Positive(skill.ProjectileLifetime.Value);
+                CombatMath.Positive(skill.ProjectileSpeed.Value); CombatMath.Positive(skillConfig.ProjectileRadius.Value); CombatMath.Positive(skill.ProjectileLifetime.Value);
             }
             else
             {
@@ -389,8 +390,10 @@ namespace Roguelike.Features.Combat.Ecs
                 WindupSeconds = player ? 0 : skill.AttackWindupSeconds.Value,
                 Facing = new float2(scenario.PresentationId_Ref.InitialDirectionId_Ref.X, scenario.PresentationId_Ref.InitialDirectionId_Ref.Y),
                 // 近战不消费弹丸字段；零仅为空布局，不作为弹丸参数兜底。
+                SkillId = skillConfig.Id,
+                ProjectileOffset = player ? new float2(skillConfig.ProjectileOffsetX.Value, skillConfig.ProjectileOffsetY.Value) : float2.zero,
                 ProjectileSpeed = player ? skill.ProjectileSpeed.Value : 0,
-                ProjectileLifetime = player ? skill.ProjectileLifetime.Value : 0, ProjectileRadius = player ? skill.ProjectileRadius.Value : 0 };
+                ProjectileLifetime = player ? skill.ProjectileLifetime.Value : 0, ProjectileRadius = player ? skillConfig.ProjectileRadius.Value : 0 };
         }
 
         /// <summary>实体创建前验证必须的场景引用与固定步进参数，旧移动场景不能误入战斗。</summary>

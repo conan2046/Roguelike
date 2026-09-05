@@ -21,6 +21,71 @@ namespace Roguelike.Tests
         [SetUp]
         public void TraceTestStart() => Debug.Log("COMBAT_TEST_BEGIN " + TestContext.CurrentContext.Test.Name);
 
+        /// <summary>两种技能共享同一机制时，表内各自半径必须传到正式 ECS 扫掠并改变擦边命中结果。</summary>
+        /// <param name="radiusMilli">TbSkill 半径千分整数。</param><param name="hit">横向间距为 0.4 的目标是否应命中。</param>
+        [TestCase(80, false)]
+        [TestCase(400, true)]
+        public void SkillRadiusControlsIndependentProjectileCollision(int radiusMilli, bool hit)
+        {
+            var tables = LoadTables(); var scenario = tables.TbPerformanceScenario.Get(4);
+            var source = scenario.CharacterId_Ref.DefaultSkillId_Ref;
+            var skill = SkillWithCollision(source, radiusMilli, 0, 0);
+            scenario.CharacterId_Ref.DefaultSkillId_Ref = skill;
+            Assert.That(skill.CombatProfileId_Ref, Is.SameAs(source.CombatProfileId_Ref));
+            using var world = new World("Independent skill radius"); using var session = CreateSession(world, scenario);
+            Assert.That(session.ReadUnit(0).ProjectileRadius, Is.EqualTo(radiusMilli / 1000f));
+            for (int slot = 1; slot < session.UnitCount; slot++)
+            {
+                var unit = session.ReadUnit(slot); unit.Position = new float2(2, 0); unit.MoveSpeed = 0; unit.Cooldown = 1000;
+                unit.Target.Health = slot == 1 ? unit.Target.MaxHealth : 0; unit.Target.Evasion = 0;
+                world.EntityManager.SetComponentData(session.UnitEntity(slot), unit);
+            }
+            session.Advance(session.StepSeconds, float2.zero);
+            var entity = session.ProjectileEntity(0); var projectile = world.EntityManager.GetComponentData<CombatProjectile>(entity);
+            Assert.That(projectile.Active, Is.True);
+            projectile.Position = new float2(0, 0.4f); projectile.Velocity = new float2(600, 0);
+            world.EntityManager.SetComponentData(entity, projectile);
+            long health = session.ReadUnit(1).Target.Health;
+            session.Advance(session.StepSeconds, float2.zero);
+            Assert.That(session.ReadUnit(1).Target.Health < health, Is.EqualTo(hit));
+        }
+
+        /// <summary>发射方向为右时，技能局部右/前偏移应旋转到世界下/右；扫掠消费偏移且不改变表现原点。</summary>
+        [Test]
+        public void SkillOffsetRotatesAndParticipatesInSweep()
+        {
+            var tables = LoadTables(); var scenario = tables.TbPerformanceScenario.Get(4);
+            scenario.CharacterId_Ref.DefaultSkillId_Ref = SkillWithCollision(scenario.CharacterId_Ref.DefaultSkillId_Ref, 80, 500, 1000);
+            using var world = new World("Skill local offset"); using var session = CreateSession(world, scenario);
+            for (int slot = 1; slot < session.UnitCount; slot++)
+            {
+                var unit = session.ReadUnit(slot); unit.Position = new float2(2, 0); unit.MoveSpeed = 0; unit.Cooldown = 1000;
+                unit.Target.Health = slot == 1 ? unit.Target.MaxHealth : 0; unit.Target.Evasion = 0;
+                world.EntityManager.SetComponentData(session.UnitEntity(slot), unit);
+            }
+            session.Advance(session.StepSeconds, float2.zero);
+            var entity = session.ProjectileEntity(0); var projectile = world.EntityManager.GetComponentData<CombatProjectile>(entity);
+            Assert.That(math.distance(projectile.CollisionOffset, new float2(1, -0.5f)), Is.LessThan(1e-6f));
+            Assert.That(projectile.Position.y, Is.Zero);
+            projectile.Position = new float2(0, 0.5f); projectile.Velocity = new float2(600, 0);
+            world.EntityManager.SetComponentData(entity, projectile);
+            long health = session.ReadUnit(1).Target.Health;
+            session.Advance(session.StepSeconds, float2.zero);
+            Assert.That(session.ReadUnit(1).Target.Health, Is.LessThan(health));
+        }
+
+        /// <summary>隔离配置测试通过生成的二进制协议创建技能变体，保留相同机制和视觉引用，不写源表。</summary>
+        /// <param name="source">实际 TbSkill 行。</param><param name="radius">半径千分整数。</param>
+        /// <param name="x">局部右向偏移千分整数。</param><param name="y">局部前向偏移千分整数。</param>
+        /// <returns>仅当前测试持有的技能配置。</returns>
+        private static SkillConfig SkillWithCollision(SkillConfig source, int radius, int x, int y)
+        {
+            var b = new ByteBuf(); b.WriteInt(source.Id); b.WriteString(source.Name); b.WriteInt(source.VisualSetId);
+            b.WriteBool(true); b.WriteInt(source.CombatProfileId.Value);
+            b.WriteBool(true); b.WriteInt(radius); b.WriteBool(true); b.WriteInt(x); b.WriteBool(true); b.WriteInt(y);
+            return new SkillConfig(b) { CombatProfileId_Ref = source.CombatProfileId_Ref, VisualSetId_Ref = source.VisualSetId_Ref };
+        }
+
         /// <summary>持续圆周出生并追逐静止玩家，校验活怪互不重叠且不能进入玩家圆柱。</summary>
         [Test]
         public void TimedCrowdCannotOverlapMovementCylinders()
@@ -60,7 +125,7 @@ namespace Roguelike.Tests
             for (int tick = 1; tick <= last + gap; tick++)
             {
                 var player = session.ReadUnit(0);
-                player.Position = new float2(s.ArenaHalfWidth.Value - player.Radius, 0);
+                player.Position = new float2(s.ArenaHalfWidth.Value - player.Movement.Radius - player.Movement.Offset.x, 0);
                 for (int slot = 0; slot < session.UnitCount; slot++)
                 { var u = slot == 0 ? player : session.ReadUnit(slot); u.MoveSpeed = 0; u.Cooldown = 1000; world.EntityManager.SetComponentData(session.UnitEntity(slot), u); }
                 long before = session.SpawnedMonsters;
@@ -91,7 +156,7 @@ namespace Roguelike.Tests
             for (int i = 0; i < ticks - 1; i++) session.Advance(session.StepSeconds, float2.zero);
             Assert.That(session.SpawnedMonsters, Is.Zero);
             var player = session.ReadUnit(0);
-            player.Position = new float2(scenario.ArenaHalfWidth.Value - player.Radius, 0);
+            player.Position = new float2(scenario.ArenaHalfWidth.Value - player.Movement.Radius - player.Movement.Offset.x, 0);
             player.Cooldown = 1000;
             world.EntityManager.SetComponentData(session.UnitEntity(0), player);
             session.Advance(session.StepSeconds, float2.zero);
@@ -111,7 +176,7 @@ namespace Roguelike.Tests
             Assert.That(math.distance(session.ReadUnit(1).Position, player.Position), Is.LessThan(math.distance(oldMonster.Position, player.Position)));
         }
 
-        /// <summary>六批实际生成突破旧容量；隔离战斗伤害后检查槽复用、暂停死亡冻结和重开确定性。</summary>
+        /// <summary>六批实际生成突破旧容量；将已生成单位移离出生圆周，隔离占位与伤害后检查槽复用、暂停死亡冻结和重开确定性。</summary>
         [Test]
         public void TimedCircleGrowsReusesAndResetsWithoutAliveLimit()
         {
@@ -123,7 +188,12 @@ namespace Roguelike.Tests
             for (int i = 0; i < waveTicks * 6; i++)
             {
                 for (int slot = 0; slot < session.UnitCount; slot++)
-                { var u = session.ReadUnit(slot); u.MoveSpeed = 0; u.Cooldown = 1000; world.EntityManager.SetComponentData(session.UnitEntity(slot), u); }
+                {
+                    var u = session.ReadUnit(slot); u.MoveSpeed = 0; u.Cooldown = 1000;
+                    // 本用例测容量而非拥堵；活怪持续堆在出生圆周会触发正确的延迟生成。
+                    if (slot > 0) u.Position = new float2(100 + slot * 2, 0);
+                    world.EntityManager.SetComponentData(session.UnitEntity(slot), u);
+                }
                 session.Advance(session.StepSeconds, float2.zero);
             }
             Assert.That(session.SpawnedMonsters, Is.EqualTo(6 * scenario.SpawnBatchCount.Value));
@@ -487,7 +557,7 @@ namespace Roguelike.Tests
                     world.EntityManager.SetComponentData(session.UnitEntity(slot), unit);
                 }
                 for (int tick = 0; tick < 120; tick++) session.Advance(session.StepSeconds, float2.zero);
-                Assert.That(session.ReadUnit(1).Attack.Sequence, Is.GreaterThan(0), $"No melee attack from direction {direction}.");
+                Assert.That(session.ReadUnit(1).PendingAttack.Sequence, Is.GreaterThan(0), $"No melee attack from direction {direction}.");
             }
         }
 
@@ -611,8 +681,6 @@ namespace Roguelike.Tests
         /// <param name="windup">测试生成表的可空前摇值。</param>
         [TestCase(null)]
         [TestCase(-0.1f)]
-        [TestCase(float.NaN)]
-        [TestCase(float.PositiveInfinity)]
         public void MeleeRejectsInvalidWindup(float? windup)
         {
             var scenario = LoadTables().TbPerformanceScenario.Get(4);
@@ -650,15 +718,13 @@ namespace Roguelike.Tests
         {
             var buffer = new ByteBuf();
             buffer.WriteInt(source.Id); buffer.WriteInt((int)source.DeliveryType);
-            buffer.WriteFloat(source.BaseInterval); buffer.WriteFloat(source.Range);
+            buffer.WriteInt(source.BaseIntervalMilli); buffer.WriteInt(source.RangeMilli);
             buffer.WriteBool(source.ProjectileSpeed.HasValue);
-            if (source.ProjectileSpeed.HasValue) buffer.WriteFloat(source.ProjectileSpeed.Value);
+            if (source.ProjectileSpeed.HasValue) buffer.WriteInt(source.ProjectileSpeedMilli.Value);
             buffer.WriteBool(source.ProjectileLifetime.HasValue);
-            if (source.ProjectileLifetime.HasValue) buffer.WriteFloat(source.ProjectileLifetime.Value);
-            buffer.WriteBool(source.ProjectileRadius.HasValue);
-            if (source.ProjectileRadius.HasValue) buffer.WriteFloat(source.ProjectileRadius.Value);
+            if (source.ProjectileLifetime.HasValue) buffer.WriteInt(source.ProjectileLifetimeMilli.Value);
             buffer.WriteBool(windup.HasValue);
-            if (windup.HasValue) buffer.WriteFloat(windup.Value);
+            if (windup.HasValue) buffer.WriteInt(ConfigNumber.Encode(windup.Value));
             return new SkillCombatConfig(buffer);
         }
 
@@ -740,7 +806,7 @@ namespace Roguelike.Tests
                 Path.Combine(Application.streamingAssetsPath, "Config", "Luban", name + ".bytes"))));
             // 既有近战/寻敌夹具需要出生即有固定目标；只修改测试内存副本，不改变正式场景 4。
             if (!timedSpawn)
-                foreach (string field in new[] { "SpawnRadiusPixels", "SpawnIntervalSeconds", "SpawnBatchCount", "SpawnUnitIntervalSeconds" })
+                foreach (string field in new[] { "SpawnRadiusPixelsMilli", "SpawnIntervalSecondsMilli", "SpawnBatchCount", "SpawnUnitIntervalSecondsMilli" })
                     typeof(PerformanceScenarioConfig).GetField(field).SetValue(tables.TbPerformanceScenario.Get(4), null);
             return tables;
         }

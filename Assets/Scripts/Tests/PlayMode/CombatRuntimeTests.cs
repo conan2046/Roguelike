@@ -16,8 +16,38 @@ using UnityEngine.TestTools;
 namespace Roguelike.Tests
 {
     /// <summary>真实 YooAsset 与独立 ECS 世界的可操作入口验收，不以离线选帧代替相机画面。</summary>
-    public sealed class CombatRuntimeTests
+    [PrebuildSetup(typeof(CombatRuntimeTests))]
+    [PostBuildCleanup(typeof(CombatRuntimeTests))]
+    public sealed class CombatRuntimeTests : IPrebuildSetup, IPostBuildCleanup
     {
+        /// <summary>Unity Test Runner 进入运行模式前标记隔离资源环境，避免命令行战斗入口与测试同时拥有 YooAsset。</summary>
+        /// <remarks>只设置编辑器会话标记，不写配置、场景或项目设置；测试完成后清除。</remarks>
+        public void Setup()
+        {
+#if UNITY_EDITOR
+            UnityEditor.SessionState.SetBool("Roguelike.CombatRuntimeTests.Isolated", true);
+#endif
+        }
+
+        /// <summary>Unity Test Runner 完成后清除隔离标记，后续人工 Play 仍正常启动游戏。</summary>
+        public void Cleanup()
+        {
+#if UNITY_EDITOR
+            UnityEditor.SessionState.EraseBool("Roguelike.CombatRuntimeTests.Isolated");
+#endif
+        }
+
+        /// <summary>测试程序集加载后、自动入口安装前抑制本次测试的自动启动；仅隔离测试自行创建资源服务的场合。</summary>
+        /// <remarks>SubsystemRegistration 已重置入口，测试只改当前域中的重复安装标记。下次普通 Play 自动重置，不改变正式运行代码。</remarks>
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
+        private static void IsolateAutomaticBootstrap()
+        {
+#if UNITY_EDITOR
+            if (!UnityEditor.SessionState.GetBool("Roguelike.CombatRuntimeTests.Isolated", false)) return;
+            typeof(Roguelike.App.GameApplicationBootstrap).GetField("installed", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic).SetValue(null, true);
+#endif
+        }
+
         /// <summary>共享美术加载后、会话 ANI 尚未返回时销毁入口，验证晚到句柄与部分世界均回收。</summary>
         /// <returns>等待真实 YooAsset 与受控晚到资源的协程。</returns>
         /// <remarks>资源服务保持存活直到启动任务结束；不依赖底层供应商立即取消 IO。</remarks>
@@ -52,7 +82,7 @@ namespace Roguelike.Tests
             finally { source.Complete(); if (root != null) { runner.Close(); UnityEngine.Object.Destroy(root); } }
         }
 
-        /// <summary>连续进入两次，验证移动自动攻击、暂停、重开、死亡冻结以及完整清理。</summary>
+        /// <summary>连续进入两次，验证移动自动攻击、暂停、重开、死亡冻结，以及正常退出和 World 提前销毁后的完整清理。</summary>
         /// <returns>等待真实资源和 Unity 帧的测试协程。</returns>
         /// <remarks>测试组件改动只在隔离 World 内；输出真实相机截图，不保存 Scene/Prefab。</remarks>
         [UnityTest]
@@ -65,7 +95,7 @@ namespace Roguelike.Tests
             var resources = new YooAssetResourceService(initializer, config);
             var scenario = config.Tables.TbPerformanceScenario.Get(4);
             // 本用例验证输入/死亡/退出，保留出生即有目标的隔离夹具；圆周刷怪由专用用例验收。
-            foreach (string field in new[] { "SpawnRadiusPixels", "SpawnIntervalSeconds", "SpawnBatchCount", "SpawnUnitIntervalSeconds" })
+            foreach (string field in new[] { "SpawnRadiusPixelsMilli", "SpawnIntervalSecondsMilli", "SpawnBatchCount", "SpawnUnitIntervalSecondsMilli" })
                 typeof(cfg.PerformanceScenarioConfig).GetField(field).SetValue(scenario, null);
             int originalWorlds = World.All.Count;
             int originalFrameRate = Application.targetFrameRate, originalVSync = QualitySettings.vSyncCount;
@@ -78,6 +108,14 @@ namespace Roguelike.Tests
                 {
                     yield return Wait(runner.InitializeAsync(scenario, resources, input, CancellationToken.None));
                     Assert.That(runner.Ready, Is.True); Assert.That(runner.ViewCamera, Is.Not.Null);
+                    // 固定阵列夹具原点有怪物；移至玩家左侧，避免移动圆柱把本输入用例锁在出生点。
+                    var inputWorld = FindCombatWorld();
+                    for (int slot = 1; slot < runner.Session.UnitCount; slot++)
+                    {
+                        var unit = runner.Session.ReadUnit(slot);
+                        unit.Position = new float2(-3 - (slot - 1) % 5, (slot - 1) / 5);
+                        inputWorld.EntityManager.SetComponentData(runner.Session.UnitEntity(slot), unit);
+                    }
                     var start = runner.Session.ReadUnit(0).Position;
                     input.Frame = new CombatInputFrame { Movement = new float2(1, 0) };
                     for (int frame = 0; frame < 12; frame++) yield return null;
@@ -119,6 +157,8 @@ namespace Roguelike.Tests
                     for (int frame = 0; frame < 5; frame++) yield return null;
                     Assert.That(runner.Session.Statistics.Tick, Is.EqualTo(tick));
                     runner.Restart(); Assert.That(runner.Session.Statistics.PlayerDead, Is.False);
+                    if (run == 1) FindCombatWorld().Dispose();
+                    Assert.DoesNotThrow(() => runner.Close());
                 }
                 finally { runner.Close(); UnityEngine.Object.Destroy(root); }
                 yield return null;

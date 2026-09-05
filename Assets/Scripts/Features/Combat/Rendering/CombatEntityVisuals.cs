@@ -12,6 +12,7 @@ namespace Roguelike.Features.Combat.Rendering
     public sealed class CombatEntityVisuals : IDisposable
     {
         private readonly EntityManager manager;
+        private readonly World world;
         private readonly CombatSession session;
         private readonly CombatVisualResources resources;
         private CombatVisualPlayer[] players;
@@ -28,6 +29,7 @@ namespace Roguelike.Features.Combat.Rendering
         /// <remarks>修改会话单位渲染组件；自有世界退出顺序为本绑定、会话、世界、共享资源，先清理 GPU 注册。不修改 Scene/Prefab。</remarks>
         public CombatEntityVisuals(World world, CombatSession session, PerformanceScenarioConfig scenario, CombatVisualResources resources)
         {
+            this.world = world;
             manager = world.EntityManager; this.session = session; this.resources = resources;
             this.scenario = scenario;
             players = Array.Empty<CombatVisualPlayer>();
@@ -86,10 +88,11 @@ namespace Roguelike.Features.Combat.Rendering
         }
 
         /// <summary>会话销毁前解除渲染资源引用并禁用绘制，允许重复调用。</summary>
-        /// <remarks>只移除本绑定使用的渲染入口；会话随后销毁实体，资源所有者再释放网格和材质。</remarks>
+        /// <remarks>只移除本绑定使用的渲染入口；会话随后销毁实体，资源所有者再释放网格和材质。Unity 退出 Play Mode 可能先销毁 World，此时实体及 GPU 注册已随 World 回收，不再访问失效的 EntityManager。</remarks>
         public void Dispose()
         {
             if (disposed) return; disposed = true;
+            if (!world.IsCreated) return;
             for (int slot = 0; slot < players.Length; slot++)
             {
                 var entity = session.UnitEntity(slot);

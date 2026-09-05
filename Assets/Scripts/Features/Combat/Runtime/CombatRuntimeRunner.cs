@@ -186,14 +186,14 @@ namespace Roguelike.Features.Combat.Runtime
         }
 
         /// <summary>初始化失败及关闭时按表现、会话、世界、资源顺序回收；世界先释放已登记的 GPU 引用。</summary>
-        /// <remarks>可能由加载失败再次调用；每个字段释放后清空，不保留半就绪状态。</remarks>
+        /// <remarks>可能由加载失败再次调用；每个字段释放后清空，不保留半就绪状态。编辑器退出时 World 可能已被 Entities 提前释放，仅在仍存活时销毁。</remarks>
         private void ReleaseOwnedObjects()
         {
             Ready = false;
             if (ViewCamera != null) { ViewCamera.enabled = false; Destroy(ViewCamera.gameObject); ViewCamera = null; }
             visuals?.Dispose(); visuals = null;
             Session?.Dispose(); Session = null;
-            world?.Dispose(); world = null;
+            if (world != null && world.IsCreated) world.Dispose(); world = null;
             assets?.Dispose(); assets = null;
             if (settingsApplied)
             {

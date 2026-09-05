@@ -68,7 +68,7 @@ namespace Roguelike.Features.Combat.Authoring.Editor
                     if (shape.IsHero) { var c=tables.TbCharacter.Get(shape.ConfigId); expected=new[]{c.MoveRadiusPixels,c.MoveHeightPixels,c.MoveOffsetXPixels,c.MoveOffsetYPixels,c.MoveElevationPixels}; }
                     else { var c=tables.TbMonster.Get(shape.ConfigId); expected=new[]{c.MoveRadiusPixels,c.MoveHeightPixels,c.MoveOffsetXPixels,c.MoveOffsetYPixels,c.MoveElevationPixels}; }
                     for (int i=0;i<actual.Length;i++)
-                        if (!expected[i].HasValue || Mathf.Abs(actual[i]-expected[i].Value)>Mathf.Max(1,Mathf.Abs(actual[i]))*0.000001f)
+                        if (!expected[i].HasValue || Mathf.Abs(actual[i]-expected[i].Value)>0.00051f)
                         { pending.Add(path); break; }
                 }
             }

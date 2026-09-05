@@ -21,7 +21,7 @@ public sealed partial class AttributeValue : Luban.BeanBase
     {
         AttributeId = _buf.ReadInt();
         AttributeId_Ref = null;
-        Value = _buf.ReadDouble();
+        ValueMilli = _buf.ReadLong();
     }
 
     public static AttributeValue DeserializeAttributeValue(ByteBuf _buf)
@@ -35,9 +35,9 @@ public sealed partial class AttributeValue : Luban.BeanBase
     public readonly int AttributeId;
     public AttributeConfig AttributeId_Ref;
     /// <summary>
-    /// 属性基础值
+    /// 属性基础值；原单位&#215;1000；实际值=表值/1000；最多3位小数
     /// </summary>
-    public readonly double Value;
+    public readonly long ValueMilli;
    
     public const int __ID__ = 1322714197;
     public override int GetTypeId() => __ID__;
@@ -51,7 +51,7 @@ public sealed partial class AttributeValue : Luban.BeanBase
     {
         return "{ "
         + "attributeId:" + AttributeId + ","
-        + "value:" + Value + ","
+        + "valueMilli:" + ValueMilli + ","
         + "}";
     }
 }

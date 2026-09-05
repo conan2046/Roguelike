@@ -25,13 +25,13 @@ public sealed partial class CombatRulesConfig : Luban.BeanBase
         CriticalMultiplierBp = _buf.ReadInt();
         ZeroHitDenominatorRateBp = _buf.ReadInt();
         ZeroCritDenominatorRateBp = _buf.ReadInt();
-        MinAttackInterval = _buf.ReadFloat();
-        PlayerInvulnerabilitySeconds = _buf.ReadFloat();
+        MinAttackIntervalMilli = _buf.ReadInt();
+        PlayerInvulnerabilitySecondsMilli = _buf.ReadInt();
         SimulationHz = _buf.ReadInt();
         MaxCatchUpSteps = _buf.ReadInt();
-        TargetRefreshSeconds = _buf.ReadFloat();
-        SpatialCellSize = _buf.ReadFloat();
-        WorldUnitsPerPixel = _buf.ReadFloat();
+        TargetRefreshSecondsMilli = _buf.ReadInt();
+        SpatialCellSizeMilli = _buf.ReadInt();
+        WorldUnitsPerPixelMilli = _buf.ReadInt();
     }
 
     public static CombatRulesConfig DeserializeCombatRulesConfig(ByteBuf _buf)
@@ -64,13 +64,13 @@ public sealed partial class CombatRulesConfig : Luban.BeanBase
     /// </summary>
     public readonly int ZeroCritDenominatorRateBp;
     /// <summary>
-    /// 技能最短间隔，秒
+    /// 技能最短间隔，秒；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
     /// </summary>
-    public readonly float MinAttackInterval;
+    public readonly int MinAttackIntervalMilli;
     /// <summary>
-    /// 玩家正数扣血后的无敌时间，秒
+    /// 玩家正数扣血后的无敌时间，秒；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
     /// </summary>
-    public readonly float PlayerInvulnerabilitySeconds;
+    public readonly int PlayerInvulnerabilitySecondsMilli;
     /// <summary>
     /// 模拟频率，Hz
     /// </summary>
@@ -80,17 +80,17 @@ public sealed partial class CombatRulesConfig : Luban.BeanBase
     /// </summary>
     public readonly int MaxCatchUpSteps;
     /// <summary>
-    /// 寻敌刷新周期，秒
+    /// 寻敌刷新周期，秒；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
     /// </summary>
-    public readonly float TargetRefreshSeconds;
+    public readonly int TargetRefreshSecondsMilli;
     /// <summary>
-    /// 空间网格边长，世界单位
+    /// 空间网格边长，世界单位；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
     /// </summary>
-    public readonly float SpatialCellSize;
+    public readonly int SpatialCellSizeMilli;
     /// <summary>
-    /// 资源像素转换为世界单位的比例
+    /// 资源像素转换为世界单位的比例；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
     /// </summary>
-    public readonly float WorldUnitsPerPixel;
+    public readonly int WorldUnitsPerPixelMilli;
    
     public const int __ID__ = -1681609883;
     public override int GetTypeId() => __ID__;
@@ -108,13 +108,13 @@ public sealed partial class CombatRulesConfig : Luban.BeanBase
         + "criticalMultiplierBp:" + CriticalMultiplierBp + ","
         + "zeroHitDenominatorRateBp:" + ZeroHitDenominatorRateBp + ","
         + "zeroCritDenominatorRateBp:" + ZeroCritDenominatorRateBp + ","
-        + "minAttackInterval:" + MinAttackInterval + ","
-        + "playerInvulnerabilitySeconds:" + PlayerInvulnerabilitySeconds + ","
+        + "minAttackIntervalMilli:" + MinAttackIntervalMilli + ","
+        + "playerInvulnerabilitySecondsMilli:" + PlayerInvulnerabilitySecondsMilli + ","
         + "simulationHz:" + SimulationHz + ","
         + "maxCatchUpSteps:" + MaxCatchUpSteps + ","
-        + "targetRefreshSeconds:" + TargetRefreshSeconds + ","
-        + "spatialCellSize:" + SpatialCellSize + ","
-        + "worldUnitsPerPixel:" + WorldUnitsPerPixel + ","
+        + "targetRefreshSecondsMilli:" + TargetRefreshSecondsMilli + ","
+        + "spatialCellSizeMilli:" + SpatialCellSizeMilli + ","
+        + "worldUnitsPerPixelMilli:" + WorldUnitsPerPixelMilli + ","
         + "}";
     }
 }

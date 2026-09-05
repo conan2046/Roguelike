@@ -25,22 +25,22 @@ public sealed partial class PerformanceScenarioConfig : Luban.BeanBase
         {int n0 = _buf.ReadSize(); MonsterIds = new System.Collections.Generic.List<int>(n0);for(var i0 = 0 ; i0 < n0 ; i0++) { int _e0;  _e0 = _buf.ReadInt(); MonsterIds.Add(_e0);}}
         {int n0 = _buf.ReadSize(); SkillIds = new System.Collections.Generic.List<int>(n0);for(var i0 = 0 ; i0 < n0 ; i0++) { int _e0;  _e0 = _buf.ReadInt(); SkillIds.Add(_e0);}}
         EntityCount = _buf.ReadInt();
-        WarmupSeconds = _buf.ReadFloat();
-        SampleSeconds = _buf.ReadFloat();
-        TargetAverageFps = _buf.ReadFloat();
-        MaxP95FrameTimeMs = _buf.ReadFloat();
+        WarmupSecondsMilli = _buf.ReadInt();
+        SampleSecondsMilli = _buf.ReadInt();
+        TargetAverageFpsMilli = _buf.ReadInt();
+        MaxP95FrameTimeMsMilli = _buf.ReadInt();
         ScreenWidth = _buf.ReadInt();
         ScreenHeight = _buf.ReadInt();
         SpawnColumns = _buf.ReadInt();
-        HorizontalSpacing = _buf.ReadFloat();
-        VerticalSpacing = _buf.ReadFloat();
-        EntityScale = _buf.ReadFloat();
-        MoveAmplitude = _buf.ReadFloat();
-        MoveSpeedMin = _buf.ReadFloat();
-        MoveSpeedMax = _buf.ReadFloat();
+        HorizontalSpacingMilli = _buf.ReadInt();
+        VerticalSpacingMilli = _buf.ReadInt();
+        EntityScaleMilli = _buf.ReadInt();
+        MoveAmplitudeMilli = _buf.ReadInt();
+        MoveSpeedMinMilli = _buf.ReadInt();
+        MoveSpeedMaxMilli = _buf.ReadInt();
         RandomSeed = _buf.ReadInt();
         MaxGcAllocBytesPerFrame = _buf.ReadInt();
-        CameraPadding = _buf.ReadFloat();
+        CameraPaddingMilli = _buf.ReadInt();
         VSyncCount = _buf.ReadInt();
         TargetFrameRate = _buf.ReadInt();
         RunInBackground = _buf.ReadBool();
@@ -52,19 +52,19 @@ public sealed partial class PerformanceScenarioConfig : Luban.BeanBase
         CharacterProfileOverrideId_Ref = null;
         if(_buf.ReadBool()){ MonsterProfileOverrideId = _buf.ReadInt(); } else { MonsterProfileOverrideId = null; }
         MonsterProfileOverrideId_Ref = null;
-        if(_buf.ReadBool()){ ArenaHalfWidth = _buf.ReadFloat(); } else { ArenaHalfWidth = null; }
-        if(_buf.ReadBool()){ ArenaHalfHeight = _buf.ReadFloat(); } else { ArenaHalfHeight = null; }
-        if(_buf.ReadBool()){ PlayerStartX = _buf.ReadFloat(); } else { PlayerStartX = null; }
-        if(_buf.ReadBool()){ PlayerStartY = _buf.ReadFloat(); } else { PlayerStartY = null; }
+        if(_buf.ReadBool()){ ArenaHalfWidthMilli = _buf.ReadInt(); } else { ArenaHalfWidthMilli = null; }
+        if(_buf.ReadBool()){ ArenaHalfHeightMilli = _buf.ReadInt(); } else { ArenaHalfHeightMilli = null; }
+        if(_buf.ReadBool()){ PlayerStartXMilli = _buf.ReadInt(); } else { PlayerStartXMilli = null; }
+        if(_buf.ReadBool()){ PlayerStartYMilli = _buf.ReadInt(); } else { PlayerStartYMilli = null; }
         if(_buf.ReadBool()){ ReplenishOnDeath = _buf.ReadBool(); } else { ReplenishOnDeath = null; }
         if(_buf.ReadBool()){ PlayerHealthPolicy = (ETestHealthPolicy)_buf.ReadInt(); } else { PlayerHealthPolicy = null; }
         if(_buf.ReadBool()){ PlayerInputPolicy = (ETestInputPolicy)_buf.ReadInt(); } else { PlayerInputPolicy = null; }
         if(_buf.ReadBool()){ PresentationId = _buf.ReadInt(); } else { PresentationId = null; }
         PresentationId_Ref = null;
-        if(_buf.ReadBool()){ SpawnRadiusPixels = _buf.ReadFloat(); } else { SpawnRadiusPixels = null; }
-        if(_buf.ReadBool()){ SpawnIntervalSeconds = _buf.ReadFloat(); } else { SpawnIntervalSeconds = null; }
+        if(_buf.ReadBool()){ SpawnRadiusPixelsMilli = _buf.ReadInt(); } else { SpawnRadiusPixelsMilli = null; }
+        if(_buf.ReadBool()){ SpawnIntervalSecondsMilli = _buf.ReadInt(); } else { SpawnIntervalSecondsMilli = null; }
         if(_buf.ReadBool()){ SpawnBatchCount = _buf.ReadInt(); } else { SpawnBatchCount = null; }
-        if(_buf.ReadBool()){ SpawnUnitIntervalSeconds = _buf.ReadFloat(); } else { SpawnUnitIntervalSeconds = null; }
+        if(_buf.ReadBool()){ SpawnUnitIntervalSecondsMilli = _buf.ReadInt(); } else { SpawnUnitIntervalSecondsMilli = null; }
     }
 
     public static PerformanceScenarioConfig DeserializePerformanceScenarioConfig(ByteBuf _buf)
@@ -99,21 +99,21 @@ public sealed partial class PerformanceScenarioConfig : Luban.BeanBase
     /// </summary>
     public readonly int EntityCount;
     /// <summary>
-    /// 预热秒数，预热期间不计入结果
+    /// 预热秒数，预热期间不计入结果；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
     /// </summary>
-    public readonly float WarmupSeconds;
+    public readonly int WarmupSecondsMilli;
     /// <summary>
-    /// 正式采样秒数
+    /// 正式采样秒数；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
     /// </summary>
-    public readonly float SampleSeconds;
+    public readonly int SampleSecondsMilli;
     /// <summary>
-    /// 平均帧率通过线
+    /// 平均帧率通过线；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
     /// </summary>
-    public readonly float TargetAverageFps;
+    public readonly int TargetAverageFpsMilli;
     /// <summary>
-    /// P95帧耗时上限，毫秒
+    /// P95帧耗时上限，毫秒；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
     /// </summary>
-    public readonly float MaxP95FrameTimeMs;
+    public readonly int MaxP95FrameTimeMsMilli;
     /// <summary>
     /// 性能测试窗口宽度
     /// </summary>
@@ -127,29 +127,29 @@ public sealed partial class PerformanceScenarioConfig : Luban.BeanBase
     /// </summary>
     public readonly int SpawnColumns;
     /// <summary>
-    /// 实体水平间距
+    /// 实体水平间距；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
     /// </summary>
-    public readonly float HorizontalSpacing;
+    public readonly int HorizontalSpacingMilli;
     /// <summary>
-    /// 实体垂直间距
+    /// 实体垂直间距；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
     /// </summary>
-    public readonly float VerticalSpacing;
+    public readonly int VerticalSpacingMilli;
     /// <summary>
-    /// 测试实体渲染缩放
+    /// 测试实体渲染缩放；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
     /// </summary>
-    public readonly float EntityScale;
+    public readonly int EntityScaleMilli;
     /// <summary>
-    /// 实体往复移动振幅
+    /// 实体往复移动振幅；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
     /// </summary>
-    public readonly float MoveAmplitude;
+    public readonly int MoveAmplitudeMilli;
     /// <summary>
-    /// 实体最小移动角速度
+    /// 实体最小移动角速度；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
     /// </summary>
-    public readonly float MoveSpeedMin;
+    public readonly int MoveSpeedMinMilli;
     /// <summary>
-    /// 实体最大移动角速度
+    /// 实体最大移动角速度；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
     /// </summary>
-    public readonly float MoveSpeedMax;
+    public readonly int MoveSpeedMaxMilli;
     /// <summary>
     /// 确定性生成随机种子
     /// </summary>
@@ -159,9 +159,9 @@ public sealed partial class PerformanceScenarioConfig : Luban.BeanBase
     /// </summary>
     public readonly int MaxGcAllocBytesPerFrame;
     /// <summary>
-    /// 正交相机边缘留白
+    /// 正交相机边缘留白；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
     /// </summary>
-    public readonly float CameraPadding;
+    public readonly int CameraPaddingMilli;
     /// <summary>
     /// 垂直同步间隔，0表示关闭
     /// </summary>
@@ -195,21 +195,21 @@ public sealed partial class PerformanceScenarioConfig : Luban.BeanBase
     public readonly int? MonsterProfileOverrideId;
     public AttributeProfileConfig MonsterProfileOverrideId_Ref;
     /// <summary>
-    /// 开放场地半宽，世界单位
+    /// 开放场地半宽，世界单位；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
     /// </summary>
-    public readonly float? ArenaHalfWidth;
+    public readonly int? ArenaHalfWidthMilli;
     /// <summary>
-    /// 开放场地半高，世界单位
+    /// 开放场地半高，世界单位；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
     /// </summary>
-    public readonly float? ArenaHalfHeight;
+    public readonly int? ArenaHalfHeightMilli;
     /// <summary>
-    /// 玩家出生X
+    /// 玩家出生X；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
     /// </summary>
-    public readonly float? PlayerStartX;
+    public readonly int? PlayerStartXMilli;
     /// <summary>
-    /// 玩家出生Y
+    /// 玩家出生Y；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
     /// </summary>
-    public readonly float? PlayerStartY;
+    public readonly int? PlayerStartYMilli;
     /// <summary>
     /// 当tick死亡怪物回收后补齐
     /// </summary>
@@ -228,21 +228,21 @@ public sealed partial class PerformanceScenarioConfig : Luban.BeanBase
     public readonly int? PresentationId;
     public CombatPresentationConfig PresentationId_Ref;
     /// <summary>
-    /// 跟随角色圆周出生半径，逻辑像素；空表示旧阵列
+    /// 跟随角色圆周出生半径，逻辑像素；空表示旧阵列；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
     /// </summary>
-    public readonly float? SpawnRadiusPixels;
+    public readonly int? SpawnRadiusPixelsMilli;
     /// <summary>
-    /// 波间等待秒数；上一波最后一只之后计时，首波同样等待
+    /// 波间等待秒数；上一波最后一只之后计时，首波同样等待；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
     /// </summary>
-    public readonly float? SpawnIntervalSeconds;
+    public readonly int? SpawnIntervalSecondsMilli;
     /// <summary>
     /// 每波只数；不设存活上限，死亡槽复用
     /// </summary>
     public readonly int? SpawnBatchCount;
     /// <summary>
-    /// 波内每只生成间隔，模拟秒
+    /// 波内每只生成间隔，模拟秒；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
     /// </summary>
-    public readonly float? SpawnUnitIntervalSeconds;
+    public readonly int? SpawnUnitIntervalSecondsMilli;
    
     public const int __ID__ = 1968250658;
     public override int GetTypeId() => __ID__;
@@ -271,22 +271,22 @@ public sealed partial class PerformanceScenarioConfig : Luban.BeanBase
         + "monsterIds:" + Luban.StringUtil.CollectionToString(MonsterIds) + ","
         + "skillIds:" + Luban.StringUtil.CollectionToString(SkillIds) + ","
         + "entityCount:" + EntityCount + ","
-        + "warmupSeconds:" + WarmupSeconds + ","
-        + "sampleSeconds:" + SampleSeconds + ","
-        + "targetAverageFps:" + TargetAverageFps + ","
-        + "maxP95FrameTimeMs:" + MaxP95FrameTimeMs + ","
+        + "warmupSecondsMilli:" + WarmupSecondsMilli + ","
+        + "sampleSecondsMilli:" + SampleSecondsMilli + ","
+        + "targetAverageFpsMilli:" + TargetAverageFpsMilli + ","
+        + "maxP95FrameTimeMsMilli:" + MaxP95FrameTimeMsMilli + ","
         + "screenWidth:" + ScreenWidth + ","
         + "screenHeight:" + ScreenHeight + ","
         + "spawnColumns:" + SpawnColumns + ","
-        + "horizontalSpacing:" + HorizontalSpacing + ","
-        + "verticalSpacing:" + VerticalSpacing + ","
-        + "entityScale:" + EntityScale + ","
-        + "moveAmplitude:" + MoveAmplitude + ","
-        + "moveSpeedMin:" + MoveSpeedMin + ","
-        + "moveSpeedMax:" + MoveSpeedMax + ","
+        + "horizontalSpacingMilli:" + HorizontalSpacingMilli + ","
+        + "verticalSpacingMilli:" + VerticalSpacingMilli + ","
+        + "entityScaleMilli:" + EntityScaleMilli + ","
+        + "moveAmplitudeMilli:" + MoveAmplitudeMilli + ","
+        + "moveSpeedMinMilli:" + MoveSpeedMinMilli + ","
+        + "moveSpeedMaxMilli:" + MoveSpeedMaxMilli + ","
         + "randomSeed:" + RandomSeed + ","
         + "maxGcAllocBytesPerFrame:" + MaxGcAllocBytesPerFrame + ","
-        + "cameraPadding:" + CameraPadding + ","
+        + "cameraPaddingMilli:" + CameraPaddingMilli + ","
         + "vSyncCount:" + VSyncCount + ","
         + "targetFrameRate:" + TargetFrameRate + ","
         + "runInBackground:" + RunInBackground + ","
@@ -294,18 +294,18 @@ public sealed partial class PerformanceScenarioConfig : Luban.BeanBase
         + "characterId:" + CharacterId + ","
         + "characterProfileOverrideId:" + CharacterProfileOverrideId + ","
         + "monsterProfileOverrideId:" + MonsterProfileOverrideId + ","
-        + "arenaHalfWidth:" + ArenaHalfWidth + ","
-        + "arenaHalfHeight:" + ArenaHalfHeight + ","
-        + "playerStartX:" + PlayerStartX + ","
-        + "playerStartY:" + PlayerStartY + ","
+        + "arenaHalfWidthMilli:" + ArenaHalfWidthMilli + ","
+        + "arenaHalfHeightMilli:" + ArenaHalfHeightMilli + ","
+        + "playerStartXMilli:" + PlayerStartXMilli + ","
+        + "playerStartYMilli:" + PlayerStartYMilli + ","
         + "replenishOnDeath:" + ReplenishOnDeath + ","
         + "playerHealthPolicy:" + PlayerHealthPolicy + ","
         + "playerInputPolicy:" + PlayerInputPolicy + ","
         + "presentationId:" + PresentationId + ","
-        + "spawnRadiusPixels:" + SpawnRadiusPixels + ","
-        + "spawnIntervalSeconds:" + SpawnIntervalSeconds + ","
+        + "spawnRadiusPixelsMilli:" + SpawnRadiusPixelsMilli + ","
+        + "spawnIntervalSecondsMilli:" + SpawnIntervalSecondsMilli + ","
         + "spawnBatchCount:" + SpawnBatchCount + ","
-        + "spawnUnitIntervalSeconds:" + SpawnUnitIntervalSeconds + ","
+        + "spawnUnitIntervalSecondsMilli:" + SpawnUnitIntervalSecondsMilli + ","
         + "}";
     }
 }

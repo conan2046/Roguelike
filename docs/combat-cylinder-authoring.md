@@ -37,7 +37,21 @@
 - **导出全部已保存圆柱并生成 Luban**：更新两张源 Excel 的圆柱字段并调用项目生成脚本。日志为 `Library/CombatCylinderExport.log`。
 - **刷新修改状态**：检查模板与生成 bytes 一致性，列出待导出资源；窗口获得焦点时也会刷新。
 
-源表新增 `moveRadiusPixels`、`moveHeightPixels`、`moveOffsetXPixels`、`moveOffsetYPixels`、`moveElevationPixels`，单位全部为逻辑像素。`bodyRadius` 保留为独立伤害判定半径。
+源表使用 `moveRadiusPixelsMilli`、`moveHeightPixelsMilli`、`moveOffsetXPixelsMilli`、`moveOffsetYPixelsMilli`、`moveElevationPixelsMilli`，存储逻辑像素乘 1000 后的整数。`bodyRadiusMilli` 保留为独立伤害判定半径的千分整数。运行时统一通过 `ConfigNumber` 还原单位。
+
+## 技能碰撞
+
+`Assets/Prefabs/Combat/Skill/` 按 `TbSkill.id` 保存技能编辑节点。选择 `ProjectileCollision` 调整半径及位置：X 为技能局部右向，Z 为发射前向，Y 必须为零；根位置和旋转为零，缩放为一。
+
+保存后执行 **Roguelike > Combat > 技能碰撞配置 > 导出已保存技能并生成 Luban**。工具写入 `TbSkill.projectileRadiusMilli`、`projectileOffsetXMilli`、`projectileOffsetYMilli`，按世界单位乘 1000 四舍五入；只导出已配置为弹丸的技能。非弹丸条目保留空值，`int?` 的问号仍表示允许为空。
+
+`TbSkillCombat` 不再持有弹丸半径，继续定义发射方式、间隔、射程、速度、寿命及近战前摇。同一战斗配置可供不同半径的技能共用。ECS 在发射时旋转局部偏移，扫掠使用碰撞中心，表现原点不变。
+
+打开技能预制体时直接读取正式 ANI/PNG，在内存中显示首帧；关闭或域重载释放临时对象。不得保存独立预览纹理、材质、网格或其引用。**校验保存节点与配置** 菜单只读检查，不覆盖手动编辑。
+
+技能预览在 Prefab Stage 初始化后延迟创建，将 ANI 的 XY 图像映射到碰撞使用的 XZ 编辑平面，并以正交俯视同时展示特效与圆形范围。选择 `ProjectileCollision` 后可调整半径与 X/Z 偏移；视角被手动改变时，点击 Inspector 的 **刷新技能表现并俯视碰撞范围** 恢复。该映射仅用于编辑参考，不改变运行时表现，也不会移动已保存的碰撞节点。
+
+配置小数统一采用千分整数；既有万分比维持原单位，属性大值使用 `long`。修改源表后运行 `Tools/Config/generate.ps1`，再运行 `Tools/Config/validate.ps1` 确认生成代码及 bytes 可复现，重新进入战斗消费新快照。
 
 ## 移动行为
 
@@ -49,6 +63,7 @@ ECS 固定步进按空间网格查询相邻圆柱，进行连续扫掠与接触�
 
 ## 预览缓存与可复现性
 
+- 强制禁止生成、落盘或提交独立预览资产；本节“缓存/重建”仅指内存中的临时绘制对象，不生成 Assets、Library 或其他目录下的预览文件。
 - 新机器无需下载预览副本：配置生成物与源 PNG/ANI 就绪后，双击 Prefab 并开启 Scene Gizmos 即可显示首帧。
 - 预览使用原 `VisualPreview` 节点变换，不改碰撞形状、节点位置或资源 GUID；Prefab 不保存缓存引用。
 - 项目资源变更、Play 状态切换、程序集重载或退出编辑器时释放缓存；下一次查看自动重建。

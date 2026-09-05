@@ -18,7 +18,7 @@ namespace Roguelike.Features.Combat.Authoring.Editor
     public static class CombatCylinderPipeline
     {
         public const string Root = "Assets/Prefabs/Combat";
-        private static readonly string[] Fields = { "moveRadiusPixels", "moveHeightPixels", "moveOffsetXPixels", "moveOffsetYPixels", "moveElevationPixels" };
+        private static readonly string[] Fields = { "moveRadiusPixelsMilli", "moveHeightPixelsMilli", "moveOffsetXPixelsMilli", "moveOffsetYPixelsMilli", "moveElevationPixelsMilli" };
 
         /// <summary>编辑器工具从当前生成 bytes 读取表；不持有缓存，避免导出后沿用旧值。</summary>
         /// <returns>解析引用后的 Luban 表集合。</returns>
@@ -181,7 +181,7 @@ namespace Roguelike.Features.Combat.Authoring.Editor
             return result;
         }
 
-        /// <summary>按钮或菜单调用时将保存的模板写回源 Excel 并生成 Luban，异常时恢复源表。</summary>
+        /// <summary>按钮或菜单调用时将保存模板量化到三位小数，按千分整数写回源 Excel 并生成 Luban，异常时恢复源表。</summary>
         /// <remarks>不保存 Scene/Prefab；未保存的 Prefab Stage 会拒绝导出，防止导出旧值。生成日志写入 Library。</remarks>
         public static void Export()
         {
@@ -197,8 +197,8 @@ namespace Roguelike.Features.Combat.Authoring.Editor
                     string kind = group.Key ? "Character" : "Monster";
                     string path = Directory.GetFiles("Config/Datas/Tables", "*_" + kind + "Config.xlsx").Single();
                     backups.Add(path, File.ReadAllBytes(path));
-                    var updates = group.ToDictionary(s => s.ConfigId, s => Values(s, tables));
-                    PatchWorkbook(path, updates);
+                    var updates = group.ToDictionary(s => s.ConfigId, s => Values(s, tables).Select(v => ConfigNumber.Encode(v)).ToArray());
+                    ConfigWorkbookWriter.Patch(path, Fields, updates);
                 }
                 var info = new ProcessStartInfo("pwsh", "-NoProfile -File Tools/Config/generate.ps1")
                 { WorkingDirectory = Directory.GetCurrentDirectory(), UseShellExecute = false, CreateNoWindow = true,
@@ -216,42 +216,6 @@ namespace Roguelike.Features.Combat.Authoring.Editor
             Debug.Log("圆柱配置已导出并生成 Luban。重新进入战斗生效。");
         }
 
-        /// <summary>仅更新源表已定义的圆柱数值单元格，保留其他 ZIP 项与工作表结构。</summary>
-        /// <param name="path">既有 Excel 文件。</param><param name="updates">按角色或怪物 ID 索引的五字段值。</param>
-        /// <remarks>同步写文件，调用方负责备份及失败恢复；不依赖本机 Excel 或外部 Python 包。</remarks>
-        private static void PatchWorkbook(string path, Dictionary<int, float[]> updates)
-        {
-            XNamespace ns = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
-            using var zip = ZipFile.Open(path, ZipArchiveMode.Update);
-            string[] strings = Array.Empty<string>();
-            var shared = zip.GetEntry("xl/sharedStrings.xml");
-            if (shared != null) { using var stream = shared.Open(); strings = XDocument.Load(stream).Descendants(ns + "si").Select(e => string.Concat(e.Descendants(ns + "t").Select(t => t.Value))).ToArray(); }
-            var sheet = zip.GetEntry("xl/worksheets/sheet1.xml"); XDocument xml;
-            using (var stream = sheet.Open()) xml = XDocument.Load(stream);
-            var rows = xml.Descendants(ns + "row").ToArray();
-            string Read(XElement cell) => cell == null ? "" : (string)cell.Attribute("t") == "s" ? strings[int.Parse(cell.Element(ns + "v").Value)] :
-                (string)cell.Attribute("t") == "inlineStr" ? string.Concat(cell.Descendants(ns + "t").Select(t => t.Value)) : cell.Element(ns + "v")?.Value ?? "";
-            string Column(XElement cell) => new string(((string)cell.Attribute("r")).TakeWhile(char.IsLetter).ToArray());
-            var headers = rows.Single(r => (string)r.Attribute("r") == "1").Elements(ns + "c").ToDictionary(Read, Column);
-            var found = new HashSet<int>();
-            foreach (var row in rows)
-            {
-                var cells = row.Elements(ns + "c").ToArray();
-                if (!int.TryParse(Read(cells.FirstOrDefault(c => Column(c) == headers["id"])), out int id) || !updates.TryGetValue(id, out var values)) continue;
-                found.Add(id);
-                for (int i = 0; i < Fields.Length; i++)
-                {
-                    string address = headers[Fields[i]] + (string)row.Attribute("r");
-                    var cell = cells.FirstOrDefault(c => (string)c.Attribute("r") == address);
-                    if (cell == null) { cell = new XElement(ns + "c", new XAttribute("r", address)); row.Add(cell); }
-                    cell.Attribute("t")?.Remove(); cell.Elements().Remove();
-                    cell.Add(new XElement(ns + "v", values[i].ToString("R", CultureInfo.InvariantCulture)));
-                }
-            }
-            if (found.Count != updates.Count) throw new InvalidOperationException("预制体 ID 不存在于源表。");
-            sheet.Delete(); using var output = zip.CreateEntry("xl/worksheets/sheet1.xml").Open(); xml.Save(output);
-        }
-
         /// <summary>校验已保存 Prefab 与当前生成 bytes 的圆柱字段一致，供导出及人工验收调用。</summary>
         /// <remarks>只读资产和数据；浮点容差只覆盖像素/世界换算舍入。</remarks>
         public static void ValidateSaved()
@@ -264,7 +228,7 @@ namespace Roguelike.Features.Combat.Authoring.Editor
                 else { var c = tables.TbMonster.Get(shape.ConfigId); expected = new[] {c.MoveRadiusPixels,c.MoveHeightPixels,c.MoveOffsetXPixels,c.MoveOffsetYPixels,c.MoveElevationPixels}; }
                 float[] actual = Values(shape, tables);
                 for (int i = 0; i < actual.Length; i++)
-                    if (!expected[i].HasValue || Mathf.Abs(actual[i] - expected[i].Value) > Mathf.Max(1, Mathf.Abs(actual[i])) * 0.000001f)
+                    if (!expected[i].HasValue || Mathf.Abs(actual[i] - expected[i].Value) > 0.00051f)
                         throw new InvalidOperationException(shape.name + " 尚未导出: " + Fields[i]);
             }
         }

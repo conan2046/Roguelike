@@ -25,6 +25,9 @@ public sealed partial class SkillConfig : Luban.BeanBase
         VisualSetId_Ref = null;
         if(_buf.ReadBool()){ CombatProfileId = _buf.ReadInt(); } else { CombatProfileId = null; }
         CombatProfileId_Ref = null;
+        if(_buf.ReadBool()){ ProjectileRadiusMilli = _buf.ReadInt(); } else { ProjectileRadiusMilli = null; }
+        if(_buf.ReadBool()){ ProjectileOffsetXMilli = _buf.ReadInt(); } else { ProjectileOffsetXMilli = null; }
+        if(_buf.ReadBool()){ ProjectileOffsetYMilli = _buf.ReadInt(); } else { ProjectileOffsetYMilli = null; }
     }
 
     public static SkillConfig DeserializeSkillConfig(ByteBuf _buf)
@@ -50,6 +53,18 @@ public sealed partial class SkillConfig : Luban.BeanBase
     /// </summary>
     public readonly int? CombatProfileId;
     public SkillCombatConfig CombatProfileId_Ref;
+    /// <summary>
+    /// 弹丸半径；世界单位&#215;1000；实际值=表值/1000；最多3位小数；非弹丸留空
+    /// </summary>
+    public readonly int? ProjectileRadiusMilli;
+    /// <summary>
+    /// 碰撞中心横向偏移；技能局部右向；世界单位&#215;1000；实际值=表值/1000；最多3位小数
+    /// </summary>
+    public readonly int? ProjectileOffsetXMilli;
+    /// <summary>
+    /// 碰撞中心纵向偏移；技能局部前向；世界单位&#215;1000；实际值=表值/1000；最多3位小数
+    /// </summary>
+    public readonly int? ProjectileOffsetYMilli;
    
     public const int __ID__ = -844226349;
     public override int GetTypeId() => __ID__;
@@ -67,6 +82,9 @@ public sealed partial class SkillConfig : Luban.BeanBase
         + "name:" + Name + ","
         + "visualSetId:" + VisualSetId + ","
         + "combatProfileId:" + CombatProfileId + ","
+        + "projectileRadiusMilli:" + ProjectileRadiusMilli + ","
+        + "projectileOffsetXMilli:" + ProjectileOffsetXMilli + ","
+        + "projectileOffsetYMilli:" + ProjectileOffsetYMilli + ","
         + "}";
     }
 }

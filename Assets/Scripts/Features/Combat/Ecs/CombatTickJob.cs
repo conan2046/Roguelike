@@ -246,10 +246,11 @@ namespace Roguelike.Features.Combat.Ecs
                     {
                         if (ProjectileData[Projectiles[index]].Active) continue;
                         var target = UnitData[Units[unit.TargetSlot]];
-                        // 初始重叠时零方向弹丸由本 tick 扫掠直接接触，不猜测方向。
-                        float2 direction = math.normalizesafe(target.Position - unit.Position);
+                        // 初始重叠时沿用配置初始化的单位朝向，使局部碰撞偏移仍有确定方向。
+                        float2 direction = math.normalizesafe(target.Position - unit.Position, math.normalizesafe(unit.Facing));
                         ProjectileData[Projectiles[index]] = new CombatProjectile { Active = true, BornThisTick = true, Attack = attack,
-                            Position = unit.Position, Velocity = direction * unit.ProjectileSpeed,
+                            Position = unit.Position, Velocity = direction * unit.ProjectileSpeed, SkillId = unit.SkillId,
+                            CollisionOffset = new float2(direction.y, -direction.x) * unit.ProjectileOffset.x + direction * unit.ProjectileOffset.y,
                             Remaining = unit.ProjectileLifetime, Radius = unit.ProjectileRadius };
                         counters.ProjectileSpawns++;
                         counters.ActiveProjectiles++;
@@ -288,7 +289,7 @@ namespace Roguelike.Features.Combat.Ecs
 
         /// <summary>对弹丸与运动目标做相对扫掠；首个几何接触即回收，命中随机不会导致穿透。</summary>
         /// <param name="counters">候选与活动池统计。</param>
-        /// <remarks>生成伤害请求但不立即扣血，确保同 tick 请求按统一顺序结算。</remarks>
+        /// <remarks>碰撞中心使用 TbSkill 导出的局部偏移，在发射时按方向旋转；表现原点保持不变。生成伤害请求但不立即扣血，确保同 tick 请求按统一顺序结算。</remarks>
         private void SweepProjectiles(ref CombatCounters counters)
         {
             for (int index = 0; index < Projectiles.Length; index++)
@@ -296,10 +297,11 @@ namespace Roguelike.Features.Combat.Ecs
                 var projectile = ProjectileData[Projectiles[index]];
                 if (!projectile.Active) continue;
                 float travelTime = (float)math.min(Delta, projectile.Remaining);
-                float2 end = projectile.Position + projectile.Velocity * travelTime;
+                float2 start = projectile.Position + projectile.CollisionOffset;
+                float2 end = start + projectile.Velocity * travelTime;
                 float padding = projectile.Radius + MaximumRadius + MaximumMotion;
-                int2 lower = (int2)math.floor((math.min(projectile.Position, end) - padding) / CellSize);
-                int2 upper = (int2)math.floor((math.max(projectile.Position, end) + padding) / CellSize);
+                int2 lower = (int2)math.floor((math.min(start, end) - padding) / CellSize);
+                int2 upper = (int2)math.floor((math.max(start, end) + padding) / CellSize);
                 int selected = -1;
                 float first = float.PositiveInfinity;
                 ulong lifetime = ulong.MaxValue;
@@ -314,13 +316,13 @@ namespace Roguelike.Features.Combat.Ecs
                             counters.Candidates++;
                             float2 targetStart = projectile.BornThisTick ? target.Position : target.PreviousPosition;
                             float2 targetEnd = math.lerp(targetStart, target.Position, travelTime / Delta);
-                            if (CombatGeometry.Sweep(projectile.Position - targetStart, end - targetEnd,
+                            if (CombatGeometry.Sweep(start - targetStart, end - targetEnd,
                                 projectile.Radius + target.Radius, out float fraction) &&
                                 (fraction < first || (fraction == first && target.Target.Lifetime < lifetime)))
                             { selected = slot; first = fraction; lifetime = target.Target.Lifetime; }
                         } while (Grid.TryGetNextValue(out slot, ref iterator));
                     }
-                projectile.Position = end;
+                projectile.Position = end - projectile.CollisionOffset;
                 projectile.BornThisTick = false;
                 projectile.Remaining -= travelTime;
                 if (selected >= 0)

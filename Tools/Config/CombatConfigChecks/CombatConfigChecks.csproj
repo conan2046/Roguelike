@@ -14,6 +14,7 @@
     <Compile Include="../../../Assets/Scripts/Animation/CocosAniData.cs" />
     <Compile Include="../../../Assets/Scripts/Features/Combat/*.cs" />
     <Compile Include="$(GeneratedConfigDir)/*.cs" />
+    <Compile Include="../../../Assets/Scripts/Generated/Extensions/*.cs" />
     <Compile Include="../../../Assets/Scripts/ThirdParty/Luban/*.cs" />
   </ItemGroup>
 </Project>
