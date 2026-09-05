@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
@@ -242,12 +243,12 @@ namespace Roguelike.Tests
             }
         }
 
-        /// <summary>前十个调用加载真实共享美术，第十一个调用模拟不能立即取消的供应商 IO。</summary>
+        /// <summary>共享美术首次读取正常完成，会话再次读取攻击 ANI 时模拟不能立即取消的供应商 IO。</summary>
         private sealed class DeferredResources : IResourceService
         {
             private readonly IResourceService source;
             private readonly TaskCompletionSource<IRawResourceHandle> completion = new TaskCompletionSource<IRawResourceHandle>();
-            private int loads;
+            private readonly HashSet<int> loadedResourceIds = new HashSet<int>();
             public bool Blocked { get; private set; }
             public readonly LateHandle Handle = new LateHandle();
             /// <summary>构造测试资源代理，不转移底层服务所有权。</summary>
@@ -260,13 +261,13 @@ namespace Roguelike.Tests
             /// <returns>真实服务的加载任务。</returns>
             public Task<IResourceHandle<TAsset>> LoadAssetAsync<TAsset>(int resourceId, CancellationToken cancellationToken) where TAsset : class
                 => source.LoadAssetAsync<TAsset>(resourceId, cancellationToken);
-            /// <summary>固定测试注入点挂起，其他调用仍使用真实资源和取消检查。</summary>
+            /// <summary>同一资源 ID 首次读取走真实服务，首次重复读取作为会话加载边界挂起。</summary>
             /// <param name="resourceId">表资源 ID。</param>
             /// <param name="cancellationToken">调用者令牌。</param>
             /// <returns>真实加载或受控晚到句柄。</returns>
             public Task<IRawResourceHandle> LoadRawFileAsync(int resourceId, CancellationToken cancellationToken)
             {
-                if (++loads == 11) { Blocked = true; return completion.Task; }
+                if (!loadedResourceIds.Add(resourceId)) { Blocked = true; return completion.Task; }
                 return source.LoadRawFileAsync(resourceId, cancellationToken);
             }
             /// <summary>测试关闭入口后放行晚到结果，允许 finally 重复调用。</summary>

@@ -23,6 +23,7 @@ namespace Roguelike.Features.Combat.Ecs
         private NativeArray<CombatCounters> counters;
         private NativeParallelMultiHashMap<int2, int> grid;
         private NativeList<CombatDamageRequest> requests;
+        private NativeList<CombatImpactEvent> impacts;
         private NativeList<CombatAttackOption> attackOptions;
         private float maximumRadius, maximumMotion;
         private bool disposed;
@@ -119,6 +120,7 @@ namespace Roguelike.Features.Combat.Ecs
                     projectiles[index] = manager.CreateEntity(typeof(CombatProjectile), typeof(LocalTransform), typeof(LocalToWorld));
                 grid = new NativeParallelMultiHashMap<int2, int>(count, Allocator.Persistent);
                 requests = new NativeList<CombatDamageRequest>(count + projectiles.Length, Allocator.Persistent);
+                impacts = new NativeList<CombatImpactEvent>(Allocator.Persistent);
                 Restart();
             }
             catch { Dispose(); throw; }
@@ -136,6 +138,7 @@ namespace Roguelike.Features.Combat.Ecs
             EnsureAlive();
             CombatMath.NonNegative(elapsedSeconds);
             if (!math.all(math.isfinite(movement))) throw new InvalidOperationException("Combat input must be finite.");
+            impacts.Clear();
             if (Paused || Statistics.PlayerDead) return 0;
             double debt = BacklogSeconds + elapsedSeconds;
             CombatMath.NonNegative(debt);
@@ -149,6 +152,7 @@ namespace Roguelike.Features.Combat.Ecs
                 {
                     Units = units.AsArray(), Projectiles = projectiles, Templates = templates.AsArray(), Counters = counters,
                     Grid = grid, Requests = requests, Rules = damageRules, Input = movement,
+                    Impacts = impacts,
                     AttackOptions = attackOptions.AsArray(),
                     Arena = new float2(scenario.ArenaHalfWidth.Value, scenario.ArenaHalfHeight.Value),
                     Delta = (float)StepSeconds, Time = Statistics.Tick * StepSeconds, TargetRefresh = rules.TargetRefreshSeconds,
@@ -199,7 +203,7 @@ namespace Roguelike.Features.Combat.Ecs
             counters[0] = new CombatCounters { NextLifetime = nextLifetime, AliveMonsters = timedSpawn ? 0 : scenario.EntityCount };
             nextSpawnTick = timedSpawn ? SpawnDelayTicks(scenario.SpawnIntervalSeconds.Value) : 0;
             WaveNumber = 0; SpawnedInWave = 0; SpawnedMonsters = 0;
-            grid.Clear(); requests.Clear();
+            grid.Clear(); requests.Clear(); impacts.Clear();
             Paused = false;
             BacklogSeconds = PeakBacklogSeconds = 0;
         }
@@ -321,6 +325,21 @@ namespace Roguelike.Features.Combat.Ecs
         /// <returns>会话拥有的 ECS 实体。</returns>
         /// <exception cref="ObjectDisposedException">会话已释放。</exception>
         public Entity ProjectileEntity(int slot) { EnsureAlive(); return projectiles[slot]; }
+
+        /// <summary>表现层在固定 tick 完成后读取弹丸池槽，不转移原生容器所有权。</summary>
+        /// <param name="slot">弹丸池槽。</param>
+        /// <returns>当前弹丸状态副本。</returns>
+        /// <exception cref="ObjectDisposedException">会话已释放。</exception>
+        public CombatProjectile ReadProjectile(int slot) { EnsureAlive(); return manager.GetComponentData<CombatProjectile>(projectiles[slot]); }
+
+        /// <summary>获取本次 Advance 内首次接触事件数量；下一次 Advance 开始时清空。</summary>
+        public int ImpactCount { get { EnsureAlive(); return impacts.Length; } }
+
+        /// <summary>表现层按稳定写入顺序读取一次命中事件。</summary>
+        /// <param name="index">零起始事件索引。</param>
+        /// <returns>包含技能、位置、攻击序号和 tick 的事件副本。</returns>
+        /// <exception cref="ObjectDisposedException">会话已释放。</exception>
+        public CombatImpactEvent ReadImpact(int index) { EnsureAlive(); return impacts[index]; }
 
         /// <summary>属性来源改变后同步防守、后续攻击与移动数据，保留冷却比例和当前攻击原速进度；已起手攻击快照不变。</summary>
         /// <param name="slot">当前生命周期的单位槽。</param>
@@ -454,6 +473,7 @@ namespace Roguelike.Features.Combat.Ecs
             if (counters.IsCreated) counters.Dispose();
             if (grid.IsCreated) grid.Dispose();
             if (requests.IsCreated) requests.Dispose();
+            if (impacts.IsCreated) impacts.Dispose();
             if (attackOptions.IsCreated) attackOptions.Dispose();
         }
     }

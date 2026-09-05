@@ -8,6 +8,7 @@ using NUnit.Framework;
 using Roguelike.Core.Resources;
 using Roguelike.Features.Combat.Ecs;
 using Roguelike.Features.Combat.Rendering;
+using Roguelike.Features.Combat.Run;
 using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Rendering;
@@ -73,15 +74,84 @@ namespace Roguelike.Tests
         {
             var tables = LoadTables(); var source = new Files(tables);
             var assets = CombatVisualResources.LoadAsync(tables.TbPerformanceScenario.Get(5), source, CancellationToken.None).GetAwaiter().GetResult();
-            Assert.That(source.Loads, Is.EqualTo(10));
+            Assert.That(source.Loads, Is.EqualTo(14));
             Assert.That(source.ActiveHandles, Is.Zero);
-            Assert.That(assets.TextureCount, Is.EqualTo(5));
-            Assert.That(assets.Materials.Length, Is.EqualTo(5));
+            Assert.That(assets.ClipCount, Is.EqualTo(7));
+            Assert.That(assets.TextureCount, Is.EqualTo(7));
+            Assert.That(assets.Materials.Length, Is.EqualTo(7));
             Assert.That(assets.Meshes.Length, Is.GreaterThan(100));
             var mesh = assets.Meshes[0]; var material = assets.Materials[0]; var texture = material.mainTexture;
             assets.Dispose(); assets.Dispose();
             Assert.That(mesh == null && material == null && texture == null, Is.True);
             Assert.Throws<ObjectDisposedException>(() => assets.Read(20001, 20002));
+        }
+
+        /// <summary>正式关卡一次性预加载三种弹丸及两种目标位置技能的全部显式 ANI。</summary>
+        [Test]
+        public void FormalRunPreloadsAllConfirmedSkillVisuals()
+        {
+            var tables = LoadTables();
+            var definition = CombatRunDefinition.Create(tables, 1);
+            var source = new Files(tables);
+            using var assets = CombatVisualResources.LoadAsync(definition, source, CancellationToken.None).GetAwaiter().GetResult();
+            foreach (var skill in definition.AvailableSkills)
+            {
+                if (skill.ProjectileClipId.HasValue)
+                    Assert.That(assets.Read(skill.Id, skill.ProjectileClipId.Value).Animation.ActionCount, Is.GreaterThan(0));
+                if (skill.ImpactClipId.HasValue)
+                    Assert.That(assets.Read(skill.Id, skill.ImpactClipId.Value).Animation.ActionCount, Is.GreaterThan(0));
+                foreach (var clipId in skill.AreaClipIds)
+                    Assert.That(assets.Read(skill.Id, clipId).Animation.ActionCount, Is.GreaterThan(0));
+            }
+            Assert.That(source.ActiveHandles, Is.Zero);
+        }
+
+        /// <summary>真实弹丸在飞行期间可见，首次命中后只产生一个命中 ANI，播放结束后回收。</summary>
+        [Test]
+        public void ProjectileFlightAndFirstImpactHaveVisibleLifecycle()
+        {
+            var tables = LoadTables(); var scenario = tables.TbPerformanceScenario.Get(4); var source = new Files(tables);
+            using var world = new World("Projectile visual lifecycle");
+            using var assets = CombatVisualResources.LoadAsync(scenario, source, CancellationToken.None).GetAwaiter().GetResult();
+            using var session = CombatSessionFactory.CreateAsync(world, scenario, source, CancellationToken.None).GetAwaiter().GetResult();
+            using var visuals = new CombatEntityVisuals(world, session, scenario, assets);
+            var hero = session.ReadUnit(0);
+            for (int slot = 1; slot < session.UnitCount; slot++)
+            {
+                var monster = session.ReadUnit(slot);
+                if (slot == 1)
+                {
+                    monster.Position = hero.Position + new float2(hero.Range * 0.8f, 0);
+                    monster.PreviousPosition = monster.Position;
+                    monster.MoveSpeed = 0;
+                }
+                else monster.Target.Health = 0;
+                world.EntityManager.SetComponentData(session.UnitEntity(slot), monster);
+            }
+
+            bool sawFlight = false, sawImpact = false;
+            int maximumTicks = (int)Math.Ceiling(hero.ProjectileLifetime / session.StepSeconds) + 2;
+            for (int tick = 0; tick < maximumTicks && !sawImpact; tick++)
+            {
+                session.Advance(session.StepSeconds, float2.zero);
+                visuals.Synchronize();
+                sawFlight |= visuals.VisibleProjectileCount > 0;
+                sawImpact |= session.ImpactCount == 1 && visuals.VisibleImpactCount == 1;
+            }
+            Assert.That(sawFlight, Is.True);
+            Assert.That(sawImpact, Is.True);
+            Assert.That(session.Statistics.DamageEvents, Is.EqualTo(1));
+
+            int impactTicks = (int)Math.Ceiling(assets.Read(hero.SkillId,
+                scenario.CharacterId_Ref.DefaultSkillId_Ref.ImpactClipId.Value).Animation.DurationSeconds(0) / session.StepSeconds) + 1;
+            hero = session.ReadUnit(0); hero.Cooldown = 100;
+            world.EntityManager.SetComponentData(session.UnitEntity(0), hero);
+            for (int tick = 0; tick < impactTicks; tick++)
+            {
+                session.Advance(session.StepSeconds, float2.zero);
+                visuals.Synchronize();
+            }
+            Assert.That(visuals.VisibleImpactCount, Is.Zero);
         }
 
         /// <summary>注入中途取消或加载错误后临时句柄和部分 Unity 对象全部释放。</summary>

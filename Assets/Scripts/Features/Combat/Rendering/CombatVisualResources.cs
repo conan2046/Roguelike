@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using cfg;
@@ -7,6 +8,7 @@ using ProjectX.Migration;
 using Roguelike.Animation;
 using Roguelike.Animation.Rendering;
 using Roguelike.Core.Resources;
+using Roguelike.Features.Combat.Run;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -32,6 +34,7 @@ namespace Roguelike.Features.Combat.Rendering
         public Material[] Materials { get; private set; }
         public Mesh[] Meshes { get; private set; }
         public int TextureCount => textures.Count;
+        public int ClipCount => clips.Count;
 
         /// <summary>入局时读取表现表 Shader/过滤方式，按资源 ID 加载必要片段，不扫描后缀或补缺省资源。</summary>
         /// <param name="scenario">已解析外键的 TbPerformanceScenario。</param>
@@ -58,11 +61,59 @@ namespace Roguelike.Features.Combat.Rendering
             var result = new CombatVisualResources();
             try
             {
-                await result.LoadVisualAsync(scenario.CharacterId_Ref.VisualSetId_Ref, false, scenario, resources, shader, filter, token);
+                await result.LoadVisualAsync(scenario.CharacterId_Ref.VisualSetId_Ref, false, scenario.CombatRulesId_Ref,
+                    scenario.PresentationId_Ref, resources, shader, filter, token);
                 foreach (var monster in scenario.MonsterIds_Ref)
-                    await result.LoadVisualAsync(monster.VisualSetId_Ref, true, scenario, resources, shader, filter, token);
+                    await result.LoadVisualAsync(monster.VisualSetId_Ref, true, scenario.CombatRulesId_Ref,
+                        scenario.PresentationId_Ref, resources, shader, filter, token);
+                await result.LoadSkillAsync(scenario.CharacterId_Ref.DefaultSkillId_Ref, scenario.CombatRulesId_Ref,
+                    scenario.PresentationId_Ref, resources, shader, filter, token);
                 token.ThrowIfCancellationRequested();
                 result.Materials = result.materials.ToArray(); result.Meshes = result.meshes.ToArray();
+                return result;
+            }
+            catch { result.Dispose(); throw; }
+        }
+
+        /// <summary>正式关卡入局时共享加载全部单位和可解锁技能表现，避免每次生成实体重复读取 ANI。</summary>
+        /// <param name="definition">由 TbStage 聚合并验证的正式单局定义。</param>
+        /// <param name="resources">已初始化的统一资源服务。</param>
+        /// <param name="token">退出或取消入局令牌。</param>
+        /// <returns>覆盖角色、普通怪、Boss、Projectile、Impact 和 TargetArea 的共享资源集合。</returns>
+        /// <remarks>在 Unity 主线程创建材质、纹理和网格；调用方必须在全部表现实例释放后 Dispose。</remarks>
+        /// <exception cref="InvalidOperationException">配置、Shader、纹理或 ANI 不可用。</exception>
+        /// <exception cref="OperationCanceledException">加载被取消。</exception>
+        public static async Task<CombatVisualResources> LoadAsync(CombatRunDefinition definition, IResourceService resources, CancellationToken token)
+        {
+            if (definition?.Presentation == null || resources == null)
+                throw new InvalidOperationException("Missing formal run visual configuration or resources.");
+            var presentation = definition.Presentation;
+            if (string.IsNullOrWhiteSpace(presentation.ShaderName))
+                throw new InvalidOperationException("TbCombatPresentation.shaderName is required.");
+            Shader shader = Shader.Find(presentation.ShaderName);
+            if (shader == null || !shader.isSupported)
+                throw new InvalidOperationException("Unavailable configured shader: " + presentation.ShaderName);
+            FilterMode filter;
+            switch (presentation.TextureFilterMode)
+            {
+                case "Point": filter = FilterMode.Point; break;
+                case "Bilinear": filter = FilterMode.Bilinear; break;
+                default: throw new InvalidOperationException("TbCombatPresentation.textureFilterMode must be Point or Bilinear.");
+            }
+
+            var result = new CombatVisualResources();
+            try
+            {
+                await result.LoadVisualAsync(definition.Character.VisualSetId_Ref, false, definition.CombatRules,
+                    presentation, resources, shader, filter, token);
+                foreach (var monster in definition.Monsters.Concat(new[] { definition.Boss.MonsterId_Ref }).GroupBy(item => item.Id).Select(group => group.First()))
+                    await result.LoadVisualAsync(monster.VisualSetId_Ref, true, definition.CombatRules,
+                        presentation, resources, shader, filter, token);
+                foreach (var skill in definition.AvailableSkills)
+                    await result.LoadSkillAsync(skill, definition.CombatRules, presentation, resources, shader, filter, token);
+                token.ThrowIfCancellationRequested();
+                result.Materials = result.materials.ToArray();
+                result.Meshes = result.meshes.ToArray();
                 return result;
             }
             catch { result.Dispose(); throw; }
@@ -71,7 +122,8 @@ namespace Roguelike.Features.Combat.Rendering
         /// <summary>为角色集合加载必需待机/移动，怪物另加载显式攻击；复用同集合已准备的帧。</summary>
         /// <param name="visual">TbVisualSet 显式片段引用及缩放。</param>
         /// <param name="monster">是否必须加载攻击。</param>
-        /// <param name="scenario">提供规则及表现时钟。</param>
+        /// <param name="rules">提供世界单位换算的 TbCombatRules。</param>
+        /// <param name="presentation">提供方向及时钟的 TbCombatPresentation。</param>
         /// <param name="resources">统一资源入口。</param>
         /// <param name="shader">已验证的配置 Shader。</param>
         /// <param name="filter">配置解析的过滤方式。</param>
@@ -79,16 +131,49 @@ namespace Roguelike.Features.Combat.Rendering
         /// <returns>全部必需片段准备任务。</returns>
         /// <remarks>创建共享 Unity 对象，所有权归本资源集合。</remarks>
         /// <exception cref="InvalidOperationException">缺少显式片段或缩放非法。</exception>
-        private async Task LoadVisualAsync(VisualSetConfig visual, bool monster, PerformanceScenarioConfig scenario,
+        private async Task LoadVisualAsync(VisualSetConfig visual, bool monster, CombatRulesConfig rules, CombatPresentationConfig presentation,
             IResourceService resources, Shader shader, FilterMode filter, CancellationToken token)
         {
             if (visual?.StandClipId_Ref == null || visual.MoveClipId_Ref == null || (monster && visual.AttackClipId_Ref == null))
                 throw new InvalidOperationException("Visual requires explicit idle/move and monster attack clips.");
-            float scale = scenario.CombatRulesId_Ref.WorldUnitsPerPixel * visual.ScalePermille / 1000f;
+            float scale = rules.WorldUnitsPerPixel * visual.ScalePermille / 1000f;
             CombatMath.Positive(scale);
-            await LoadClipAsync(visual.Id, visual.StandClipId_Ref, scale, scenario.PresentationId_Ref, resources, shader, filter, token);
-            await LoadClipAsync(visual.Id, visual.MoveClipId_Ref, scale, scenario.PresentationId_Ref, resources, shader, filter, token);
-            if (monster) await LoadClipAsync(visual.Id, visual.AttackClipId_Ref, scale, scenario.PresentationId_Ref, resources, shader, filter, token);
+            await LoadClipAsync(visual.Id, visual.StandClipId_Ref, scale, presentation, resources, shader, filter, token);
+            await LoadClipAsync(visual.Id, visual.MoveClipId_Ref, scale, presentation, resources, shader, filter, token);
+            if (monster) await LoadClipAsync(visual.Id, visual.AttackClipId_Ref, scale, presentation, resources, shader, filter, token);
+        }
+
+        /// <summary>按 TbSkill 的投递类型加载已确认的飞行、命中或目标位置片段。</summary>
+        /// <param name="skill">正式初始或可解锁技能。</param>
+        /// <param name="rules">提供世界像素比例的 TbCombatRules。</param>
+        /// <param name="presentation">提供 ANI 时间单位的 TbCombatPresentation。</param>
+        /// <param name="resources">统一资源入口。</param>
+        /// <param name="shader">已验证的配置 Shader。</param>
+        /// <param name="filter">配置解析的纹理过滤方式。</param>
+        /// <param name="token">取消令牌。</param>
+        /// <returns>该技能全部显式片段完成加载的任务。</returns>
+        /// <exception cref="InvalidOperationException">技能投递类型或片段角色不符合协议。</exception>
+        private async Task LoadSkillAsync(SkillConfig skill, CombatRulesConfig rules, CombatPresentationConfig presentation,
+            IResourceService resources, Shader shader, FilterMode filter, CancellationToken token)
+        {
+            if (skill?.CombatProfileId_Ref == null) throw new InvalidOperationException("TbSkill: missing combat profile.");
+            float scale = rules.WorldUnitsPerPixel;
+            CombatMath.Positive(scale);
+            if (skill.CombatProfileId_Ref.DeliveryType == ESkillDeliveryType.Projectile)
+            {
+                if (skill.ProjectileClipId_Ref?.Action != EAnimationAction.Projectile ||
+                    (skill.ImpactClipId_Ref != null && skill.ImpactClipId_Ref.Action != EAnimationAction.Impact))
+                    throw new InvalidOperationException($"TbSkill {skill.Id}: invalid projectile visual roles.");
+                await LoadClipAsync(skill.Id, skill.ProjectileClipId_Ref, scale, presentation, resources, shader, filter, token);
+                if (skill.ImpactClipId_Ref != null)
+                    await LoadClipAsync(skill.Id, skill.ImpactClipId_Ref, scale, presentation, resources, shader, filter, token);
+                return;
+            }
+            if (skill.CombatProfileId_Ref.DeliveryType != ESkillDeliveryType.TargetArea || skill.AreaClipIds_Ref == null ||
+                skill.AreaClipIds_Ref.Count == 0 || skill.AreaClipIds_Ref.Any(item => item?.Action != EAnimationAction.Area))
+                throw new InvalidOperationException($"TbSkill {skill.Id}: invalid target-area visual roles.");
+            foreach (var clip in skill.AreaClipIds_Ref)
+                await LoadClipAsync(skill.Id, clip, scale, presentation, resources, shader, filter, token);
         }
 
         /// <summary>按 TbAnimationClip 的 ANI/PNG ID 加载，验证图集边界并预建普通与镜像网格。</summary>
@@ -132,7 +217,8 @@ namespace Roguelike.Features.Combat.Rendering
             var animation = new CombatAnimation(data, presentation, config.Loop);
             var clip = new Clip { Animation = animation, MaterialIndex = materialIndices[config.TextureResourceId], MeshIndices = new int[data.frames.Length * 2] };
             for (int i = 0; i < clip.MeshIndices.Length; i++) clip.MeshIndices[i] = -1;
-            if (config.Action != EAnimationAction.Attack) clip.Directions = new CombatDirections(presentation, animation);
+            if (config.Action == EAnimationAction.Stand || config.Action == EAnimationAction.Move)
+                clip.Directions = new CombatDirections(presentation, animation);
             for (int action = 0; action < data.actions.Length; action++)
                 for (int frame = 0; frame < data.actions[action].frames.Length; frame++)
                 {

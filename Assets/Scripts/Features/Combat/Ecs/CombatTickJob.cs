@@ -22,6 +22,7 @@ namespace Roguelike.Features.Combat.Ecs
         public ComponentLookup<LocalTransform> Transforms;
         public NativeParallelMultiHashMap<int2, int> Grid;
         public NativeList<CombatDamageRequest> Requests;
+        public NativeList<CombatImpactEvent> Impacts;
         public NativeArray<CombatCounters> Counters;
         public DamageRules Rules;
         public float2 Input, Arena;
@@ -324,9 +325,15 @@ namespace Roguelike.Features.Combat.Ecs
                     }
                 projectile.Position = end - projectile.CollisionOffset;
                 projectile.BornThisTick = false;
+                projectile.Age += travelTime;
                 projectile.Remaining -= travelTime;
                 if (selected >= 0)
+                {
+                    projectile.Position = math.lerp(start, end, first) - projectile.CollisionOffset;
                     Requests.Add(new CombatDamageRequest { Attack = projectile.Attack, TargetSlot = selected, TargetLifetime = lifetime });
+                    Impacts.Add(new CombatImpactEvent { SkillId = projectile.SkillId, Position = projectile.Position,
+                        AttackSequence = projectile.Attack.Sequence, Tick = counters.Tick + 1 });
+                }
                 if (selected >= 0 || projectile.Remaining <= 0)
                 { projectile.Active = false; counters.ActiveProjectiles--; }
                 ProjectileData[Projectiles[index]] = projectile;

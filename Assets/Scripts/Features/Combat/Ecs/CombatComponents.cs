@@ -38,9 +38,17 @@ namespace Roguelike.Features.Combat.Ecs
         public float2 Position, Velocity;
         public float2 CollisionOffset;
         public int SkillId;
-        public double Remaining;
+        public double Age, Remaining;
         public float Radius;
         public bool Active, BornThisTick;
+    }
+
+    /// <summary>弹丸首次有效几何接触后写入的单帧表现事件；超时与越界回收不会产生该事件。</summary>
+    public struct CombatImpactEvent
+    {
+        public int SkillId;
+        public float2 Position;
+        public ulong AttackSequence, Tick;
     }
 
     /// <summary>每局计数，不将无敌拒绝、命中零伤害混作有效扣血。</summary>
