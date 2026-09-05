@@ -13,6 +13,15 @@
 - 编辑器外观展示直接读取已有正式资源；必要的临时绘制对象仅存在于内存，使用后释放，不序列化、不保存引用到 Scene/Prefab。
 - 批量工具只生成任务明确需要的正式资产和配置，不附带生成预览副本。提交前必须检查不存在新增预览资产。
 
+## Tower 参考工程审查
+
+- 正式功能进入方案讨论和代码实现前，先按本次功能范围审查 `F:\project__conan\tower\Client\Tower\Assets` 中的相关实现；禁止每次无目标地全工程扫描。
+- 战斗功能优先核对 `GameScript/HotFix/Battle` 下的 Manager、Entity、Skill、Buff、Attribute、UI 分工；界面功能同时核对 `GameScript/HotFix/UIKit`、`GameScript/HotFix/Window` 和 `GameScript/Editor/ExportUI*.cs`；配置功能核对 `GameScript/HotFix/TableData`、`GameScript/HotFix/Generate` 和 `GameScript/Editor/ExcelTools`；资源生命周期核对实际业务调用方及 YooAsset、对象池的加载和释放方式。
+- 审查结果至少覆盖：入口和调用链、职责边界、配置读取、资源所有权、异步取消、对象池或销毁、UI 绑定、异常和清场流程；方案中写明采用点、调整点和拒绝点后再编码。
+- Tower 仅作为成熟业务行为和拆分方式的参考。当前项目的单机 Steam 范围、Luban 唯一数据源、分层程序集、Entities 1.0、YooAsset 2.3.19、注释和测试规范优先。
+- 禁止照搬 Tower 的 HotFix/HybridCLR、网络、账号、广告、Firebase、CDN 下载、全局单例、旧表生成链和业务硬编码；第三方、生成代码及 `Library` 不作为项目编码规范来源。
+- 参考路径不可访问或没有同类实现时，在方案中记录该事实，继续依据当前项目架构实现，不得因此跳过数据表、验证或验收流程。
+
 ## 数据驱动
 
 - 项目配置数据的唯一源头是数据表，数据表统一通过 [Luban](https://www.datable.cn/docs/intro) 转换。
