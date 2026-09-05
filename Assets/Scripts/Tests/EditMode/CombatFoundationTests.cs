@@ -52,6 +52,22 @@ namespace Roguelike.Tests
             Assert.That(target.Health, Is.EqualTo(30));
         }
 
+        /// <summary>验证局内属性严格按 Add、AddPercent、Multiply 三个乘区顺序结算。</summary>
+        [Test]
+        public void AttributeModifiersApplyFixedThreeStageOrder()
+        {
+            var attributes = new CombatAttributes(LoadTables().TbAttributeProfile.Get(1));
+            double baseline = attributes.Get(EAttributeType.Attack);
+            attributes.Replace(1, new AttributeModifier
+            {
+                Attribute = EAttributeType.Attack,
+                Flat = 10,
+                PercentBp = 1000,
+                Multiplier = 2
+            });
+            Assert.That(attributes.Get(EAttributeType.Attack), Is.EqualTo((baseline + 10) * 1.1 * 2).Within(0.000001));
+        }
+
         /// <summary>EditMode 中验证无敌优先级和过期目标生命周期拒绝。</summary>
         [Test]
         public void InvulnerabilityAndLifetimeProtectTarget()

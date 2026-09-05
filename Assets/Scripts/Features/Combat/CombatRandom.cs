@@ -3,7 +3,15 @@ using System;
 namespace Roguelike.Features.Combat
 {
     /// <summary>随机用途域分离；枚举只标识算法流，不承载概率配置。</summary>
-    public enum CombatRandomPurpose : ulong { Hit, Critical, Damage, SpawnAngle }
+    public enum CombatRandomPurpose : ulong
+    {
+        Hit,
+        Critical,
+        Damage,
+        SpawnAngle,
+        SpawnMonster,
+        UpgradeChoice
+    }
 
     /// <summary>基于攻击与目标生命周期的无共享状态随机流。</summary>
     public static class CombatRandom

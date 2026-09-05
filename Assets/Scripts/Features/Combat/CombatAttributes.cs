@@ -10,6 +10,8 @@ namespace Roguelike.Features.Combat
         public EAttributeType Attribute;
         public double Flat;
         public int PercentBp;
+        /// <summary>最终乘区；零表示该修改不参与乘区，非零值必须大于零。</summary>
+        public double Multiplier;
     }
 
     /// <summary>主线程属性聚合器；仅属性变化时分配和重算，不能传入 Job。</summary>
@@ -63,7 +65,8 @@ namespace Roguelike.Features.Combat
             if (modifiers == null) throw new InvalidOperationException("Missing attribute modifiers.");
             var copy = (AttributeModifier[])modifiers.Clone();
             foreach (var item in copy)
-                if (!definitions.ContainsKey(item.Attribute) || double.IsNaN(item.Flat) || double.IsInfinity(item.Flat))
+                if (!definitions.ContainsKey(item.Attribute) || double.IsNaN(item.Flat) || double.IsInfinity(item.Flat) ||
+                    double.IsNaN(item.Multiplier) || double.IsInfinity(item.Multiplier) || item.Multiplier < 0)
                     throw new InvalidOperationException("Invalid attribute modifier.");
             var candidate = new SortedDictionary<ulong, AttributeModifier[]>(sources) { [source] = copy };
             var computed = Recalculate(candidate);
@@ -96,11 +99,16 @@ namespace Roguelike.Features.Combat
             var result = new Dictionary<EAttributeType, double>();
             foreach (var pair in definitions)
             {
-                double flat = 0, percent = 0;
+                double flat = 0, percent = 0, multiplier = 1;
                 foreach (var source in candidate.Values)
                     foreach (var item in source)
-                        if (item.Attribute == pair.Key) { flat += item.Flat; percent += item.PercentBp; }
-                double value = (bases[pair.Key] + flat) * (1 + percent / CombatMath.BasisPoints);
+                        if (item.Attribute == pair.Key)
+                        {
+                            flat += item.Flat;
+                            percent += item.PercentBp;
+                            if (item.Multiplier > 0) multiplier *= item.Multiplier;
+                        }
+                double value = (bases[pair.Key] + flat) * (1 + percent / CombatMath.BasisPoints) * multiplier;
                 if (double.IsNaN(value) || double.IsInfinity(value)) throw new InvalidOperationException($"Attribute {pair.Key}: aggregation overflow.");
                 value = Math.Max(pair.Value.MinValue, Math.Min(pair.Value.MaxValue, value));
                 if (pair.Value.ValueKind == EAttributeValueKind.Integer) value = Math.Floor(value);
