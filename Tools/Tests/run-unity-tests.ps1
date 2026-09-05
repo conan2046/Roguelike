@@ -12,6 +12,8 @@ param(
 
     [string]$ReportDirectory,
 
+    [switch]$IncludeStress,
+
     [ValidateRange(1, 3600)]
     [int]$InactivityTimeoutSeconds = 90,
 
@@ -62,12 +64,15 @@ $arguments = @(
 if (-not [string]::IsNullOrWhiteSpace($TestFilter)) {
     $arguments += @('-testFilter', $TestFilter)
 }
+if (-not $IncludeStress) {
+    $arguments += @('-testCategory', '!Stress')
+}
 
 $startedUtc = [DateTime]::UtcNow
 $lastProgressUtc = $startedUtc
 $lastLogLength = -1L
 $unityProcess = Start-Process -FilePath $UnityEditorPath -ArgumentList $arguments -PassThru -WindowStyle Hidden
-Write-Output "UNITY_TEST_STARTED pid=$($unityProcess.Id) mode=$Mode report=$reportPath"
+Write-Output "UNITY_TEST_STARTED pid=$($unityProcess.Id) mode=$Mode includeStress=$IncludeStress report=$reportPath"
 
 try {
     while (-not $unityProcess.HasExited) {
