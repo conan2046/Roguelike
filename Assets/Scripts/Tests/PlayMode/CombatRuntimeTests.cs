@@ -173,7 +173,7 @@ namespace Roguelike.Tests
             }
         }
 
-        /// <summary>完整推进四阶段模拟时钟，再用正式 TbStage 1 加载五个 UI Prefab，完成升级、Boss、胜利和重开。</summary>
+        /// <summary>完整推进四阶段模拟时钟，再用正式 TbStage 1 加载五个 UI Prefab，完成升级、Boss、胜负结算和重开。</summary>
         /// <returns>等待真实 YooAsset、渲染帧和加速战斗状态的协程。</returns>
         /// <remarks>规则模型用不规则步长覆盖完整 18 分钟；UI/ECS 入口只快进已由规则层证明的区段，不等待墙钟。</remarks>
         [UnityTest]
@@ -256,6 +256,70 @@ namespace Roguelike.Tests
                 Assert.That(settlement.gameObject.activeSelf, Is.False);
                 Assert.That(Enumerable.Range(0, runner.Session.PlayerWeaponCount)
                     .Count(index => runner.Session.ReadPlayerWeapon(index).Active), Is.EqualTo(1));
+
+                CombatUnit defeatedPlayer = runner.Session.ReadUnit(0);
+                defeatedPlayer.Target.Health = 1;
+                defeatedPlayer.Target.Evasion = 0;
+                defeatedPlayer.Target.ImmunityCharges = 0;
+                defeatedPlayer.Target.InvulnerableUntil = 0;
+                defeatedPlayer.Cooldown = 1000;
+                combatWorld.EntityManager.SetComponentData(runner.Session.UnitEntity(0), defeatedPlayer);
+                Assert.That(runner.Session.TrySpawnMonster(definition.Monsters[0],
+                    cfg.ConfigNumber.Decode(definition.Map.SpawnRadiusPixelsMilli), 1, false, out int monsterSlot), Is.True);
+                CombatUnit monster = runner.Session.ReadUnit(monsterSlot);
+                monster.Position = defeatedPlayer.Position;
+                monster.PreviousPosition = monster.Position;
+                monster.MoveSpeed = 0;
+                monster.Cooldown = 0;
+                monster.AttackActive = false;
+                monster.Attack.Attack = 1000000;
+                monster.Attack.Hit = 1;
+                monster.Target.Health = monster.Target.MaxHealth;
+                combatWorld.EntityManager.SetComponentData(runner.Session.UnitEntity(monsterSlot), monster);
+                runner.AdvanceFrame(runner.Session.StepSeconds, default);
+                if (runner.RunModel.State != CombatRunState.DefeatSettlement)
+                {
+                    monster = runner.Session.ReadUnit(monsterSlot);
+                    Assert.That(monster.AttackActive, Is.True);
+                    monster.AttackAge = monster.WindupSeconds + monster.AttackOption.HitSeconds;
+                    monster.PendingAttack.Attack = 1000000;
+                    monster.PendingAttack.Hit = 1;
+                    combatWorld.EntityManager.SetComponentData(runner.Session.UnitEntity(monsterSlot), monster);
+                    runner.AdvanceFrame(runner.Session.StepSeconds, default);
+                }
+                Assert.That(runner.RunModel.State, Is.EqualTo(CombatRunState.DefeatSettlement));
+                Assert.That(settlement.gameObject.activeSelf, Is.True);
+                Assert.That(settlement.ResultText.text, Is.EqualTo(definition.UiSet.DefeatText));
+                Assert.That(settlement.StatisticsText.text, Is.Not.Empty);
+                ulong frozenTick = runner.Session.Statistics.Tick;
+                long frozenElapsedMilli = runner.RunModel.ElapsedMilli;
+                for (int frame = 0; frame < 5; frame++) runner.AdvanceFrame(runner.Session.StepSeconds, new CombatInputFrame { Movement = new float2(1) });
+                Assert.That(runner.Session.Statistics.Tick, Is.EqualTo(frozenTick));
+                Assert.That(runner.RunModel.ElapsedMilli, Is.EqualTo(frozenElapsedMilli));
+
+                settlement.RestartButton.onClick.Invoke();
+                Assert.That(runner.RunModel.State, Is.EqualTo(CombatRunState.Playing));
+                Assert.That(runner.RunModel.Result, Is.Null);
+                Assert.That(runner.RunModel.ElapsedMilli, Is.Zero);
+                Assert.That(runner.RunModel.Level, Is.EqualTo(1));
+                Assert.That(runner.RunModel.Experience, Is.Zero);
+                Assert.That(runner.RunModel.Kills, Is.Zero);
+                Assert.That(runner.RunModel.CompletedWaves, Is.Zero);
+                Assert.That(runner.RunModel.Drops, Is.Empty);
+                Assert.That(runner.Coordinator.Drops, Is.Empty);
+                Assert.That(runner.Coordinator.PendingSpawnCount, Is.Zero);
+                Assert.That(runner.RunModel.CurrentHealth, Is.EqualTo(runner.RunModel.MaxHealth));
+                Assert.That(runner.Session.ReadUnit(0).Target.Health, Is.EqualTo((long)runner.RunModel.MaxHealth));
+                Assert.That(runner.Session.Statistics.PlayerDead, Is.False);
+                Assert.That(runner.RunModel.ActiveSkills.Keys.OrderBy(id => id),
+                    Is.EqualTo(definition.InitialSkills.Select(skill => skill.Id).OrderBy(id => id)));
+                Assert.That(Enumerable.Range(0, runner.Session.PlayerWeaponCount)
+                    .Count(index => runner.Session.ReadPlayerWeapon(index).Active), Is.EqualTo(definition.InitialSkills.Count));
+                Assert.That(Enumerable.Range(1, runner.Session.UnitCount - 1)
+                    .All(slot => runner.Session.ReadUnit(slot).Target.Health <= 0), Is.True);
+                Assert.That(settlement.gameObject.activeSelf, Is.False);
+                Assert.That(upgrade.gameObject.activeSelf, Is.False);
+                Assert.That(bossView.gameObject.activeSelf, Is.False);
 
                 LogAssert.Expect(LogType.Exception,
                     new System.Text.RegularExpressions.Regex("Combat runtime state was invalidated"));
