@@ -67,7 +67,8 @@ namespace Roguelike.App
             DontDestroyOnLoad(root);
             var bootstrap = root.AddComponent<GameApplicationBootstrap>();
             bootstrap.launch = launch;
-            if (launch.Mode == ApplicationMode.Combat) bootstrap.sceneIsolation = new CombatSceneIsolation(root);
+            if (launch.Mode == ApplicationMode.Combat || launch.Mode == ApplicationMode.Stage)
+                bootstrap.sceneIsolation = new CombatSceneIsolation(root);
         }
 
         /// <summary>
@@ -89,6 +90,8 @@ namespace Roguelike.App
             var features = new List<IGameFeature>();
             switch (launch.Mode)
             {
+                case ApplicationMode.Stage:
+                    throw new InvalidOperationException("Formal -stage runtime is not connected yet.");
                 case ApplicationMode.Combat: features.Add(new CombatStartupFeature(this, launch.ScenarioId.Value)); break;
                 case ApplicationMode.Performance: features.Add(new PerformanceFeature()); break;
                 default: features.Add(new GameplayFeature()); break;

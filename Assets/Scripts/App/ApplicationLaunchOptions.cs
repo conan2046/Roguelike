@@ -5,7 +5,7 @@ using System.Globalization;
 namespace Roguelike.App
 {
     /// <summary>组合根的互斥启动分支，不承载任何玩法默认值。</summary>
-    public enum ApplicationMode { Normal, Performance, Combat }
+    public enum ApplicationMode { Normal, Stage, Performance, Combat }
 
     /// <summary>只解析调用方显式请求的模式和表 ID；无参数时保持普通启动。</summary>
     public sealed class ApplicationLaunchOptions
@@ -23,11 +23,12 @@ namespace Roguelike.App
             for (int i = 0; i < arguments.Count; i++)
             {
                 string argument = arguments[i];
-                if (argument != "-combatScenario" && argument != "-performanceScenario") continue;
+                if (argument != "-stage" && argument != "-combatScenario" && argument != "-performanceScenario") continue;
                 if (result.Mode != ApplicationMode.Normal) throw new ArgumentException("Launch modes must be specified exactly once and cannot be combined.");
                 if (++i >= arguments.Count || !int.TryParse(arguments[i], NumberStyles.None, CultureInfo.InvariantCulture, out int id) || id <= 0)
                     throw new ArgumentException("Scenario argument requires a positive Luban ID.");
-                result.Mode = argument == "-combatScenario" ? ApplicationMode.Combat : ApplicationMode.Performance;
+                result.Mode = argument == "-stage" ? ApplicationMode.Stage :
+                    argument == "-combatScenario" ? ApplicationMode.Combat : ApplicationMode.Performance;
                 result.ScenarioId = id;
             }
             return result;
