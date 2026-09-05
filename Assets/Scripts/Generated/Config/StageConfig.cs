@@ -70,7 +70,7 @@ public sealed partial class StageConfig : Luban.BeanBase
     public readonly int PresentationId;
     public CombatPresentationConfig PresentationId_Ref;
     /// <summary>
-    /// 正式UI方案；Prefab完成后填写
+    /// 正式UI方案ID
     /// </summary>
     public readonly int? UiSetId;
     public CombatUiSetConfig UiSetId_Ref;

@@ -14,17 +14,24 @@ namespace Roguelike.Infrastructure.Editor
     public sealed class ProjectResourceAddressRule : IAddressRule
     {
         private const string StreamingAssetsPrefix = "Assets/StreamingAssets/";
+        private const string GameContentPrefix = "Assets/GameContent/";
+        private const string AssetsPrefix = "Assets/";
 
         /// <summary>
-        /// Removes only the StreamingAssets root while retaining extensions and subdirectories required by TbResource.
+        /// Removes the physical Unity root while retaining the provider-relative path stored by TbResource.
         /// </summary>
         /// <param name="data">YooAsset collector context containing the source asset path.</param>
-        /// <returns>A stable address matching TbResource.path for legacy raw files, or the full Assets path for GameContent.</returns>
+        /// <returns>A stable address matching TbResource.path for StreamingAssets and GameContent collectors.</returns>
         public string GetAssetAddress(AddressRuleData data)
         {
             string normalized = data.AssetPath.Replace('\\', '/');
-            return normalized.StartsWith(StreamingAssetsPrefix, StringComparison.Ordinal)
-                ? normalized.Substring(StreamingAssetsPrefix.Length)
+            if (normalized.StartsWith(StreamingAssetsPrefix, StringComparison.Ordinal))
+            {
+                return normalized.Substring(StreamingAssetsPrefix.Length);
+            }
+
+            return normalized.StartsWith(GameContentPrefix, StringComparison.Ordinal)
+                ? normalized.Substring(AssetsPrefix.Length)
                 : normalized;
         }
     }

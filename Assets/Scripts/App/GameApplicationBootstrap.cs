@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using cfg;
 using Roguelike.Features.Combat.Runtime;
+using Roguelike.Features.Combat.Run;
 using Roguelike.Core;
 using Roguelike.Core.Features;
 using Roguelike.Core.Startup;
@@ -91,7 +92,8 @@ namespace Roguelike.App
             switch (launch.Mode)
             {
                 case ApplicationMode.Stage:
-                    throw new InvalidOperationException("Formal -stage runtime is not connected yet.");
+                    features.Add(new StageStartupFeature(this, launch.ScenarioId.Value));
+                    break;
                 case ApplicationMode.Combat: features.Add(new CombatStartupFeature(this, launch.ScenarioId.Value)); break;
                 case ApplicationMode.Performance: features.Add(new PerformanceFeature()); break;
                 default: features.Add(new GameplayFeature()); break;
@@ -188,6 +190,41 @@ namespace Roguelike.App
                 var root = new GameObject("[Roguelike.Combat]"); root.transform.SetParent(owner.transform, false);
                 owner.combatRunner = root.AddComponent<CombatRuntimeRunner>();
                 await owner.combatRunner.InitializeAsync(scenario, services.Resources, new UnityCombatInput(scenario.PresentationId_Ref), cancellationToken);
+            }
+        }
+
+        /// <summary>组合根私有正式关卡启动步骤，在配置就绪后显式消费 TbStage.id。</summary>
+        private sealed class StageStartupFeature : IGameFeature
+        {
+            private readonly GameApplicationBootstrap owner;
+            private readonly int stageId;
+            public string Name => "Stage";
+
+            /// <summary>保存正式关卡启动参数，不在配置初始化前解析任何表引用。</summary>
+            /// <param name="owner">持有应用和战斗生命周期的组合根。</param>
+            /// <param name="stageId">命令行 -stage 后显式提供的 TbStage.id。</param>
+            internal StageStartupFeature(GameApplicationBootstrap owner, int stageId)
+            {
+                this.owner = owner;
+                this.stageId = stageId;
+            }
+
+            /// <summary>聚合并验证 TbStage，创建正式运行器并等待 UI 与战斗资源完成加载。</summary>
+            /// <param name="services">已初始化的配置和资源服务。</param>
+            /// <param name="cancellationToken">应用退出令牌。</param>
+            /// <returns>正式单局可以交互时完成的任务。</returns>
+            /// <remarks>运行器和 UI 都挂在持久应用根下，资源服务销毁前由组合根主动关闭。</remarks>
+            /// <exception cref="InvalidOperationException">关卡、规则、UI 或资源引用不完整。</exception>
+            public async Task InitializeAsync(ApplicationServices services, CancellationToken cancellationToken)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                CombatRunDefinition definition = CombatRunDefinition.Create(services.Config.Tables, stageId);
+                definition.RequireUiReady();
+                var root = new GameObject("[Roguelike.Stage]");
+                root.transform.SetParent(owner.transform, false);
+                owner.combatRunner = root.AddComponent<CombatRuntimeRunner>();
+                await owner.combatRunner.InitializeAsync(definition, services.Resources,
+                    new UnityCombatInput(definition.Presentation), cancellationToken);
             }
         }
     }

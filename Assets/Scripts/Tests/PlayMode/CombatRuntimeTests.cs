@@ -2,11 +2,14 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using NUnit.Framework;
 using Roguelike.Core.Resources;
 using Roguelike.Features.Combat.Runtime;
+using Roguelike.Features.Combat.Run;
+using Roguelike.Features.Combat.Ecs;
 using Roguelike.Infrastructure.Configuration;
 using Roguelike.Infrastructure.Resources;
 using Unity.Entities;
@@ -137,7 +140,7 @@ namespace Roguelike.Tests
                     if (run == 0)
                     {
                         runner.Restart(); runner.TogglePause();
-                        yield return CaptureCamera(runner.ViewCamera);
+                        yield return CaptureCamera(runner.ViewCamera, "ecs-camera.png");
                     }
                     runner.Restart();
                     var world = FindCombatWorld();
@@ -170,6 +173,87 @@ namespace Roguelike.Tests
             }
         }
 
+        /// <summary>用正式 TbStage 1 加载五个 UI Prefab，完成升级选择、18 分钟 Boss 边界、胜利和按钮重开。</summary>
+        /// <returns>等待真实 YooAsset、渲染帧和加速战斗状态的协程。</returns>
+        /// <remarks>时间线在纯模型中快进到 Boss 前一个固定 tick，再由真实协调器跨过边界；不等待 18 分钟墙钟。</remarks>
+        [UnityTest]
+        public IEnumerator FormalStagePrefabUiAndAcceleratedRunLoop()
+        {
+            using var initializer = new YooAssetPackageInitializer();
+            yield return Wait(initializer.InitializeAsync(ResourcePlayMode.EditorSimulate, CancellationToken.None));
+            var config = new LubanConfigService(initializer);
+            yield return Wait(config.InitializeAsync(CancellationToken.None));
+            var resources = new YooAssetResourceService(initializer, config);
+            CombatRunDefinition definition = CombatRunDefinition.Create(config.Tables, 1);
+            Assert.DoesNotThrow(definition.RequireUiReady);
+            int originalWorlds = World.All.Count;
+            var root = new GameObject("Formal stage runtime test");
+            var runner = root.AddComponent<CombatRuntimeRunner>();
+            try
+            {
+                yield return Wait(runner.InitializeAsync(definition, resources, new TestInput(), CancellationToken.None));
+                Assert.That(runner.Ready, Is.True);
+                Assert.That(runner.FormalUiRoot, Is.Not.Null);
+                Assert.That(runner.FormalUiRoot.GetComponent<CombatHudView>(), Is.Not.Null);
+                Assert.That(runner.RunModel.State, Is.EqualTo(CombatRunState.Playing));
+                Assert.That(runner.Coordinator, Is.Not.Null);
+                yield return CaptureCamera(runner.ViewCamera, "formal-stage.png");
+
+                int required = definition.ExperienceLevels[runner.RunModel.Level - 1].RequiredExperience;
+                runner.RunModel.GrantExperience(required);
+                runner.AdvanceFrame(0, default);
+                Assert.That(runner.RunModel.State, Is.EqualTo(CombatRunState.UpgradeChoice));
+                UpgradeChoicePanelView upgrade = runner.FormalUiRoot.GetComponentInChildren<UpgradeChoicePanelView>(true);
+                Assert.That(upgrade.gameObject.activeSelf, Is.True);
+                Assert.That(upgrade.CardContainer.childCount, Is.EqualTo(definition.UpgradePool.DrawCount));
+                upgrade.CardContainer.GetChild(0).GetComponent<UpgradeCardView>().SelectButton.onClick.Invoke();
+                Assert.That(runner.RunModel.State, Is.EqualTo(CombatRunState.Playing));
+                Assert.That(upgrade.gameObject.activeSelf, Is.False);
+
+                int oneTickMilli = 1000 / definition.CombatRules.SimulationHz;
+                runner.RunModel.Advance(checked((int)(definition.Rule.BossTimeMilli - runner.RunModel.ElapsedMilli - oneTickMilli)));
+                runner.AdvanceFrame(runner.Session.StepSeconds, default);
+                Assert.That(runner.RunModel.State, Is.EqualTo(CombatRunState.Boss));
+                BossHealthBarView bossView = runner.FormalUiRoot.GetComponentInChildren<BossHealthBarView>(true);
+                Assert.That(bossView.gameObject.activeSelf, Is.True);
+
+                int bossSlot = Enumerable.Range(1, runner.Session.UnitCount - 1)
+                    .Single(slot => runner.Session.ReadUnit(slot).IsBoss && runner.Session.ReadUnit(slot).Target.Health > 0);
+                World combatWorld = FindCombatWorld();
+                CombatUnit player = runner.Session.ReadUnit(0);
+                player.Cooldown = 0;
+                player.Attack.Attack = 1000000;
+                player.Attack.Hit = 1;
+                combatWorld.EntityManager.SetComponentData(runner.Session.UnitEntity(0), player);
+                CombatUnit boss = runner.Session.ReadUnit(bossSlot);
+                boss.Position = player.Position + new float2(1, 0);
+                boss.PreviousPosition = boss.Position;
+                boss.MoveSpeed = 0;
+                boss.Cooldown = 1000;
+                boss.Target.Health = 1;
+                boss.Target.Evasion = 0;
+                combatWorld.EntityManager.SetComponentData(runner.Session.UnitEntity(bossSlot), boss);
+                for (int tick = 0; tick < 180 && runner.RunModel.State != CombatRunState.VictorySettlement; tick++)
+                    runner.AdvanceFrame(runner.Session.StepSeconds, default);
+                Assert.That(runner.RunModel.State, Is.EqualTo(CombatRunState.VictorySettlement));
+                SettlementPanelView settlement = runner.FormalUiRoot.GetComponentInChildren<SettlementPanelView>(true);
+                Assert.That(settlement.gameObject.activeSelf, Is.True);
+                settlement.RestartButton.onClick.Invoke();
+                Assert.That(runner.RunModel.State, Is.EqualTo(CombatRunState.Playing));
+                Assert.That(runner.RunModel.ElapsedMilli, Is.Zero);
+                Assert.That(settlement.gameObject.activeSelf, Is.False);
+                Assert.That(Enumerable.Range(0, runner.Session.PlayerWeaponCount)
+                    .Count(index => runner.Session.ReadPlayerWeapon(index).Active), Is.EqualTo(1));
+            }
+            finally
+            {
+                runner.Close();
+                UnityEngine.Object.Destroy(root);
+            }
+            yield return null;
+            Assert.That(World.All.Count, Is.EqualTo(originalWorlds));
+        }
+
         /// <summary>测试读取专属世界；使用具体枚举器，Entities 禁止将 World.All 装箱给 LINQ。</summary>
         /// <returns>唯一已启动的战斗世界。</returns>
         /// <exception cref="InvalidOperationException">世界缺失或重复。</exception>
@@ -187,9 +271,10 @@ namespace Roguelike.Tests
 
         /// <summary>GPU 读回真实战斗相机，检查内容不同于背景后保存证据。</summary>
         /// <param name="camera">运行器创建的相机。</param>
+        /// <param name="fileName">输出到 runtime-review 的证据文件名。</param>
         /// <returns>等待世界 LateUpdate 和首次 Shader/GPU 准备的协程，超时仍严格判失败。</returns>
         /// <remarks>临时目标和 CPU 纹理在 finally 销毁，恢复相机原目标。</remarks>
-        private static IEnumerator CaptureCamera(Camera camera)
+        private static IEnumerator CaptureCamera(Camera camera, string fileName)
         {
             var target = new RenderTexture(1280, 720, 24); var pixels = new Texture2D(1280, 720, TextureFormat.RGB24, false);
             var oldTarget = camera.targetTexture; var oldActive = RenderTexture.active;
@@ -210,7 +295,7 @@ namespace Roguelike.Tests
                     RenderTexture.active = oldActive;
                 } while (different <= 500 && Time.realtimeSinceStartupAsDouble < deadline);
                 Directory.CreateDirectory("outputs/combat-config/runtime-review");
-                File.WriteAllBytes("outputs/combat-config/runtime-review/ecs-camera.png", pixels.EncodeToPNG());
+                File.WriteAllBytes(Path.Combine("outputs/combat-config/runtime-review", fileName), pixels.EncodeToPNG());
                 Assert.That(different, Is.GreaterThan(500), "Actual ECS camera must show rendered combat units.");
             }
             finally

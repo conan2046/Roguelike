@@ -32,6 +32,19 @@ public sealed partial class CombatUiSetConfig : Luban.BeanBase
         VictoryText = _buf.ReadString();
         DefeatText = _buf.ReadString();
         RestartText = _buf.ReadString();
+        UpgradeCardPrefabResourceId = _buf.ReadInt();
+        UpgradeCardPrefabResourceId_Ref = null;
+        FontResourceId = _buf.ReadInt();
+        FontResourceId_Ref = null;
+        HealthFormat = _buf.ReadString();
+        TimerFormat = _buf.ReadString();
+        LevelFormat = _buf.ReadString();
+        ExperienceFormat = _buf.ReadString();
+        KillsFormat = _buf.ReadString();
+        WaveFormat = _buf.ReadString();
+        BossHealthFormat = _buf.ReadString();
+        SettlementStatsFormat = _buf.ReadString();
+        RankFormat = _buf.ReadString();
     }
 
     public static CombatUiSetConfig DeserializeCombatUiSetConfig(ByteBuf _buf)
@@ -79,6 +92,52 @@ public sealed partial class CombatUiSetConfig : Luban.BeanBase
     /// 重开按钮文本
     /// </summary>
     public readonly string RestartText;
+    /// <summary>
+    /// 升级卡片Prefab资源
+    /// </summary>
+    public readonly int UpgradeCardPrefabResourceId;
+    public ResourceConfig UpgradeCardPrefabResourceId_Ref;
+    /// <summary>
+    /// 界面字体资源
+    /// </summary>
+    public readonly int FontResourceId;
+    public ResourceConfig FontResourceId_Ref;
+    /// <summary>
+    /// 生命显示格式
+    /// </summary>
+    public readonly string HealthFormat;
+    /// <summary>
+    /// 计时显示格式
+    /// </summary>
+    public readonly string TimerFormat;
+    /// <summary>
+    /// 等级显示格式
+    /// </summary>
+    public readonly string LevelFormat;
+    /// <summary>
+    /// 经验显示格式
+    /// </summary>
+    public readonly string ExperienceFormat;
+    /// <summary>
+    /// 击杀显示格式
+    /// </summary>
+    public readonly string KillsFormat;
+    /// <summary>
+    /// 波次显示格式
+    /// </summary>
+    public readonly string WaveFormat;
+    /// <summary>
+    /// Boss生命显示格式
+    /// </summary>
+    public readonly string BossHealthFormat;
+    /// <summary>
+    /// 结算统计格式
+    /// </summary>
+    public readonly string SettlementStatsFormat;
+    /// <summary>
+    /// 升级卡等级格式
+    /// </summary>
+    public readonly string RankFormat;
    
     public const int __ID__ = -1590109604;
     public override int GetTypeId() => __ID__;
@@ -89,6 +148,8 @@ public sealed partial class CombatUiSetConfig : Luban.BeanBase
         BossBarPrefabResourceId_Ref = tables.TbResource.GetOrDefault(BossBarPrefabResourceId);
         UpgradePanelPrefabResourceId_Ref = tables.TbResource.GetOrDefault(UpgradePanelPrefabResourceId);
         SettlementPrefabResourceId_Ref = tables.TbResource.GetOrDefault(SettlementPrefabResourceId);
+        UpgradeCardPrefabResourceId_Ref = tables.TbResource.GetOrDefault(UpgradeCardPrefabResourceId);
+        FontResourceId_Ref = tables.TbResource.GetOrDefault(FontResourceId);
     }
 
     public override string ToString()
@@ -103,6 +164,17 @@ public sealed partial class CombatUiSetConfig : Luban.BeanBase
         + "victoryText:" + VictoryText + ","
         + "defeatText:" + DefeatText + ","
         + "restartText:" + RestartText + ","
+        + "upgradeCardPrefabResourceId:" + UpgradeCardPrefabResourceId + ","
+        + "fontResourceId:" + FontResourceId + ","
+        + "healthFormat:" + HealthFormat + ","
+        + "timerFormat:" + TimerFormat + ","
+        + "levelFormat:" + LevelFormat + ","
+        + "experienceFormat:" + ExperienceFormat + ","
+        + "killsFormat:" + KillsFormat + ","
+        + "waveFormat:" + WaveFormat + ","
+        + "bossHealthFormat:" + BossHealthFormat + ","
+        + "settlementStatsFormat:" + SettlementStatsFormat + ","
+        + "rankFormat:" + RankFormat + ","
         + "}";
     }
 }

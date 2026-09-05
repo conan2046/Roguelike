@@ -9,7 +9,8 @@
     "Roguelike.Presentation",
     "Roguelike.Generated",
     "Luban.Runtime",
-    "Roguelike.Features.Combat.Runtime"
+    "Roguelike.Features.Combat.Runtime",
+    "Roguelike.Features.Combat"
   ],
   "includePlatforms": [],
   "excludePlatforms": [],

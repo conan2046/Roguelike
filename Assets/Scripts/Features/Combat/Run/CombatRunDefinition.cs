@@ -111,10 +111,28 @@ namespace Roguelike.Features.Combat.Run
             RequirePrefab(UiSet.HudPrefabResourceId_Ref, "HUD");
             RequirePrefab(UiSet.BossBarPrefabResourceId_Ref, "Boss bar");
             RequirePrefab(UiSet.UpgradePanelPrefabResourceId_Ref, "upgrade panel");
+            RequirePrefab(UiSet.UpgradeCardPrefabResourceId_Ref, "upgrade card");
             RequirePrefab(UiSet.SettlementPrefabResourceId_Ref, "settlement panel");
+            Require(UiSet.FontResourceId_Ref != null && UiSet.FontResourceId_Ref.Type == EResourceType.UnityAsset &&
+                    !string.IsNullOrWhiteSpace(UiSet.FontResourceId_Ref.Path),
+                $"TbCombatUiSet {UiSet.Id}: invalid font asset resource.");
             Require(!string.IsNullOrWhiteSpace(UiSet.LevelUpTitle) && !string.IsNullOrWhiteSpace(UiSet.VictoryText) &&
-                    !string.IsNullOrWhiteSpace(UiSet.DefeatText) && !string.IsNullOrWhiteSpace(UiSet.RestartText),
+                    !string.IsNullOrWhiteSpace(UiSet.DefeatText) && !string.IsNullOrWhiteSpace(UiSet.RestartText) &&
+                    !string.IsNullOrWhiteSpace(UiSet.HealthFormat) && !string.IsNullOrWhiteSpace(UiSet.TimerFormat) &&
+                    !string.IsNullOrWhiteSpace(UiSet.LevelFormat) && !string.IsNullOrWhiteSpace(UiSet.ExperienceFormat) &&
+                    !string.IsNullOrWhiteSpace(UiSet.KillsFormat) && !string.IsNullOrWhiteSpace(UiSet.WaveFormat) &&
+                    !string.IsNullOrWhiteSpace(UiSet.BossHealthFormat) && !string.IsNullOrWhiteSpace(UiSet.SettlementStatsFormat) &&
+                    !string.IsNullOrWhiteSpace(UiSet.RankFormat),
                 $"TbCombatUiSet {UiSet.Id}: display text is incomplete.");
+            _ = string.Format(UiSet.HealthFormat, 0, 0);
+            _ = string.Format(UiSet.TimerFormat, 0, 0);
+            _ = string.Format(UiSet.LevelFormat, 0);
+            _ = string.Format(UiSet.ExperienceFormat, 0, 0);
+            _ = string.Format(UiSet.KillsFormat, 0);
+            _ = string.Format(UiSet.WaveFormat, 0);
+            _ = string.Format(UiSet.BossHealthFormat, 0, 0);
+            _ = string.Format(UiSet.SettlementStatsFormat, 0, 0, 0, 0);
+            _ = string.Format(UiSet.RankFormat, 0, 0);
         }
 
         /// <summary>验证关卡、地图、固定步进及玩家基础引用。</summary>

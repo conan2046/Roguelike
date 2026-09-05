@@ -6,19 +6,22 @@ using cfg;
 using Roguelike.Core.Resources;
 using Roguelike.Features.Combat.Ecs;
 using Roguelike.Features.Combat.Rendering;
+using Roguelike.Features.Combat.Run;
 using Unity.Entities;
 using UnityEngine;
 
 namespace Roguelike.Features.Combat.Runtime
 {
-    /// <summary>正式交互入口：整局拥有 World、会话、表现、相机，读取表驱动输入和状态界面。</summary>
+    /// <summary>交互战斗入口：测试场景与正式 TbStage 共用 World、会话、表现和相机生命周期。</summary>
     public sealed class CombatRuntimeRunner : MonoBehaviour
     {
         private readonly CancellationTokenSource lifetime = new CancellationTokenSource();
         private PerformanceScenarioConfig scenario;
+        private CombatRunDefinition runDefinition;
         private CombatPresentationConfig presentation;
         private CombatVisualResources assets;
         private CombatEntityVisuals visuals;
+        private CombatUiRuntime ui;
         private ICombatInput input;
         private World world;
         private bool started, closed, settingsApplied;
@@ -26,138 +29,290 @@ namespace Roguelike.Features.Combat.Runtime
         private bool oldBackground;
         private GUIStyle labelStyle, buttonStyle;
         private string status;
+
         public bool Ready { get; private set; }
         public CombatSession Session { get; private set; }
+        public CombatRunModel RunModel { get; private set; }
+        public CombatRunCoordinator Coordinator { get; private set; }
         public Camera ViewCamera { get; private set; }
         public string StatusText => status;
         public CombatEntityVisuals Visuals => visuals;
+        public GameObject FormalUiRoot => ui?.Root;
 
-        /// <summary>配置和资源服务就绪后异步加载整局资源，成功才开放 Update 和界面。</summary>
+        /// <summary>配置和资源服务就绪后加载 TbPerformanceScenario 战斗测试入口。</summary>
         /// <param name="scenario">显式请求的 TbPerformanceScenario Combat 行。</param>
         /// <param name="resources">生命周期长于本入口的统一资源服务。</param>
         /// <param name="input">从表现表构造的设备输入适配器。</param>
         /// <param name="token">组合根退出令牌。</param>
-        /// <returns>资源、会话、渲染世界和相机全部就绪的任务。</returns>
-        /// <remarks>必须 Unity 主线程调用并保留同步上下文；失败/取消清理全部部分对象，调用方仍负责销毁根 GameObject。</remarks>
+        /// <returns>资源、会话、渲染 World 和相机全部就绪的任务。</returns>
+        /// <remarks>保留 OnGUI 调试界面和测试场景重开行为；不创建正式 Prefab UI。</remarks>
         /// <exception cref="InvalidOperationException">重复初始化或配置不合法。</exception>
         /// <exception cref="OperationCanceledException">初始化被取消。</exception>
-        public async Task InitializeAsync(PerformanceScenarioConfig scenario, IResourceService resources, ICombatInput input, CancellationToken token)
+        public async Task InitializeAsync(PerformanceScenarioConfig scenario, IResourceService resources,
+            ICombatInput input, CancellationToken token)
         {
-            if (started || closed) throw new InvalidOperationException("Combat runner cannot be initialized twice.");
-            started = true;
+            BeginInitialization();
             using var linked = CancellationTokenSource.CreateLinkedTokenSource(token, lifetime.Token);
             try
             {
-                if (scenario == null || scenario.Kind != EPerformanceKind.Combat || scenario.PresentationId_Ref == null || input == null)
+                if (scenario == null || scenario.Kind != EPerformanceKind.Combat ||
+                    scenario.PresentationId_Ref == null || input == null)
                     throw new InvalidOperationException("Combat launch requires an explicit Combat scenario and input adapter.");
-                this.scenario = scenario; presentation = scenario.PresentationId_Ref; this.input = input;
-                ValidatePresentation();
+                this.scenario = scenario;
+                presentation = scenario.PresentationId_Ref;
+                this.input = input;
+                ValidateScenarioPresentation();
                 assets = await CombatVisualResources.LoadAsync(scenario, resources, linked.Token);
-                linked.Token.ThrowIfCancellationRequested();
-                world = new World("Roguelike Combat");
-                DefaultWorldInitialization.AddSystemsToRootLevelSystemGroups(world,
-                    DefaultWorldInitialization.GetAllSystems(WorldSystemFilterFlags.Default));
+                CreateWorld();
                 Session = await CombatSessionFactory.CreateAsync(world, scenario, resources, linked.Token);
                 linked.Token.ThrowIfCancellationRequested();
                 visuals = new CombatEntityVisuals(world, Session, scenario, assets);
-                var cameraObject = new GameObject("Combat Camera"); cameraObject.transform.SetParent(transform, false);
-                ViewCamera = cameraObject.AddComponent<Camera>();
-                ViewCamera.orthographic = true; ViewCamera.clearFlags = CameraClearFlags.SolidColor;
-                ViewCamera.backgroundColor = new Color(presentation.BackgroundR, presentation.BackgroundG, presentation.BackgroundB);
-                ViewCamera.nearClipPlane = presentation.CameraNear; ViewCamera.farClipPlane = presentation.CameraFar;
-                ViewCamera.transform.localPosition = new Vector3(0, 0, -presentation.CameraDepth);
-                UpdateCameraFit();
-                oldFrameRate = Application.targetFrameRate; oldVSync = QualitySettings.vSyncCount; oldBackground = Application.runInBackground;
-                settingsApplied = true;
-                Application.targetFrameRate = scenario.TargetFrameRate; QualitySettings.vSyncCount = scenario.VSyncCount;
-                Application.runInBackground = scenario.RunInBackground;
-                RefreshStatus(); Ready = true;
+                CreateCamera();
+                ApplyScenarioSettings();
+                RefreshStatus();
+                Ready = true;
             }
-            catch { ReleaseOwnedObjects(); throw; }
+            catch
+            {
+                ReleaseOwnedObjects();
+                throw;
+            }
         }
 
-        /// <summary>初始化时检查已有表现参数，缺配不使用硬编码界面或相机兜底。</summary>
-        /// <exception cref="InvalidOperationException">尺寸、相机、文本或格式不合法。</exception>
-        private void ValidatePresentation()
+        /// <summary>配置和资源服务就绪后加载正式 TbStage 单局、协调器和全部 UI Prefab。</summary>
+        /// <param name="definition">由 TbStage 聚合并验证的正式单局定义。</param>
+        /// <param name="resources">生命周期长于本入口的统一资源服务。</param>
+        /// <param name="input">由 TbCombatPresentation 构造的设备输入适配器。</param>
+        /// <param name="token">组合根退出令牌。</param>
+        /// <returns>战斗、美术、相机及正式 UI 全部就绪的任务。</returns>
+        /// <remarks>失败或取消时按 UI、表现、会话、World、共享美术顺序回收，不保存场景。</remarks>
+        /// <exception cref="InvalidOperationException">重复初始化、UI 缺配或 Prefab 无效。</exception>
+        /// <exception cref="OperationCanceledException">初始化被取消。</exception>
+        public async Task InitializeAsync(CombatRunDefinition definition, IResourceService resources,
+            ICombatInput input, CancellationToken token)
         {
-            CombatMath.Positive(presentation.PanelWidth); CombatMath.Positive(presentation.PanelHeight);
-            CombatMath.Positive(presentation.FontSize); CombatMath.Positive(presentation.CameraDepth);
-            CombatMath.Positive(presentation.CameraNear); CombatMath.Positive(presentation.CameraFar);
+            BeginInitialization();
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(token, lifetime.Token);
+            try
+            {
+                runDefinition = definition ?? throw new ArgumentNullException(nameof(definition));
+                this.input = input ?? throw new ArgumentNullException(nameof(input));
+                presentation = definition.Presentation;
+                definition.RequireUiReady();
+                ValidateCameraPresentation();
+                assets = await CombatVisualResources.LoadAsync(definition, resources, linked.Token);
+                CreateWorld();
+                Session = await CombatSessionFactory.CreateAsync(world, definition, resources, linked.Token);
+                linked.Token.ThrowIfCancellationRequested();
+                RunModel = new CombatRunModel(definition);
+                Coordinator = new CombatRunCoordinator(RunModel, Session);
+                visuals = new CombatEntityVisuals(world, Session, definition, assets);
+                CreateCamera();
+                ui = await CombatUiRuntime.CreateAsync(definition, resources, transform, ViewCamera,
+                    ChooseUpgrade, Restart, linked.Token);
+                linked.Token.ThrowIfCancellationRequested();
+                RefreshStatus();
+                Ready = true;
+            }
+            catch
+            {
+                ReleaseOwnedObjects();
+                throw;
+            }
+        }
+
+        /// <summary>拒绝重复初始化并在任何资源创建前锁定本组件生命周期。</summary>
+        /// <exception cref="InvalidOperationException">组件已开始初始化或已关闭。</exception>
+        private void BeginInitialization()
+        {
+            if (started || closed) throw new InvalidOperationException("Combat runner cannot be initialized twice.");
+            started = true;
+        }
+
+        /// <summary>创建本入口独占的 ECS World 并登记默认系统组。</summary>
+        /// <remarks>World 不追加到 PlayerLoop，由 LateUpdate 手动推进一次。</remarks>
+        private void CreateWorld()
+        {
+            lifetime.Token.ThrowIfCancellationRequested();
+            world = new World("Roguelike Combat");
+            DefaultWorldInitialization.AddSystemsToRootLevelSystemGroups(world,
+                DefaultWorldInitialization.GetAllSystems(WorldSystemFilterFlags.Default));
+        }
+
+        /// <summary>创建只属于本局的正交相机，并从 TbCombatPresentation 应用渲染参数。</summary>
+        /// <remarks>不接管、修改或保存原场景相机。</remarks>
+        private void CreateCamera()
+        {
+            var cameraObject = new GameObject("Combat Camera");
+            cameraObject.transform.SetParent(transform, false);
+            ViewCamera = cameraObject.AddComponent<Camera>();
+            ViewCamera.orthographic = true;
+            ViewCamera.clearFlags = CameraClearFlags.SolidColor;
+            ViewCamera.backgroundColor = new Color(presentation.BackgroundR, presentation.BackgroundG, presentation.BackgroundB);
+            ViewCamera.nearClipPlane = presentation.CameraNear;
+            ViewCamera.farClipPlane = presentation.CameraFar;
+            ViewCamera.transform.localPosition = new Vector3(0, 0, -presentation.CameraDepth);
+            UpdateCameraFit();
+        }
+
+        /// <summary>初始化测试入口时检查 OnGUI、输入帮助与相机参数。</summary>
+        /// <exception cref="InvalidOperationException">尺寸、相机、文本或格式不合法。</exception>
+        private void ValidateScenarioPresentation()
+        {
+            ValidateCameraPresentation();
+            CombatMath.Positive(presentation.PanelWidth);
+            CombatMath.Positive(presentation.PanelHeight);
+            CombatMath.Positive(presentation.FontSize);
             CombatMath.NonNegative(scenario.CameraPadding);
-            if (presentation.CameraNear >= presentation.CameraDepth || presentation.CameraFar <= presentation.CameraDepth ||
-                string.IsNullOrWhiteSpace(presentation.Title) || string.IsNullOrWhiteSpace(presentation.StatusFormat) ||
+            if (string.IsNullOrWhiteSpace(presentation.Title) || string.IsNullOrWhiteSpace(presentation.StatusFormat) ||
                 string.IsNullOrWhiteSpace(presentation.PauseText) || string.IsNullOrWhiteSpace(presentation.RestartText) ||
                 string.IsNullOrWhiteSpace(presentation.DeadText) || string.IsNullOrWhiteSpace(presentation.HelpText))
-                throw new InvalidOperationException("TbCombatPresentation: incomplete HUD or camera configuration.");
+                throw new InvalidOperationException("TbCombatPresentation: incomplete diagnostic HUD configuration.");
             _ = string.Format(CultureInfo.InvariantCulture, presentation.StatusFormat, 0, 0, 0, 0d);
         }
 
+        /// <summary>检查正式与测试入口共用的相机裁剪参数。</summary>
+        /// <exception cref="InvalidOperationException">深度或裁剪面非法。</exception>
+        private void ValidateCameraPresentation()
+        {
+            CombatMath.Positive(presentation.CameraDepth);
+            CombatMath.Positive(presentation.CameraNear);
+            CombatMath.Positive(presentation.CameraFar);
+            if (presentation.CameraNear >= presentation.CameraDepth || presentation.CameraFar <= presentation.CameraDepth)
+                throw new InvalidOperationException("TbCombatPresentation: invalid camera clipping configuration.");
+        }
+
+        /// <summary>仅对 TbPerformanceScenario 应用显式帧率、垂直同步及后台运行测试设置。</summary>
+        /// <remarks>正式关卡不改全局质量设置；释放入口时恢复此前值。</remarks>
+        private void ApplyScenarioSettings()
+        {
+            oldFrameRate = Application.targetFrameRate;
+            oldVSync = QualitySettings.vSyncCount;
+            oldBackground = Application.runInBackground;
+            settingsApplied = true;
+            Application.targetFrameRate = scenario.TargetFrameRate;
+            QualitySettings.vSyncCount = scenario.VSyncCount;
+            Application.runInBackground = scenario.RunInBackground;
+        }
+
         /// <summary>Unity 每渲染帧采样一次设备输入，资源未就绪时不运行。</summary>
-        /// <remarks>不更改 Unity timeScale；暂停只影响本会话。异常时释放本局，避免每帧重复报错。</remarks>
+        /// <remarks>不更改 Unity timeScale；异常时关闭本局，避免每帧重复报错。</remarks>
         private void Update()
         {
             if (!Ready) return;
-            try { AdvanceFrame(Time.unscaledDeltaTime, input.Read()); }
-            catch (Exception exception) { Close(); Debug.LogException(exception, this); }
+            try
+            {
+                AdvanceFrame(Time.unscaledDeltaTime, input.Read());
+            }
+            catch (Exception exception)
+            {
+                Close();
+                Debug.LogException(exception, this);
+            }
         }
 
-        /// <summary>输入采样后处理重开/暂停，再把有效渲染时间交给会话；重开同帧不额外推进。</summary>
-        /// <param name="elapsedSeconds">本渲染帧经过时间。</param>
+        /// <summary>输入采样后处理重开和暂停，再推进测试会话或正式协调器。</summary>
+        /// <param name="elapsedSeconds">本渲染帧经过的未缩放时间。</param>
         /// <param name="frame">输入适配器或测试提供的同协议快照。</param>
-        /// <remarks>统一供键盘与自动化测试调用；移动技能投递仍由原会话执行，绝不因 UI 再扣血。</remarks>
+        /// <remarks>正式升级与结算由协调器冻结；UI 只刷新状态，不重复执行伤害。</remarks>
         public void AdvanceFrame(double elapsedSeconds, CombatInputFrame frame)
         {
             if (!Ready) return;
-            if (frame.RestartPressed) { Restart(); return; }
+            if (frame.RestartPressed && Restart()) return;
             if (frame.PausePressed) TogglePause();
-            Session.Advance(elapsedSeconds, frame.Movement);
-            visuals.Synchronize(); RefreshStatus();
+            if (Coordinator != null) Coordinator.Advance(elapsedSeconds, frame.Movement);
+            else Session.Advance(elapsedSeconds, frame.Movement);
+            visuals.Synchronize();
+            RefreshStatus();
         }
 
-        /// <summary>Unity LateUpdate 在本帧模拟/选帧后推进自有 World 的变换与 Presentation，确保同帧绘制。</summary>
-        /// <remarks>此 World 不追加到 PlayerLoop，避免自动和手动双更新；暂停时仍绘制冻结画面。</remarks>
+        /// <summary>Unity LateUpdate 在模拟和选帧后推进自有 World 的变换与 Presentation。</summary>
+        /// <remarks>暂停时仍绘制冻结画面；World 从不注册到全局 PlayerLoop。</remarks>
         private void LateUpdate()
         {
             if (!Ready) return;
-            try { UpdateCameraFit(); world.Update(); }
-            catch (Exception exception) { Close(); Debug.LogException(exception, this); }
+            try
+            {
+                UpdateCameraFit();
+                world.Update();
+            }
+            catch (Exception exception)
+            {
+                Close();
+                Debug.LogException(exception, this);
+            }
         }
 
-        /// <summary>按场地半宽/半高、留白和当前画面比例计算固定全场正交视野。</summary>
-        /// <remarks>仅调整本入口创建的相机，不接管或改写原场景相机。</remarks>
+        /// <summary>按测试场景或 TbMap 的场地、留白和当前宽高比计算正交视野。</summary>
+        /// <remarks>正式字段均由 Luban 千分整数解码，不保留代码默认地图尺寸。</remarks>
         private void UpdateCameraFit()
         {
-            ViewCamera.orthographicSize = Mathf.Max(scenario.ArenaHalfHeight.Value + scenario.CameraPadding,
-                (scenario.ArenaHalfWidth.Value + scenario.CameraPadding) / ViewCamera.aspect);
+            float halfWidth = scenario != null ? scenario.ArenaHalfWidth.Value : ConfigNumber.Decode(runDefinition.Map.ArenaHalfWidthMilli);
+            float halfHeight = scenario != null ? scenario.ArenaHalfHeight.Value : ConfigNumber.Decode(runDefinition.Map.ArenaHalfHeightMilli);
+            float padding = scenario != null ? scenario.CameraPadding : ConfigNumber.Decode(runDefinition.Map.CameraPaddingMilli);
+            ViewCamera.orthographicSize = Mathf.Max(halfHeight + padding, (halfWidth + padding) / ViewCamera.aspect);
         }
 
-        /// <summary>按键或按钮调用时切换本局暂停；死亡后仍保持冻结，只能重开。</summary>
+        /// <summary>按键或测试调用时切换当前入口的主动暂停。</summary>
         public void TogglePause()
         {
-            if (Ready && !Session.Statistics.PlayerDead) Session.Paused = !Session.Paused;
-        }
-
-        /// <summary>按键或按钮触发重开，复用现有实体和共享资源，同时更新出生画面及状态。</summary>
-        /// <remarks>会话恢复生命/冷却/代际，播放器随代际自动复位，不重新加载美术。</remarks>
-        public void Restart()
-        {
             if (!Ready) return;
-            Session.Restart(); visuals.Synchronize(); RefreshStatus();
+            if (Coordinator != null) Coordinator.TogglePause();
+            else if (!Session.Statistics.PlayerDead) Session.Paused = !Session.Paused;
+            RefreshStatus();
         }
 
-        /// <summary>模拟更新后从真实生命与统计生成状态文本，OnGUI 多次重绘复用此结果。</summary>
+        /// <summary>测试入口随时重置会话；正式入口仅在胜负结算时开始下一代单局。</summary>
+        /// <returns>本次输入实际完成重开时为真。</returns>
+        /// <remarks>复用已加载 ANI、Prefab 和实体池，不重新加载资源。</remarks>
+        public bool Restart()
+        {
+            if (!Ready) return false;
+            if (Coordinator != null)
+            {
+                if (!Coordinator.Restart()) return false;
+            }
+            else
+            {
+                Session.Restart();
+            }
+            visuals.Synchronize();
+            RefreshStatus();
+            return true;
+        }
+
+        /// <summary>升级卡提交当前面板代次与 TbUpgradeOption.id，并立即刷新表现和界面。</summary>
+        /// <param name="panelGeneration">卡片创建时记录的模型面板代次。</param>
+        /// <param name="optionId">当前候选升级选项 ID。</param>
+        /// <returns>协调器接受并完成 ECS 同步时为真。</returns>
+        public bool ChooseUpgrade(ulong panelGeneration, int optionId)
+        {
+            if (!Ready || Coordinator == null || !Coordinator.ChooseUpgrade(panelGeneration, optionId)) return false;
+            visuals.Synchronize();
+            RefreshStatus();
+            return true;
+        }
+
+        /// <summary>模拟更新后刷新测试状态文本或正式 Prefab UI。</summary>
         private void RefreshStatus()
         {
-            var unit = Session.ReadUnit(0); var stats = Session.Statistics;
+            if (Coordinator != null)
+            {
+                status = RunModel.State.ToString();
+                ui?.Refresh(RunModel, Coordinator, Session);
+                return;
+            }
+            CombatUnit unit = Session.ReadUnit(0);
+            CombatCounters stats = Session.Statistics;
             status = string.Format(CultureInfo.InvariantCulture, presentation.StatusFormat,
                 unit.Target.Health, unit.Target.MaxHealth, stats.AliveMonsters, stats.Tick * Session.StepSeconds);
         }
 
-        /// <summary>Unity GUI 事件绘制表驱动调试界面，尺寸/字号/文本来自 TbCombatPresentation。</summary>
-        /// <remarks>布局使用 Unity 内置样式；不持有源场景 UI。按钮与键盘复用同一暂停/重开方法。</remarks>
+        /// <summary>仅为 TbPerformanceScenario 绘制表驱动调试界面。</summary>
+        /// <remarks>正式 TbStage 完全使用可编辑 Prefab，OnGUI 不参与正式入口。</remarks>
         private void OnGUI()
         {
-            if (!Ready) return;
+            if (!Ready || Coordinator != null) return;
             if (labelStyle == null)
             {
                 labelStyle = new GUIStyle(GUI.skin.label) { fontSize = presentation.FontSize, wordWrap = true };
@@ -174,36 +329,58 @@ namespace Roguelike.Features.Combat.Runtime
             if (paused != Session.Paused) TogglePause();
             GUI.enabled = enabledBefore;
             if (GUILayout.Button(presentation.RestartText, buttonStyle)) Restart();
-            GUILayout.EndHorizontal(); GUILayout.EndArea();
+            GUILayout.EndHorizontal();
+            GUILayout.EndArea();
         }
 
-        /// <summary>应用退出或测试结束时先取消加载，再停止和释放本入口所有对象。</summary>
-        /// <remarks>幂等；不释放调用者资源服务，不销毁默认世界，不修改源场景。</remarks>
+        /// <summary>应用退出或测试结束时取消加载并释放本入口全部所有权。</summary>
+        /// <remarks>幂等；不释放调用者资源服务，不销毁默认 World，不保存源场景。</remarks>
         public void Close()
         {
             if (closed) return;
-            closed = true; lifetime.Cancel(); ReleaseOwnedObjects();
+            closed = true;
+            lifetime.Cancel();
+            ReleaseOwnedObjects();
         }
 
-        /// <summary>初始化失败及关闭时按表现、会话、世界、资源顺序回收；世界先释放已登记的 GPU 引用。</summary>
-        /// <remarks>可能由加载失败再次调用；每个字段释放后清空，不保留半就绪状态。编辑器退出时 World 可能已被 Entities 提前释放，仅在仍存活时销毁。</remarks>
+        /// <summary>初始化失败及关闭时按 UI、表现、会话、World、共享资源顺序回收。</summary>
+        /// <remarks>Unity 可能先销毁 World；仅在对象仍存活时访问，字段释放后立即清空。</remarks>
         private void ReleaseOwnedObjects()
         {
             Ready = false;
-            if (ViewCamera != null) { ViewCamera.enabled = false; Destroy(ViewCamera.gameObject); ViewCamera = null; }
-            visuals?.Dispose(); visuals = null;
-            Session?.Dispose(); Session = null;
-            if (world != null && world.IsCreated) world.Dispose(); world = null;
-            assets?.Dispose(); assets = null;
+            ui?.Dispose();
+            ui = null;
+            if (ViewCamera != null)
+            {
+                ViewCamera.enabled = false;
+                Destroy(ViewCamera.gameObject);
+                ViewCamera = null;
+            }
+            visuals?.Dispose();
+            visuals = null;
+            Session?.Dispose();
+            Session = null;
+            Coordinator = null;
+            RunModel = null;
+            if (world != null && world.IsCreated) world.Dispose();
+            world = null;
+            assets?.Dispose();
+            assets = null;
             if (settingsApplied)
             {
-                Application.targetFrameRate = oldFrameRate; QualitySettings.vSyncCount = oldVSync; Application.runInBackground = oldBackground;
+                Application.targetFrameRate = oldFrameRate;
+                QualitySettings.vSyncCount = oldVSync;
+                Application.runInBackground = oldBackground;
                 settingsApplied = false;
             }
         }
 
-        /// <summary>Unity 销毁组件时取消未完成加载并关闭已创建战斗，最后释放取消源。</summary>
-        /// <remarks>组合根应在销毁 YooAsset 之前主动 Close；本回调是重复安全的生命周期保障。</remarks>
-        private void OnDestroy() { Close(); lifetime.Dispose(); }
+        /// <summary>Unity 销毁组件时取消加载、关闭已创建战斗并释放取消源。</summary>
+        /// <remarks>组合根应在 YooAsset 之前主动 Close；本回调重复安全。</remarks>
+        private void OnDestroy()
+        {
+            Close();
+            lifetime.Dispose();
+        }
     }
 }

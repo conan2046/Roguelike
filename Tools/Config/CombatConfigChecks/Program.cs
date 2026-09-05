@@ -153,8 +153,15 @@ internal static class Program
         Require(stage.MapId_Ref != null && stage.StageRuleId_Ref != null && stage.CombatRulesId_Ref != null &&
             stage.PresentationId_Ref != null && stage.InitialCharacterId_Ref != null && stage.InitialSkillIds_Ref.All(x => x != null),
             "TbStage 1: run-loop references must resolve.");
-        Require(!stage.UiSetId.HasValue && tables.TbCombatUiSet.DataList.Count == 0,
-            "TbStage 1: combat UI remains intentionally unassigned until its Prefabs exist.");
+        Require(stage.UiSetId == 1 && stage.UiSetId_Ref != null && tables.TbCombatUiSet.DataList.Count == 1,
+            "TbStage 1: approved formal UI set must resolve.");
+        var ui = stage.UiSetId_Ref;
+        Require(new[] { ui.HudPrefabResourceId_Ref, ui.BossBarPrefabResourceId_Ref,
+                ui.UpgradePanelPrefabResourceId_Ref, ui.UpgradeCardPrefabResourceId_Ref,
+                ui.SettlementPrefabResourceId_Ref }.All(x => x?.Type == EResourceType.Prefab),
+            "TbCombatUiSet 1: all formal UI views must reference Prefabs.");
+        Require(ui.FontResourceId_Ref?.Type == EResourceType.UnityAsset,
+            "TbCombatUiSet 1: font must reference a Unity asset.");
         Require(stage.InitialCharacterId == 10001 && stage.InitialSkillIds.SequenceEqual(new[] { 20001 }),
             "TbStage 1: approved initial loadout changed.");
 
