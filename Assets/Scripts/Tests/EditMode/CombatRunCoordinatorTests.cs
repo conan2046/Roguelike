@@ -158,7 +158,7 @@ namespace Roguelike.Tests
             Assert.That(fixture.Session.ReadPlayerWeapon(weaponIndex).Active, Is.True);
         }
 
-        /// <summary>验证 18 分钟边界只生成一只 Boss，死亡胜利后重开清空所有运行态。</summary>
+        /// <summary>验证 18 分钟边界先落地阶段末只普通怪再生成唯一 Boss，死亡胜利后重开清空所有运行态。</summary>
         [Test]
         public void BossVictoryAndRestartResetRuntimeState()
         {
@@ -167,7 +167,9 @@ namespace Roguelike.Tests
             fixture.Model.Advance(fixture.Definition.Rule.BossTimeMilli - oneTickMilli);
 
             AdvanceUntil(fixture.Coordinator, () => fixture.Model.State == CombatRunState.Boss, 4);
-            Assert.That(fixture.Session.Statistics.AliveMonsters, Is.EqualTo(1));
+            Assert.That(fixture.Session.Statistics.AliveMonsters, Is.EqualTo(2));
+            Assert.That(Enumerable.Range(1, fixture.Session.UnitCount - 1)
+                .Count(slot => !fixture.Session.ReadUnit(slot).IsBoss && fixture.Session.ReadUnit(slot).Target.Health > 0), Is.EqualTo(1));
             int bossSlot = Enumerable.Range(1, fixture.Session.UnitCount - 1)
                 .Single(slot => fixture.Session.ReadUnit(slot).IsBoss && fixture.Session.ReadUnit(slot).Target.Health > 0);
             PreparePlayerKill(fixture, bossSlot, new float2(1, 0));
@@ -182,6 +184,35 @@ namespace Roguelike.Tests
             Assert.That(fixture.Session.ReadUnit(0).Target.Health, Is.EqualTo((long)fixture.Model.MaxHealth));
             Assert.That(fixture.Coordinator.Drops, Is.Empty);
             Assert.That(fixture.Coordinator.PendingSpawnCount, Is.Zero);
+        }
+
+        /// <summary>验证 Boss 到点会取消因出生圆周占位而阻塞的普通请求，解堵后只落地唯一 Boss。</summary>
+        [Test]
+        public void BossBoundaryCancelsBlockedNormalSpawnBeforeUniqueBoss()
+        {
+            using var fixture = CreateFixture("Coordinator blocked spawn at boss boundary");
+            int oneTickMilli = 1000 / fixture.Definition.CombatRules.SimulationHz;
+            fixture.Model.Advance(fixture.Definition.Rule.BossTimeMilli - oneTickMilli);
+            CombatUnit player = fixture.Session.ReadUnit(0);
+            var originalMovement = player.Movement;
+            player.Movement.Radius = ConfigNumber.Decode(fixture.Definition.Map.SpawnRadiusPixelsMilli) + 100;
+            fixture.World.EntityManager.SetComponentData(fixture.Session.UnitEntity(0), player);
+
+            Assert.That(fixture.Coordinator.Advance(fixture.Session.StepSeconds, float2.zero), Is.EqualTo(1));
+            Assert.That(fixture.Model.State, Is.EqualTo(CombatRunState.Boss));
+            Assert.That(fixture.Coordinator.PendingSpawnCount, Is.EqualTo(1));
+            Assert.That(fixture.Session.Statistics.AliveMonsters, Is.Zero);
+
+            player = fixture.Session.ReadUnit(0);
+            player.Movement = originalMovement;
+            fixture.World.EntityManager.SetComponentData(fixture.Session.UnitEntity(0), player);
+            Assert.That(fixture.Coordinator.Advance(fixture.Session.StepSeconds, float2.zero), Is.EqualTo(1));
+            Assert.That(fixture.Coordinator.PendingSpawnCount, Is.Zero);
+            Assert.That(fixture.Session.Statistics.AliveMonsters, Is.EqualTo(1));
+            Assert.That(Enumerable.Range(1, fixture.Session.UnitCount - 1)
+                .Single(slot => fixture.Session.ReadUnit(slot).Target.Health > 0),
+                Is.EqualTo(Enumerable.Range(1, fixture.Session.UnitCount - 1)
+                    .Single(slot => fixture.Session.ReadUnit(slot).IsBoss && fixture.Session.ReadUnit(slot).Target.Health > 0)));
         }
 
         /// <summary>推进到 TbSpawnPhase 第一条请求已由协调器消费。</summary>

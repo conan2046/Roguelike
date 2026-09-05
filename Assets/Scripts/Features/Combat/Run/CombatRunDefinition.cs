@@ -166,6 +166,11 @@ namespace Roguelike.Features.Combat.Run
                 Require(phase.BeginTimeMilli == expectedBegin && phase.EndTimeMilli > phase.BeginTimeMilli &&
                         phase.UnitsPerWave > 0 && phase.UnitIntervalMilli > 0 && phase.WaveIntervalMilli > 0,
                     $"TbSpawnPhase {phase.Id}: invalid timeline or wave cadence.");
+                long wavePeriodMilli = checked((long)(phase.UnitsPerWave - 1) * phase.UnitIntervalMilli +
+                    phase.WaveIntervalMilli);
+                long phaseDurationMilli = checked((long)phase.EndTimeMilli - phase.BeginTimeMilli);
+                Require(phaseDurationMilli % wavePeriodMilli == 0,
+                    $"TbSpawnPhase {phase.Id}: timeline must contain complete waves.");
                 Require(phase.MonsterWeights != null && phase.MonsterWeights.Count > 0 &&
                         phase.MonsterWeights.All(item => item?.MonsterId_Ref != null && item.Weight > 0),
                     $"TbSpawnPhase {phase.Id}: invalid monster weights.");

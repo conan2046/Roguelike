@@ -143,3 +143,13 @@
 - 109 个 Prefab 仅移除预览 MeshFilter/MeshRenderer 持久引用；表 ID、85 个圆柱参数、全部节点变换及 Prefab GUID 核对不变。
 - Unity 实际验证 109 项源资源生成、缓存复用和销毁均通过；本体、怪物、独立武器的 Prefab 视图截图已记录在本地 outputs/combat-config/hero-classification/local-preview-*.png，打开预览不产生未保存修改。
 - 预览须开启 Scene Gizmos；原 PNG/ANI 与配置为唯一重建来源，运行时战斗逻辑没有改动。
+
+## M1 正式单局自动化收口（2026-09-05）
+
+- 正式 `-stage 1` 已接通五技能表现、经验掉落与拾取、连续升级三选一、18:00 Boss、胜负结算、重开及五个可替换美术资源的 UI Prefab。
+- 完整模拟时钟逐段覆盖四个刷新阶段，确认 30/50/60/75 波、150/400/720/1125 个普通怪、固定种子复现和唯一 Boss；修复了阶段结束时刻漏掉末只单位导致实际只有 211 波/2391 怪的问题。
+- Boss 到点会先尝试本阶段完整周期的末只单位，再取消仍因出生占位阻塞的普通请求；Boss 请求保留并在解堵后只生成一次。
+- 当前验证：Luban 源表与生成物一致，战斗配置 3064 项（含 `skill_1_f` 唯一镜像断言），工程编译 0 警告/0 错误，非压力 EditMode 112/112，PlayMode 4/4。
+- `skill_1_f` 对应 `TbAnimationClip 30002` 已按表启用水平镜像；专项测试核对实际 Projectile 使用镜像网格，弹道旋转和碰撞数据未改。
+- 正式 `-stage 1` 已用生产输入在可见 Unity 中重新启动，Console 0 error。原 `CombatRuntimeRunner.Update` 空引用来自 Play 中强制脚本域重载；Runner 现会识别残缺运行态、只报一次明确错误并关闭。正常重新进入与退出 Play 不出现 Missing Script 或 Persistent allocation 提示。
+- Win64 构建继续延后；现阶段只剩项目方人工体验验收。

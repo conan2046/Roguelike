@@ -202,6 +202,7 @@ namespace Roguelike.Features.Combat.Runtime
             if (!Ready) return;
             try
             {
+                RequireLiveFrameState();
                 AdvanceFrame(Time.unscaledDeltaTime, input.Read());
             }
             catch (Exception exception)
@@ -209,6 +210,19 @@ namespace Roguelike.Features.Combat.Runtime
                 Close();
                 Debug.LogException(exception, this);
             }
+        }
+
+        /// <summary>每帧采样输入前确认非序列化战斗对象仍属于当前运行域。</summary>
+        /// <remarks>Unity Editor 若配置为 Play 中重编译并继续，会保留可序列化状态却丢失输入、ECS World 和会话；此处将其转换为一次明确故障并由 Update 统一关闭，避免连续空引用。</remarks>
+        /// <exception cref="InvalidOperationException">脚本域重载或异常生命周期导致运行对象不完整。</exception>
+        private void RequireLiveFrameState()
+        {
+            bool formalStateReady = Coordinator == null || RunModel != null && ui != null;
+            if (input != null && Session != null && visuals != null && world != null && world.IsCreated &&
+                ViewCamera != null && formalStateReady)
+                return;
+            throw new InvalidOperationException(
+                "Combat runtime state was invalidated, usually because scripts recompiled while Play Mode continued. Restart Play Mode.");
         }
 
         /// <summary>输入采样后处理重开和暂停，再推进测试会话或正式协调器。</summary>

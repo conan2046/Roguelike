@@ -73,6 +73,7 @@ namespace Roguelike.Features.Combat.Ui.Editor
             GameObject root = RectObject("CombatHud", null);
             Canvas canvas = root.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceCamera;
+            canvas.planeDistance = 1f;
             canvas.sortingOrder = 100;
             CanvasScaler scaler = root.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
@@ -207,6 +208,7 @@ namespace Roguelike.Features.Combat.Ui.Editor
         {
             var result = new GameObject(name, typeof(RectTransform));
             if (parent != null) result.transform.SetParent(parent, false);
+            result.transform.localScale = Vector3.one;
             return result;
         }
 

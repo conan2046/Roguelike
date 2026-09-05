@@ -173,9 +173,9 @@ namespace Roguelike.Tests
             }
         }
 
-        /// <summary>用正式 TbStage 1 加载五个 UI Prefab，完成升级选择、18 分钟 Boss 边界、胜利和按钮重开。</summary>
+        /// <summary>完整推进四阶段模拟时钟，再用正式 TbStage 1 加载五个 UI Prefab，完成升级、Boss、胜利和重开。</summary>
         /// <returns>等待真实 YooAsset、渲染帧和加速战斗状态的协程。</returns>
-        /// <remarks>时间线在纯模型中快进到 Boss 前一个固定 tick，再由真实协调器跨过边界；不等待 18 分钟墙钟。</remarks>
+        /// <remarks>规则模型用不规则步长覆盖完整 18 分钟；UI/ECS 入口只快进已由规则层证明的区段，不等待墙钟。</remarks>
         [UnityTest]
         public IEnumerator FormalStagePrefabUiAndAcceleratedRunLoop()
         {
@@ -186,15 +186,27 @@ namespace Roguelike.Tests
             var resources = new YooAssetResourceService(initializer, config);
             CombatRunDefinition definition = CombatRunDefinition.Create(config.Tables, 1);
             Assert.DoesNotThrow(definition.RequireUiReady);
+            VerifyFullTimelineRunLoop(definition);
             int originalWorlds = World.All.Count;
             var root = new GameObject("Formal stage runtime test");
             var runner = root.AddComponent<CombatRuntimeRunner>();
             try
             {
-                yield return Wait(runner.InitializeAsync(definition, resources, new TestInput(), CancellationToken.None));
+                yield return Wait(runner.InitializeAsync(definition, resources,
+                    new UnityCombatInput(definition.Presentation), CancellationToken.None));
                 Assert.That(runner.Ready, Is.True);
                 Assert.That(runner.FormalUiRoot, Is.Not.Null);
                 Assert.That(runner.FormalUiRoot.GetComponent<CombatHudView>(), Is.Not.Null);
+                Canvas formalCanvas = runner.FormalUiRoot.GetComponent<Canvas>();
+                Vector3 formalScale = runner.FormalUiRoot.transform.localScale;
+                Assert.That(formalScale.x, Is.GreaterThan(0));
+                Assert.That(formalScale.y, Is.GreaterThan(0));
+                Assert.That(formalScale.z, Is.GreaterThan(0));
+                Assert.That(((RectTransform)runner.FormalUiRoot.transform).rect.size.sqrMagnitude, Is.GreaterThan(0));
+                Assert.That(formalCanvas.isActiveAndEnabled, Is.True);
+                Assert.That(formalCanvas.worldCamera, Is.EqualTo(runner.ViewCamera));
+                Assert.That(formalCanvas.planeDistance, Is.GreaterThan(runner.ViewCamera.nearClipPlane));
+                Assert.That(formalCanvas.planeDistance, Is.LessThan(runner.ViewCamera.farClipPlane));
                 Assert.That(runner.RunModel.State, Is.EqualTo(CombatRunState.Playing));
                 Assert.That(runner.Coordinator, Is.Not.Null);
                 yield return CaptureCamera(runner.ViewCamera, "formal-stage.png");
@@ -244,6 +256,13 @@ namespace Roguelike.Tests
                 Assert.That(settlement.gameObject.activeSelf, Is.False);
                 Assert.That(Enumerable.Range(0, runner.Session.PlayerWeaponCount)
                     .Count(index => runner.Session.ReadPlayerWeapon(index).Active), Is.EqualTo(1));
+
+                LogAssert.Expect(LogType.Exception,
+                    new System.Text.RegularExpressions.Regex("Combat runtime state was invalidated"));
+                typeof(CombatRuntimeRunner).GetField("input",
+                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)?.SetValue(runner, null);
+                yield return null;
+                Assert.That(runner.Ready, Is.False);
             }
             finally
             {
@@ -252,6 +271,63 @@ namespace Roguelike.Tests
             }
             yield return null;
             Assert.That(World.All.Count, Is.EqualTo(originalWorlds));
+        }
+
+        /// <summary>用正式表定义逐段推进 18 分钟，把刷怪、掉落拾取、两次升级、Boss 胜利和重开串成同一局。</summary>
+        /// <param name="definition">从真实 Luban bytes 聚合并完成跨表校验的第一关定义。</param>
+        /// <remarks>使用模拟毫秒时钟，不创建 Unity 对象；每次升级立即选择，避免把暂停时间误算入关卡时长。</remarks>
+        private static void VerifyFullTimelineRunLoop(CombatRunDefinition definition)
+        {
+            var model = new CombatRunModel(definition);
+            var requests = new List<CombatSpawnRequest>();
+            int[] steps = { 17, 83, 211, 997, 4000 };
+            int stepIndex = 0;
+            int collectedDrops = 0;
+            int selectedUpgrades = 0;
+            while (model.ElapsedMilli < definition.Rule.BossTimeMilli)
+            {
+                int remaining = checked((int)(definition.Rule.BossTimeMilli - model.ElapsedMilli));
+                int delta = Math.Min(remaining, steps[stepIndex++ % steps.Length]);
+                var batch = model.Advance(delta);
+                requests.AddRange(batch);
+                foreach (var request in batch)
+                {
+                    if (request.IsBoss || collectedDrops >= 12) continue;
+                    ulong dropId = model.RecordMonsterDeath(request.Sequence, false);
+                    Assert.That(dropId, Is.Not.Zero);
+                    Assert.That(model.TryMagnetizeDrop(dropId), Is.True);
+                    Assert.That(model.TryCollectDrop(dropId), Is.True);
+                    collectedDrops++;
+                    if (model.State != CombatRunState.UpgradeChoice) continue;
+                    long frozenTime = model.ElapsedMilli;
+                    Assert.That(model.CurrentChoices.Count, Is.EqualTo(definition.UpgradePool.DrawCount));
+                    Assert.That(model.Advance(1000), Is.Empty);
+                    Assert.That(model.ElapsedMilli, Is.EqualTo(frozenTime));
+                    Assert.That(model.ChooseUpgrade(model.UpgradePanelGeneration, model.CurrentChoices[0].Id), Is.True);
+                    selectedUpgrades++;
+                }
+            }
+
+            var normal = requests.Where(item => !item.IsBoss).ToArray();
+            Assert.That(model.CompletedWaves, Is.EqualTo(215));
+            Assert.That(normal.Length, Is.EqualTo(2395));
+            Assert.That(requests.Count(item => item.IsBoss), Is.EqualTo(1));
+            Assert.That(collectedDrops, Is.EqualTo(12));
+            Assert.That(selectedUpgrades, Is.EqualTo(2));
+            Assert.That(model.Level, Is.EqualTo(3));
+            Assert.That(model.Drops, Is.Empty);
+
+            CombatSpawnRequest boss = requests.Single(item => item.IsBoss);
+            Assert.That(model.RecordMonsterDeath(boss.Sequence, true), Is.Zero);
+            Assert.That(model.State, Is.EqualTo(CombatRunState.VictorySettlement));
+            ulong generation = model.RunGeneration;
+            Assert.That(model.Restart(), Is.True);
+            Assert.That(model.RunGeneration, Is.GreaterThan(generation));
+            Assert.That(model.State, Is.EqualTo(CombatRunState.Playing));
+            Assert.That(model.ElapsedMilli, Is.Zero);
+            Assert.That(model.CompletedWaves, Is.Zero);
+            Assert.That(model.Kills, Is.Zero);
+            Assert.That(model.ActiveSkills.Keys, Is.EqualTo(definition.InitialSkills.Select(item => item.Id)));
         }
 
         /// <summary>测试读取专属世界；使用具体枚举器，Entities 禁止将 World.All 装箱给 LINQ。</summary>

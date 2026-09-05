@@ -150,13 +150,18 @@ namespace Roguelike.Features.Combat.Runtime
             return milliseconds;
         }
 
-        /// <summary>把模型生成请求按计划顺序加入队列；Boss 到点时取消尚未落地的普通请求。</summary>
+        /// <summary>把模型生成请求按计划顺序入队；Boss 到点时先尝试阶段最后一只普通怪，再取消仍阻塞的普通请求。</summary>
         /// <param name="requests">CombatRunModel 本次时间跨度产生的请求。</param>
         private void EnqueueSpawns(IReadOnlyList<CombatSpawnRequest> requests)
         {
             foreach (var request in requests)
             {
-                if (request.IsBoss) pendingSpawns.Clear();
+                if (request.IsBoss)
+                {
+                    // 同一固定 tick 到期的阶段最后一只普通怪先尝试落地；此前因圆周占位仍阻塞的请求在 Boss 到点时统一取消。
+                    DrainSpawns();
+                    pendingSpawns.Clear();
+                }
                 pendingSpawns.Enqueue(request);
             }
         }

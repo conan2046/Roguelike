@@ -192,7 +192,7 @@ namespace Roguelike.Features.Combat.Rendering
                     throw new InvalidOperationException("Combat projectile references a skill visual that was not preloaded.");
                 var clip = resources.Read(projectile.SkillId, projectileSkill.ProjectileClipId.Value);
                 int frame = clip.Animation.Sample(0, projectile.Age);
-                ApplyFrame(entity, clip, frame, false);
+                ApplyFrame(entity, clip, frame, clip.FlipX);
                 float angle = math.atan2(projectile.Velocity.y, projectile.Velocity.x);
                 manager.SetComponentData(entity, LocalTransform.FromPositionRotationScale(
                     new float3(projectile.Position, 0), quaternion.RotateZ(angle), 1));
@@ -230,7 +230,7 @@ namespace Roguelike.Features.Combat.Rendering
                     HideImpact(visual);
                     continue;
                 }
-                ApplyFrame(visual.Entity, clip, clip.Animation.Sample(0, age), false);
+                ApplyFrame(visual.Entity, clip, clip.Animation.Sample(0, age), clip.FlipX);
                 VisibleImpactCount++;
             }
         }
@@ -286,7 +286,7 @@ namespace Roguelike.Features.Combat.Rendering
                     HideArea(visual);
                     continue;
                 }
-                ApplyFrame(visual.Entity, clip, clip.Animation.Sample(0, age), false);
+                ApplyFrame(visual.Entity, clip, clip.Animation.Sample(0, age), clip.FlipX);
                 VisibleAreaCount++;
             }
         }

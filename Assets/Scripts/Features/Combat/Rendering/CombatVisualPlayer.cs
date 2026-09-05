@@ -80,6 +80,7 @@ namespace Roguelike.Features.Combat.Rendering
                 ActionIndex = facing.ActionIndex; FlipX = facing.FlipX;
             }
             double age = attacking ? (windup ? unit.AttackAge : unit.AttackAge - unit.WindupSeconds) : now - started;
+            FlipX ^= clip.FlipX;
             GlobalFrame = clip.Animation.Sample(ActionIndex, age);
             MeshIndex = clip.MeshIndices[GlobalFrame * 2 + (FlipX ? 1 : 0)];
             MaterialIndex = clip.MaterialIndex;

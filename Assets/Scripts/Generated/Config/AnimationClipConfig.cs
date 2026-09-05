@@ -27,6 +27,7 @@ public sealed partial class AnimationClipConfig : Luban.BeanBase
         Action = (EAnimationAction)_buf.ReadInt();
         SourceSuffix = _buf.ReadString();
         Loop = _buf.ReadBool();
+        FlipX = _buf.ReadBool();
     }
 
     public static AnimationClipConfig DeserializeAnimationClipConfig(ByteBuf _buf)
@@ -60,6 +61,10 @@ public sealed partial class AnimationClipConfig : Luban.BeanBase
     /// 待机和移动循环；施法不中断移动
     /// </summary>
     public readonly bool Loop;
+    /// <summary>
+    /// 是否强制水平镜像；true 仅改变渲染网格，不改变弹道方向与碰撞轨迹
+    /// </summary>
+    public readonly bool FlipX;
    
     public const int __ID__ = 221675830;
     public override int GetTypeId() => __ID__;
@@ -79,6 +84,7 @@ public sealed partial class AnimationClipConfig : Luban.BeanBase
         + "action:" + Action + ","
         + "sourceSuffix:" + SourceSuffix + ","
         + "loop:" + Loop + ","
+        + "flipX:" + FlipX + ","
         + "}";
     }
 }

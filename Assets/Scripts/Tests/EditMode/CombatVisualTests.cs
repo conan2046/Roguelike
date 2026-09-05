@@ -176,16 +176,32 @@ namespace Roguelike.Tests
                 world.EntityManager.SetComponentData(session.UnitEntity(slot), monster);
             }
 
-            bool sawFlight = false, sawImpact = false;
+            bool sawFlight = false, sawConfiguredFlip = false, sawImpact = false;
             int maximumTicks = (int)Math.Ceiling(hero.ProjectileLifetime / session.StepSeconds) + 2;
             for (int tick = 0; tick < maximumTicks && !sawImpact; tick++)
             {
                 session.Advance(session.StepSeconds, float2.zero);
                 visuals.Synchronize();
                 sawFlight |= visuals.VisibleProjectileCount > 0;
+                if (!sawConfiguredFlip && visuals.VisibleProjectileCount > 0)
+                {
+                    int projectileSlot = Enumerable.Range(0, session.ProjectileCapacity)
+                        .First(index => session.ReadProjectile(index).Active);
+                    CombatProjectile projectile = session.ReadProjectile(projectileSlot);
+                    CombatVisualResources.Clip clip = assets.Read(projectile.SkillId,
+                        scenario.CharacterId_Ref.DefaultSkillId_Ref.ProjectileClipId.Value);
+                    int sampledFrame = clip.Animation.Sample(0, projectile.Age);
+                    MaterialMeshInfo mesh = world.EntityManager.GetComponentData<MaterialMeshInfo>(
+                        session.ProjectileEntity(projectileSlot));
+                    Assert.That(clip.FlipX, Is.True);
+                    Assert.That(MaterialMeshInfo.StaticIndexToArrayIndex(mesh.Mesh),
+                        Is.EqualTo(clip.MeshIndices[sampledFrame * 2 + 1]));
+                    sawConfiguredFlip = true;
+                }
                 sawImpact |= session.ImpactCount == 1 && visuals.VisibleImpactCount == 1;
             }
             Assert.That(sawFlight, Is.True);
+            Assert.That(sawConfiguredFlip, Is.True);
             Assert.That(sawImpact, Is.True);
             Assert.That(session.Statistics.DamageEvents, Is.EqualTo(1));
 

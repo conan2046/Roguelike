@@ -37,12 +37,57 @@ namespace Roguelike.Tests
             Assert.That(first[0].ScheduledTimeMilli, Is.EqualTo(definition.SpawnPhases[0].WaveIntervalMilli));
 
             var toBoundary = model.Advance(definition.SpawnPhases[0].EndTimeMilli - (int)model.ElapsedMilli);
-            Assert.That(toBoundary.All(item => item.ScheduledTimeMilli < definition.SpawnPhases[0].EndTimeMilli), Is.True);
+            Assert.That(toBoundary.Last().ScheduledTimeMilli, Is.EqualTo(definition.SpawnPhases[0].EndTimeMilli));
+            Assert.That(model.CompletedWaves, Is.EqualTo(30));
             Assert.That(model.ElapsedMilli, Is.EqualTo(definition.SpawnPhases[1].BeginTimeMilli));
             Assert.That(model.Advance(definition.SpawnPhases[1].WaveIntervalMilli - 1), Is.Empty);
             var phaseTwoFirst = model.Advance(1);
             Assert.That(phaseTwoFirst.Single().ScheduledTimeMilli,
                 Is.EqualTo((long)definition.SpawnPhases[1].BeginTimeMilli + definition.SpawnPhases[1].WaveIntervalMilli));
+        }
+
+        /// <summary>用不规则模拟步长跑完整 18 分钟，验证四阶段全部波次、普通怪数量、权重集合和唯一 Boss。</summary>
+        [Test]
+        public void FullTimelineProducesApprovedWavesAndMonstersDeterministically()
+        {
+            var definition = CreateDefinition();
+            int[] expectedWaves = { 30, 50, 60, 75 };
+            int[] expectedMonsters = { 150, 400, 720, 1125 };
+            var direct = new CombatRunModel(definition);
+            var directRequests = direct.Advance(definition.Rule.BossTimeMilli).ToArray();
+            var stepped = new CombatRunModel(definition);
+            var steppedRequests = new System.Collections.Generic.List<CombatSpawnRequest>();
+            int[] steps = { 17, 83, 211, 997, 4000 };
+            int stepIndex = 0;
+            while (stepped.ElapsedMilli < definition.Rule.BossTimeMilli)
+            {
+                int remaining = checked((int)(definition.Rule.BossTimeMilli - stepped.ElapsedMilli));
+                int delta = Math.Min(remaining, steps[stepIndex++ % steps.Length]);
+                steppedRequests.AddRange(stepped.Advance(delta));
+            }
+
+            var directNormal = directRequests.Where(item => !item.IsBoss).ToArray();
+            var steppedNormal = steppedRequests.Where(item => !item.IsBoss).ToArray();
+            Assert.That(direct.CompletedWaves, Is.EqualTo(expectedWaves.Sum()));
+            Assert.That(stepped.CompletedWaves, Is.EqualTo(expectedWaves.Sum()));
+            Assert.That(directNormal.Length, Is.EqualTo(expectedMonsters.Sum()));
+            Assert.That(steppedNormal.Length, Is.EqualTo(expectedMonsters.Sum()));
+            Assert.That(directRequests.Count(item => item.IsBoss), Is.EqualTo(1));
+            Assert.That(steppedRequests.Count(item => item.IsBoss), Is.EqualTo(1));
+
+            for (int phaseIndex = 0; phaseIndex < definition.SpawnPhases.Count; phaseIndex++)
+            {
+                SpawnPhaseConfig phase = definition.SpawnPhases[phaseIndex];
+                var phaseRequests = steppedNormal.Where(item =>
+                    item.ScheduledTimeMilli > phase.BeginTimeMilli && item.ScheduledTimeMilli <= phase.EndTimeMilli).ToArray();
+                Assert.That(phaseRequests.Length, Is.EqualTo(expectedMonsters[phaseIndex]), $"TbSpawnPhase {phase.Id} monster count changed.");
+                Assert.That(phaseRequests.Select(item => item.Monster.Id).Distinct(),
+                    Is.SubsetOf(phase.MonsterWeights.Select(item => item.MonsterId).ToArray()),
+                    $"TbSpawnPhase {phase.Id} selected a monster outside its configured weights.");
+            }
+
+            Assert.That(steppedRequests.Select(item => (item.ScheduledTimeMilli, item.Monster.Id, item.IsBoss)),
+                Is.EqualTo(directRequests.Select(item => (item.ScheduledTimeMilli, item.Monster.Id, item.IsBoss))));
         }
 
         /// <summary>验证跨 18 分钟的大步进和不规则小步进都只发出一次 Boss 请求。</summary>

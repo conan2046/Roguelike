@@ -260,7 +260,7 @@ namespace Roguelike.Features.Combat.Run
             {
                 var phase = definition.SpawnPhases[phaseIndex];
                 long phaseLimit = Math.Min(targetMilli, phase.EndTimeMilli);
-                while (nextSpawnTimeMilli <= phaseLimit && nextSpawnTimeMilli < phase.EndTimeMilli)
+                while (nextSpawnTimeMilli <= phaseLimit && nextSpawnTimeMilli <= phase.EndTimeMilli)
                 {
                     spawnSequence++;
                     requests.Add(new CombatSpawnRequest(RunGeneration, spawnSequence, nextSpawnTimeMilli,

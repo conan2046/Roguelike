@@ -22,6 +22,7 @@ namespace Roguelike.Features.Combat.Rendering
         {
             public CombatAnimation Animation;
             public CombatDirections Directions;
+            public bool FlipX;
             public int MaterialIndex;
             public int[] MeshIndices;
         }
@@ -215,7 +216,8 @@ namespace Roguelike.Features.Combat.Rendering
             }
             AniFrameLayout.ValidateAtlas(data, texture.width, texture.height);
             var animation = new CombatAnimation(data, presentation, config.Loop);
-            var clip = new Clip { Animation = animation, MaterialIndex = materialIndices[config.TextureResourceId], MeshIndices = new int[data.frames.Length * 2] };
+            var clip = new Clip { Animation = animation, FlipX = config.FlipX,
+                MaterialIndex = materialIndices[config.TextureResourceId], MeshIndices = new int[data.frames.Length * 2] };
             for (int i = 0; i < clip.MeshIndices.Length; i++) clip.MeshIndices[i] = -1;
             if (config.Action == EAnimationAction.Stand || config.Action == EAnimationAction.Move)
                 clip.Directions = new CombatDirections(presentation, animation);

@@ -148,6 +148,9 @@ internal static class Program
             "Approved projectile skill mapping changed.");
         Require(targetAreaSkillIds.All(id => tables.TbSkill.Get(id).CombatProfileId_Ref?.DeliveryType == ESkillDeliveryType.TargetArea),
             "Approved target-area skill mapping changed.");
+        Require(tables.TbAnimationClip.DataList.Where(clip => clip.FlipX).Select(clip => clip.Id)
+                .SequenceEqual(new[] { 30002 }),
+            "Only TbAnimationClip 30002 / skill_1_f may force horizontal mirroring.");
 
         var stage = tables.TbStage.Get(1);
         Require(stage.MapId_Ref != null && stage.StageRuleId_Ref != null && stage.CombatRulesId_Ref != null &&
@@ -177,17 +180,39 @@ internal static class Program
             "TbStageRule 1: approved wave sizes changed.");
         Require(phases[0].BeginTimeMilli == 0 && phases[^1].EndTimeMilli == stageRule.DurationMilli,
             "TbStageRule 1: spawn phases must cover the full pre-boss duration.");
+        (int MonsterId, int Weight)[][] approvedWeights =
+        {
+            new[] { (10010, 60), (10012, 40) },
+            new[] { (10010, 35), (10011, 20), (10012, 25), (10013, 20) },
+            new[] { (10010, 25), (10011, 25), (10012, 25), (10013, 25) },
+            new[] { (10010, 20), (10011, 30), (10012, 20), (10013, 30) }
+        };
         for (var index = 0; index < phases.Count; index++)
         {
             var phase = phases[index];
             Require(phase.BeginTimeMilli < phase.EndTimeMilli && phase.UnitIntervalMilli > 0 && phase.WaveIntervalMilli > 0,
                 $"TbSpawnPhase {phase.Id}: invalid timing.");
+            var wavePeriodMilli = checked((long)(phase.UnitsPerWave - 1) * phase.UnitIntervalMilli + phase.WaveIntervalMilli);
+            var phaseDurationMilli = checked((long)phase.EndTimeMilli - phase.BeginTimeMilli);
+            Require(phaseDurationMilli % wavePeriodMilli == 0,
+                $"TbSpawnPhase {phase.Id}: timeline must contain complete waves.");
             Require(index == 0 || phases[index - 1].EndTimeMilli == phase.BeginTimeMilli,
                 $"TbSpawnPhase {phase.Id}: gap or overlap in phase timeline.");
             Require(phase.MonsterWeights.Count > 0 && phase.MonsterWeights.Select(x => x.MonsterId).Distinct().Count() == phase.MonsterWeights.Count &&
                 phase.MonsterWeights.All(x => x.MonsterId_Ref != null && x.Weight > 0),
                 $"TbSpawnPhase {phase.Id}: invalid monster weights.");
+            Require(phase.MonsterWeights.Select(x => (x.MonsterId, x.Weight)).OrderBy(x => x.MonsterId)
+                    .SequenceEqual(approvedWeights[index]),
+                $"TbSpawnPhase {phase.Id}: approved monster weights changed.");
         }
+        var configuredWaveCounts = phases.Select(phase =>
+        {
+            var period = checked((long)(phase.UnitsPerWave - 1) * phase.UnitIntervalMilli + phase.WaveIntervalMilli);
+            return checked((int)(((long)phase.EndTimeMilli - phase.BeginTimeMilli) / period));
+        }).ToArray();
+        Require(configuredWaveCounts.SequenceEqual(new[] { 30, 50, 60, 75 }) &&
+                phases.Select((phase, index) => phase.UnitsPerWave * configuredWaveCounts[index]).Sum() == 2395,
+            "TbStageRule 1: approved 215-wave and 2395-monster cadence changed.");
 
         var normalMonsterIds = phases.SelectMany(x => x.MonsterWeights).Select(x => x.MonsterId).Distinct().OrderBy(x => x).ToArray();
         Require(normalMonsterIds.SequenceEqual(new[] { 10010, 10011, 10012, 10013 }),
