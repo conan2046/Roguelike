@@ -153,68 +153,85 @@ namespace Roguelike.Tests
             Assert.That(visuals.VisibleAreaCount, Is.Zero);
         }
 
-        /// <summary>真实弹丸在飞行期间可见，首次命中后只产生一个命中 ANI，播放结束后回收。</summary>
+        /// <summary>逐一验证正式三种弹丸技能在飞行期间可见，首次命中只产生一个命中 ANI，播放结束后回收。</summary>
         [Test]
-        public void ProjectileFlightAndFirstImpactHaveVisibleLifecycle()
+        public void FormalProjectileVisualsFlyImpactAndRecycle()
         {
-            var tables = LoadTables(); var scenario = tables.TbPerformanceScenario.Get(4); var source = new Files(tables);
-            using var world = new World("Projectile visual lifecycle");
-            using var assets = CombatVisualResources.LoadAsync(scenario, source, CancellationToken.None).GetAwaiter().GetResult();
-            using var session = CombatSessionFactory.CreateAsync(world, scenario, source, CancellationToken.None).GetAwaiter().GetResult();
-            using var visuals = new CombatEntityVisuals(world, session, scenario, assets);
-            var hero = session.ReadUnit(0);
-            for (int slot = 1; slot < session.UnitCount; slot++)
-            {
-                var monster = session.ReadUnit(slot);
-                if (slot == 1)
-                {
-                    monster.Position = hero.Position + new float2(hero.Range * 0.8f, 0);
-                    monster.PreviousPosition = monster.Position;
-                    monster.MoveSpeed = 0;
-                }
-                else monster.Target.Health = 0;
-                world.EntityManager.SetComponentData(session.UnitEntity(slot), monster);
-            }
+            var tables = LoadTables();
+            var definition = CombatRunDefinition.Create(tables, 1);
+            var source = new Files(tables);
+            using var assets = CombatVisualResources.LoadAsync(definition, source, CancellationToken.None)
+                .GetAwaiter().GetResult();
+            SkillConfig[] projectileSkills = definition.AvailableSkills
+                .Where(item => item.CombatProfileId_Ref.DeliveryType == ESkillDeliveryType.Projectile)
+                .ToArray();
+            Assert.That(projectileSkills.Select(item => item.Id), Is.EquivalentTo(new[] { 20001, 20014, 20032 }));
 
-            bool sawFlight = false, sawConfiguredFlip = false, sawImpact = false;
-            int maximumTicks = (int)Math.Ceiling(hero.ProjectileLifetime / session.StepSeconds) + 2;
-            for (int tick = 0; tick < maximumTicks && !sawImpact; tick++)
+            foreach (SkillConfig skill in projectileSkills)
             {
-                session.Advance(session.StepSeconds, float2.zero);
-                visuals.Synchronize();
-                sawFlight |= visuals.VisibleProjectileCount > 0;
-                if (!sawConfiguredFlip && visuals.VisibleProjectileCount > 0)
-                {
-                    int projectileSlot = Enumerable.Range(0, session.ProjectileCapacity)
-                        .First(index => session.ReadProjectile(index).Active);
-                    CombatProjectile projectile = session.ReadProjectile(projectileSlot);
-                    CombatVisualResources.Clip clip = assets.Read(projectile.SkillId,
-                        scenario.CharacterId_Ref.DefaultSkillId_Ref.ProjectileClipId.Value);
-                    int sampledFrame = clip.Animation.Sample(0, projectile.Age);
-                    MaterialMeshInfo mesh = world.EntityManager.GetComponentData<MaterialMeshInfo>(
-                        session.ProjectileEntity(projectileSlot));
-                    Assert.That(clip.FlipX, Is.True);
-                    Assert.That(MaterialMeshInfo.StaticIndexToArrayIndex(mesh.Mesh),
-                        Is.EqualTo(clip.MeshIndices[sampledFrame * 2 + 1]));
-                    sawConfiguredFlip = true;
-                }
-                sawImpact |= session.ImpactCount == 1 && visuals.VisibleImpactCount == 1;
-            }
-            Assert.That(sawFlight, Is.True);
-            Assert.That(sawConfiguredFlip, Is.True);
-            Assert.That(sawImpact, Is.True);
-            Assert.That(session.Statistics.DamageEvents, Is.EqualTo(1));
+                using var world = new World("Formal projectile visual " + skill.Id);
+                using var session = CombatSessionFactory.CreateAsync(world, definition, source, CancellationToken.None)
+                    .GetAwaiter().GetResult();
+                using var visuals = new CombatEntityVisuals(world, session, definition, assets);
+                session.SynchronizePlayerSkills(new[] { skill.Id });
+                int weaponIndex = Enumerable.Range(0, session.PlayerWeaponCount)
+                    .Single(index => session.ReadPlayerWeapon(index).SkillId == skill.Id);
+                CombatWeaponState weapon = session.ReadPlayerWeapon(weaponIndex);
+                Assert.That(weapon.Active, Is.True);
+                Assert.That(session.TrySpawnMonster(definition.Monsters[0],
+                    ConfigNumber.Decode(definition.Map.SpawnRadiusPixelsMilli), (ulong)skill.Id, false,
+                    out int monsterSlot), Is.True);
+                CombatUnit player = session.ReadUnit(0);
+                CombatUnit monster = session.ReadUnit(monsterSlot);
+                monster.Position = player.Position + new float2(math.max(0.5f, (float)weapon.Range * 0.5f), 0);
+                monster.PreviousPosition = monster.Position;
+                monster.MoveSpeed = 0;
+                monster.Cooldown = 1000;
+                monster.Target.Evasion = 0;
+                world.EntityManager.SetComponentData(session.UnitEntity(monsterSlot), monster);
 
-            int impactTicks = (int)Math.Ceiling(assets.Read(hero.SkillId,
-                scenario.CharacterId_Ref.DefaultSkillId_Ref.ImpactClipId.Value).Animation.DurationSeconds(0) / session.StepSeconds) + 1;
-            hero = session.ReadUnit(0); hero.Cooldown = 100;
-            world.EntityManager.SetComponentData(session.UnitEntity(0), hero);
-            for (int tick = 0; tick < impactTicks; tick++)
-            {
-                session.Advance(session.StepSeconds, float2.zero);
-                visuals.Synchronize();
+                bool sawFlight = false, sawExpectedMesh = false, sawImpact = false;
+                int maximumTicks = (int)Math.Ceiling(weapon.ProjectileLifetime / session.StepSeconds) + 2;
+                for (int tick = 0; tick < maximumTicks && !sawImpact; tick++)
+                {
+                    session.Advance(session.StepSeconds, float2.zero);
+                    visuals.Synchronize();
+                    sawFlight |= visuals.VisibleProjectileCount > 0;
+                    if (!sawExpectedMesh && visuals.VisibleProjectileCount > 0)
+                    {
+                        int projectileSlot = Enumerable.Range(0, session.ProjectileCapacity)
+                            .First(index => session.ReadProjectile(index).Active &&
+                                            session.ReadProjectile(index).SkillId == skill.Id);
+                        CombatProjectile projectile = session.ReadProjectile(projectileSlot);
+                        CombatVisualResources.Clip clip = assets.Read(skill.Id, skill.ProjectileClipId.Value);
+                        int sampledFrame = clip.Animation.Sample(0, projectile.Age);
+                        MaterialMeshInfo mesh = world.EntityManager.GetComponentData<MaterialMeshInfo>(
+                            session.ProjectileEntity(projectileSlot));
+                        Assert.That(MaterialMeshInfo.StaticIndexToArrayIndex(mesh.Mesh),
+                            Is.EqualTo(clip.MeshIndices[sampledFrame * 2 + (clip.FlipX ? 1 : 0)]));
+                        sawExpectedMesh = true;
+                    }
+                    sawImpact |= session.ImpactCount == 1 && session.ReadImpact(0).SkillId == skill.Id &&
+                                 visuals.VisibleImpactCount == 1;
+                }
+                Assert.That(sawFlight, Is.True, "Projectile flight was never visible for skill " + skill.Id);
+                Assert.That(sawExpectedMesh, Is.True, "Projectile mesh was not verified for skill " + skill.Id);
+                Assert.That(sawImpact, Is.True, "Impact feedback was never visible for skill " + skill.Id);
+                Assert.That(session.Statistics.DamageEvents, Is.EqualTo(1));
+
+                monster = session.ReadUnit(monsterSlot);
+                monster.Target.Health = 0;
+                world.EntityManager.SetComponentData(session.UnitEntity(monsterSlot), monster);
+                int impactTicks = (int)Math.Ceiling(assets.Read(skill.Id,
+                    skill.ImpactClipId.Value).Animation.DurationSeconds(0) / session.StepSeconds) + 1;
+                for (int tick = 0; tick < impactTicks; tick++)
+                {
+                    session.Advance(session.StepSeconds, float2.zero);
+                    visuals.Synchronize();
+                }
+                Assert.That(visuals.VisibleImpactCount, Is.Zero,
+                    "Impact feedback did not recycle for skill " + skill.Id);
             }
-            Assert.That(visuals.VisibleImpactCount, Is.Zero);
         }
 
         /// <summary>注入中途取消或加载错误后临时句柄和部分 Unity 对象全部释放。</summary>
