@@ -23,6 +23,8 @@ public sealed partial class SkillConfig : Luban.BeanBase
         Name = _buf.ReadString();
         VisualSetId = _buf.ReadInt();
         VisualSetId_Ref = null;
+        if(_buf.ReadBool()){ CombatProfileId = _buf.ReadInt(); } else { CombatProfileId = null; }
+        CombatProfileId_Ref = null;
     }
 
     public static SkillConfig DeserializeSkillConfig(ByteBuf _buf)
@@ -43,6 +45,11 @@ public sealed partial class SkillConfig : Luban.BeanBase
     /// </summary>
     public readonly int VisualSetId;
     public VisualSetConfig VisualSetId_Ref;
+    /// <summary>
+    /// 战斗机制；空值仅为表现目录
+    /// </summary>
+    public readonly int? CombatProfileId;
+    public SkillCombatConfig CombatProfileId_Ref;
    
     public const int __ID__ = -844226349;
     public override int GetTypeId() => __ID__;
@@ -50,6 +57,7 @@ public sealed partial class SkillConfig : Luban.BeanBase
     public  void ResolveRef(Tables tables)
     {
         VisualSetId_Ref = tables.TbVisualSet.GetOrDefault(VisualSetId);
+        CombatProfileId_Ref = CombatProfileId!= null ? tables.TbSkillCombat.GetOrDefault(CombatProfileId.Value) : null;
     }
 
     public override string ToString()
@@ -58,6 +66,7 @@ public sealed partial class SkillConfig : Luban.BeanBase
         + "id:" + Id + ","
         + "name:" + Name + ","
         + "visualSetId:" + VisualSetId + ","
+        + "combatProfileId:" + CombatProfileId + ","
         + "}";
     }
 }

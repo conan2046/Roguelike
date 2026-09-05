@@ -3,7 +3,20 @@
   "rootNamespace": "Roguelike.Tests",
   "references": [
     "Roguelike.Core",
-    "Roguelike.Infrastructure"
+    "Roguelike.App",
+    "Roguelike.Animation",
+    "Roguelike.Animation.Rendering",
+    "Roguelike.Infrastructure",
+    "Roguelike.Features.Combat",
+    "Roguelike.Features.Combat.Ecs",
+    "Roguelike.Features.Combat.Rendering",
+    "Unity.Entities.Graphics",
+    "Unity.Entities",
+    "Unity.Collections",
+    "Unity.Mathematics",
+    "Unity.Transforms",
+    "Roguelike.Generated",
+    "Luban.Runtime"
   ],
   "includePlatforms": [
     "Editor"

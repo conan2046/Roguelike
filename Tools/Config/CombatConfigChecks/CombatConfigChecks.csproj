@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <GeneratedConfigDir Condition="'$(GeneratedConfigDir)' == ''">$(MSBuildThisFileDirectory)../../../Assets/Scripts/Generated/Config</GeneratedConfigDir>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Compile Include="RuntimeChecks.cs" />
+    <Compile Include="AnimationChecks.cs" />
+    <Compile Include="../../../Assets/Scripts/Animation/CocosAniData.cs" />
+    <Compile Include="../../../Assets/Scripts/Features/Combat/*.cs" />
+    <Compile Include="$(GeneratedConfigDir)/*.cs" />
+    <Compile Include="../../../Assets/Scripts/ThirdParty/Luban/*.cs" />
+  </ItemGroup>
+</Project>

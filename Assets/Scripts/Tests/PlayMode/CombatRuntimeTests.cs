@@ -1,0 +1,245 @@
+using System;
+using System.Collections;
+using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
+using NUnit.Framework;
+using Roguelike.Core.Resources;
+using Roguelike.Features.Combat.Runtime;
+using Roguelike.Infrastructure.Configuration;
+using Roguelike.Infrastructure.Resources;
+using Unity.Entities;
+using Unity.Mathematics;
+using UnityEngine;
+using UnityEngine.TestTools;
+
+namespace Roguelike.Tests
+{
+    /// <summary>真实 YooAsset 与独立 ECS 世界的可操作入口验收，不以离线选帧代替相机画面。</summary>
+    public sealed class CombatRuntimeTests
+    {
+        /// <summary>共享美术加载后、会话 ANI 尚未返回时销毁入口，验证晚到句柄与部分世界均回收。</summary>
+        /// <returns>等待真实 YooAsset 与受控晚到资源的协程。</returns>
+        /// <remarks>资源服务保持存活直到启动任务结束；不依赖底层供应商立即取消 IO。</remarks>
+        [UnityTest]
+        public IEnumerator DestroyDuringLoadingReleasesPartialWorld()
+        {
+            using var initializer = new YooAssetPackageInitializer();
+            yield return Wait(initializer.InitializeAsync(ResourcePlayMode.EditorSimulate, CancellationToken.None));
+            var config = new LubanConfigService(initializer); yield return Wait(config.InitializeAsync(CancellationToken.None));
+            var source = new DeferredResources(new YooAssetResourceService(initializer, config));
+            int worldCount = World.All.Count;
+            var root = new GameObject("Combat cancellation test");
+            var runner = root.AddComponent<CombatRuntimeRunner>();
+            Task startup = runner.InitializeAsync(config.Tables.TbPerformanceScenario.Get(4), source, new TestInput(), CancellationToken.None);
+            try
+            {
+                double deadline = Time.realtimeSinceStartupAsDouble + 60;
+                while (!source.Blocked && !startup.IsCompleted && Time.realtimeSinceStartupAsDouble < deadline) yield return null;
+                Assert.That(source.Blocked, Is.True, "Must reach the session load after shared visuals are prepared.");
+                // Unity SceneSystem 可能为私有世界建立辅助 streaming worlds，不假定创建数量恰好为一。
+                var ownedWorld = FindCombatWorld();
+                Assert.That(ownedWorld.IsCreated, Is.True);
+                runner.Close(); UnityEngine.Object.Destroy(root); yield return null;
+                source.Complete();
+                while (!startup.IsCompleted && Time.realtimeSinceStartupAsDouble < deadline) yield return null;
+                Assert.That(startup.IsCompleted, Is.True);
+                Assert.Throws<OperationCanceledException>(() => startup.GetAwaiter().GetResult());
+                Assert.That(source.Handle.Disposed, Is.True);
+                Assert.That(ownedWorld.IsCreated, Is.False);
+                Assert.That(World.All.Count, Is.EqualTo(worldCount));
+            }
+            finally { source.Complete(); if (root != null) { runner.Close(); UnityEngine.Object.Destroy(root); } }
+        }
+
+        /// <summary>连续进入两次，验证移动自动攻击、暂停、重开、死亡冻结以及完整清理。</summary>
+        /// <returns>等待真实资源和 Unity 帧的测试协程。</returns>
+        /// <remarks>测试组件改动只在隔离 World 内；输出真实相机截图，不保存 Scene/Prefab。</remarks>
+        [UnityTest]
+        public IEnumerator RealResourcesInputCameraAndRepeatedExit()
+        {
+            using var initializer = new YooAssetPackageInitializer();
+            var packageTask = initializer.InitializeAsync(ResourcePlayMode.EditorSimulate, CancellationToken.None);
+            yield return Wait(packageTask);
+            var config = new LubanConfigService(initializer); yield return Wait(config.InitializeAsync(CancellationToken.None));
+            var resources = new YooAssetResourceService(initializer, config);
+            var scenario = config.Tables.TbPerformanceScenario.Get(4);
+            // 本用例验证输入/死亡/退出，保留出生即有目标的隔离夹具；圆周刷怪由专用用例验收。
+            foreach (string field in new[] { "SpawnRadiusPixels", "SpawnIntervalSeconds", "SpawnBatchCount", "SpawnUnitIntervalSeconds" })
+                typeof(cfg.PerformanceScenarioConfig).GetField(field).SetValue(scenario, null);
+            int originalWorlds = World.All.Count;
+            int originalFrameRate = Application.targetFrameRate, originalVSync = QualitySettings.vSyncCount;
+            bool originalBackground = Application.runInBackground;
+            for (int run = 0; run < 2; run++)
+            {
+                var root = new GameObject("Combat runtime test");
+                var runner = root.AddComponent<CombatRuntimeRunner>(); var input = new TestInput();
+                try
+                {
+                    yield return Wait(runner.InitializeAsync(scenario, resources, input, CancellationToken.None));
+                    Assert.That(runner.Ready, Is.True); Assert.That(runner.ViewCamera, Is.Not.Null);
+                    var start = runner.Session.ReadUnit(0).Position;
+                    input.Frame = new CombatInputFrame { Movement = new float2(1, 0) };
+                    for (int frame = 0; frame < 12; frame++) yield return null;
+                    Assert.That(runner.Session.ReadUnit(0).Position.x, Is.GreaterThan(start.x));
+                    input.Frame = new CombatInputFrame { PausePressed = true };
+                    yield return null;
+                    Assert.That(runner.Session.Paused, Is.True);
+                    ulong tick = runner.Session.Statistics.Tick;
+                    for (int frame = 0; frame < 5; frame++) yield return null;
+                    Assert.That(runner.Session.Statistics.Tick, Is.EqualTo(tick));
+                    ulong lifetime = runner.Session.ReadUnit(0).Target.Lifetime;
+                    input.Frame = new CombatInputFrame { RestartPressed = true };
+                    yield return null;
+                    Assert.That(runner.Session.Paused, Is.False);
+                    Assert.That(runner.Session.ReadUnit(0).Target.Lifetime, Is.GreaterThan(lifetime));
+                    for (int frame = 0; frame < 15; frame++) yield return null;
+                    Assert.That(runner.Session.Statistics.ProjectileSpawns, Is.GreaterThan(0), "Auto fire must continue through the runtime input path.");
+                    if (run == 0)
+                    {
+                        runner.Restart(); runner.TogglePause();
+                        yield return CaptureCamera(runner.ViewCamera);
+                    }
+                    runner.Restart();
+                    var world = FindCombatWorld();
+                    var player = runner.Session.ReadUnit(0); player.Target.Health = 1; player.Cooldown = 100;
+                    player.Target.Evasion = 0; player.Target.ImmunityCharges = 0; player.Target.InvulnerableUntil = 0;
+                    world.EntityManager.SetComponentData(runner.Session.UnitEntity(0), player);
+                    var monster = runner.Session.ReadUnit(1); monster.Position = player.Position; monster.AttackActive = false;
+                    monster.Target.Health = monster.Target.MaxHealth; monster.Cooldown = 0; monster.Attack.Hit = 1;
+                    world.EntityManager.SetComponentData(runner.Session.UnitEntity(1), monster);
+                    for (int frame = 0; frame < 180 && !runner.Session.Statistics.PlayerDead; frame++)
+                    {
+                        runner.AdvanceFrame(runner.Session.StepSeconds, default);
+                        yield return null;
+                    }
+                    Assert.That(runner.Session.Statistics.PlayerDead, Is.True);
+                    tick = runner.Session.Statistics.Tick;
+                    input.Frame = new CombatInputFrame { Movement = new float2(1), PausePressed = true };
+                    for (int frame = 0; frame < 5; frame++) yield return null;
+                    Assert.That(runner.Session.Statistics.Tick, Is.EqualTo(tick));
+                    runner.Restart(); Assert.That(runner.Session.Statistics.PlayerDead, Is.False);
+                }
+                finally { runner.Close(); UnityEngine.Object.Destroy(root); }
+                yield return null;
+                Assert.That(World.All.Count, Is.EqualTo(originalWorlds));
+                Assert.That(Application.targetFrameRate, Is.EqualTo(originalFrameRate));
+                Assert.That(QualitySettings.vSyncCount, Is.EqualTo(originalVSync));
+                Assert.That(Application.runInBackground, Is.EqualTo(originalBackground));
+            }
+        }
+
+        /// <summary>测试读取专属世界；使用具体枚举器，Entities 禁止将 World.All 装箱给 LINQ。</summary>
+        /// <returns>唯一已启动的战斗世界。</returns>
+        /// <exception cref="InvalidOperationException">世界缺失或重复。</exception>
+        private static World FindCombatWorld()
+        {
+            World found = null;
+            foreach (var candidate in World.All)
+                if (candidate.Name == "Roguelike Combat")
+                {
+                    if (found != null) throw new InvalidOperationException("Duplicate combat worlds.");
+                    found = candidate;
+                }
+            return found ?? throw new InvalidOperationException("Combat world not found.");
+        }
+
+        /// <summary>GPU 读回真实战斗相机，检查内容不同于背景后保存证据。</summary>
+        /// <param name="camera">运行器创建的相机。</param>
+        /// <returns>等待世界 LateUpdate 和首次 Shader/GPU 准备的协程，超时仍严格判失败。</returns>
+        /// <remarks>临时目标和 CPU 纹理在 finally 销毁，恢复相机原目标。</remarks>
+        private static IEnumerator CaptureCamera(Camera camera)
+        {
+            var target = new RenderTexture(1280, 720, 24); var pixels = new Texture2D(1280, 720, TextureFormat.RGB24, false);
+            var oldTarget = camera.targetTexture; var oldActive = RenderTexture.active;
+            try
+            {
+                target.Create(); camera.targetTexture = target;
+                int different = 0;
+                double deadline = Time.realtimeSinceStartupAsDouble + 10;
+                do
+                {
+                    // 初始 GPU 注册与 Shader 编译可能跨帧；暂停出生画面以免等待期间单位被消灭。
+                    yield return null;
+                    camera.Render(); RenderTexture.active = target;
+                    pixels.ReadPixels(new Rect(0, 0, target.width, target.height), 0, 0); pixels.Apply();
+                    var colors = pixels.GetPixels32(); var background = colors[0]; different = 0;
+                    foreach (var color in colors)
+                        if (Math.Abs(color.r - background.r) + Math.Abs(color.g - background.g) + Math.Abs(color.b - background.b) > 40) different++;
+                    RenderTexture.active = oldActive;
+                } while (different <= 500 && Time.realtimeSinceStartupAsDouble < deadline);
+                Directory.CreateDirectory("outputs/combat-config/runtime-review");
+                File.WriteAllBytes("outputs/combat-config/runtime-review/ecs-camera.png", pixels.EncodeToPNG());
+                Assert.That(different, Is.GreaterThan(500), "Actual ECS camera must show rendered combat units.");
+            }
+            finally
+            {
+                camera.targetTexture = oldTarget; RenderTexture.active = oldActive; target.Release();
+                UnityEngine.Object.Destroy(target); UnityEngine.Object.Destroy(pixels);
+            }
+        }
+
+        /// <summary>限定资源等待时长并原样抛出失败，避免加载异常导致测试无限等待。</summary>
+        /// <param name="task">启动任务。</param>
+        /// <returns>逐帧等待协程。</returns>
+        private static IEnumerator Wait(Task task)
+        {
+            double deadline = Time.realtimeSinceStartupAsDouble + 60;
+            while (!task.IsCompleted && Time.realtimeSinceStartupAsDouble < deadline) yield return null;
+            Assert.That(task.IsCompleted, Is.True, "Timed out waiting for real resource startup.");
+            task.GetAwaiter().GetResult();
+        }
+
+        /// <summary>只替代设备采样，仍走生产运行器 Update 的所有控制逻辑。</summary>
+        private sealed class TestInput : ICombatInput
+        {
+            public CombatInputFrame Frame;
+            /// <summary>读取持续移动，并在一次采样后消费按下事件。</summary>
+            /// <returns>当前测试输入快照。</returns>
+            public CombatInputFrame Read()
+            {
+                var result = Frame; Frame.PausePressed = Frame.RestartPressed = false; return result;
+            }
+        }
+
+        /// <summary>前十个调用加载真实共享美术，第十一个调用模拟不能立即取消的供应商 IO。</summary>
+        private sealed class DeferredResources : IResourceService
+        {
+            private readonly IResourceService source;
+            private readonly TaskCompletionSource<IRawResourceHandle> completion = new TaskCompletionSource<IRawResourceHandle>();
+            private int loads;
+            public bool Blocked { get; private set; }
+            public readonly LateHandle Handle = new LateHandle();
+            /// <summary>构造测试资源代理，不转移底层服务所有权。</summary>
+            /// <param name="source">真实 YooAsset 服务。</param>
+            public DeferredResources(IResourceService source) { this.source = source; }
+            /// <summary>转发非原始资源请求，本测试不改变其加载行为。</summary>
+            /// <typeparam name="TAsset">资源类型。</typeparam>
+            /// <param name="resourceId">表资源 ID。</param>
+            /// <param name="cancellationToken">调用者令牌。</param>
+            /// <returns>真实服务的加载任务。</returns>
+            public Task<IResourceHandle<TAsset>> LoadAssetAsync<TAsset>(int resourceId, CancellationToken cancellationToken) where TAsset : class
+                => source.LoadAssetAsync<TAsset>(resourceId, cancellationToken);
+            /// <summary>固定测试注入点挂起，其他调用仍使用真实资源和取消检查。</summary>
+            /// <param name="resourceId">表资源 ID。</param>
+            /// <param name="cancellationToken">调用者令牌。</param>
+            /// <returns>真实加载或受控晚到句柄。</returns>
+            public Task<IRawResourceHandle> LoadRawFileAsync(int resourceId, CancellationToken cancellationToken)
+            {
+                if (++loads == 11) { Blocked = true; return completion.Task; }
+                return source.LoadRawFileAsync(resourceId, cancellationToken);
+            }
+            /// <summary>测试关闭入口后放行晚到结果，允许 finally 重复调用。</summary>
+            public void Complete() { completion.TrySetResult(Handle); }
+        }
+
+        /// <summary>取消后不得被解析的晚到句柄，记录所有权是否已归还。</summary>
+        private sealed class LateHandle : IRawResourceHandle
+        {
+            public byte[] Data => Array.Empty<byte>();
+            public bool Disposed { get; private set; }
+            /// <summary>加载取消处理归还资源时记录释放状态。</summary>
+            public void Dispose() { Disposed = true; }
+        }
+    }
+}

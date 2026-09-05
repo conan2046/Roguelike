@@ -6,7 +6,10 @@
     "Roguelike.Infrastructure",
     "Roguelike.Features.Gameplay",
     "Roguelike.Features.Performance",
-    "Roguelike.Presentation"
+    "Roguelike.Presentation",
+    "Roguelike.Generated",
+    "Luban.Runtime",
+    "Roguelike.Features.Combat.Runtime"
   ],
   "includePlatforms": [],
   "excludePlatforms": [],

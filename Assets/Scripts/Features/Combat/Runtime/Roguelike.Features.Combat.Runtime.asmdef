@@ -1,0 +1,5 @@
+{
+  "name": "Roguelike.Features.Combat.Runtime",
+  "references": ["Roguelike.Core", "Roguelike.Generated", "Luban.Runtime", "Roguelike.Features.Combat", "Roguelike.Features.Combat.Ecs", "Roguelike.Features.Combat.Rendering", "Unity.Entities", "Unity.Collections", "Unity.Entities.Graphics", "Unity.Mathematics", "Unity.Transforms"],
+  "autoReferenced": true
+}

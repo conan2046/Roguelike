@@ -23,6 +23,16 @@ public sealed partial class MonsterConfig : Luban.BeanBase
         Name = _buf.ReadString();
         VisualSetId = _buf.ReadInt();
         VisualSetId_Ref = null;
+        if(_buf.ReadBool()){ AttributeProfileId = _buf.ReadInt(); } else { AttributeProfileId = null; }
+        AttributeProfileId_Ref = null;
+        if(_buf.ReadBool()){ DefaultSkillId = _buf.ReadInt(); } else { DefaultSkillId = null; }
+        DefaultSkillId_Ref = null;
+        if(_buf.ReadBool()){ BodyRadius = _buf.ReadFloat(); } else { BodyRadius = null; }
+        if(_buf.ReadBool()){ MoveRadiusPixels = _buf.ReadFloat(); } else { MoveRadiusPixels = null; }
+        if(_buf.ReadBool()){ MoveHeightPixels = _buf.ReadFloat(); } else { MoveHeightPixels = null; }
+        if(_buf.ReadBool()){ MoveOffsetXPixels = _buf.ReadFloat(); } else { MoveOffsetXPixels = null; }
+        if(_buf.ReadBool()){ MoveOffsetYPixels = _buf.ReadFloat(); } else { MoveOffsetYPixels = null; }
+        if(_buf.ReadBool()){ MoveElevationPixels = _buf.ReadFloat(); } else { MoveElevationPixels = null; }
     }
 
     public static MonsterConfig DeserializeMonsterConfig(ByteBuf _buf)
@@ -43,6 +53,40 @@ public sealed partial class MonsterConfig : Luban.BeanBase
     /// </summary>
     public readonly int VisualSetId;
     public VisualSetConfig VisualSetId_Ref;
+    /// <summary>
+    /// 战斗属性方案；空值仅可预览
+    /// </summary>
+    public readonly int? AttributeProfileId;
+    public AttributeProfileConfig AttributeProfileId_Ref;
+    /// <summary>
+    /// 默认装备技能；不同于已解锁技能
+    /// </summary>
+    public readonly int? DefaultSkillId;
+    public SkillConfig DefaultSkillId_Ref;
+    /// <summary>
+    /// 伤害判定身体半径，世界单位；独立于移动圆柱
+    /// </summary>
+    public readonly float? BodyRadius;
+    /// <summary>
+    /// 移动圆柱半径，逻辑像素；由预制体导出
+    /// </summary>
+    public readonly float? MoveRadiusPixels;
+    /// <summary>
+    /// 移动圆柱高度，逻辑像素；由预制体导出
+    /// </summary>
+    public readonly float? MoveHeightPixels;
+    /// <summary>
+    /// 圆柱底心横向偏移，逻辑像素
+    /// </summary>
+    public readonly float? MoveOffsetXPixels;
+    /// <summary>
+    /// 圆柱底心地面纵向偏移，逻辑像素
+    /// </summary>
+    public readonly float? MoveOffsetYPixels;
+    /// <summary>
+    /// 圆柱底面离地高度，逻辑像素
+    /// </summary>
+    public readonly float? MoveElevationPixels;
    
     public const int __ID__ = -55174244;
     public override int GetTypeId() => __ID__;
@@ -50,6 +94,8 @@ public sealed partial class MonsterConfig : Luban.BeanBase
     public  void ResolveRef(Tables tables)
     {
         VisualSetId_Ref = tables.TbVisualSet.GetOrDefault(VisualSetId);
+        AttributeProfileId_Ref = AttributeProfileId!= null ? tables.TbAttributeProfile.GetOrDefault(AttributeProfileId.Value) : null;
+        DefaultSkillId_Ref = DefaultSkillId!= null ? tables.TbSkill.GetOrDefault(DefaultSkillId.Value) : null;
     }
 
     public override string ToString()
@@ -58,6 +104,14 @@ public sealed partial class MonsterConfig : Luban.BeanBase
         + "id:" + Id + ","
         + "name:" + Name + ","
         + "visualSetId:" + VisualSetId + ","
+        + "attributeProfileId:" + AttributeProfileId + ","
+        + "defaultSkillId:" + DefaultSkillId + ","
+        + "bodyRadius:" + BodyRadius + ","
+        + "moveRadiusPixels:" + MoveRadiusPixels + ","
+        + "moveHeightPixels:" + MoveHeightPixels + ","
+        + "moveOffsetXPixels:" + MoveOffsetXPixels + ","
+        + "moveOffsetYPixels:" + MoveOffsetYPixels + ","
+        + "moveElevationPixels:" + MoveElevationPixels + ","
         + "}";
     }
 }

@@ -44,6 +44,27 @@ public sealed partial class PerformanceScenarioConfig : Luban.BeanBase
         VSyncCount = _buf.ReadInt();
         TargetFrameRate = _buf.ReadInt();
         RunInBackground = _buf.ReadBool();
+        if(_buf.ReadBool()){ CombatRulesId = _buf.ReadInt(); } else { CombatRulesId = null; }
+        CombatRulesId_Ref = null;
+        if(_buf.ReadBool()){ CharacterId = _buf.ReadInt(); } else { CharacterId = null; }
+        CharacterId_Ref = null;
+        if(_buf.ReadBool()){ CharacterProfileOverrideId = _buf.ReadInt(); } else { CharacterProfileOverrideId = null; }
+        CharacterProfileOverrideId_Ref = null;
+        if(_buf.ReadBool()){ MonsterProfileOverrideId = _buf.ReadInt(); } else { MonsterProfileOverrideId = null; }
+        MonsterProfileOverrideId_Ref = null;
+        if(_buf.ReadBool()){ ArenaHalfWidth = _buf.ReadFloat(); } else { ArenaHalfWidth = null; }
+        if(_buf.ReadBool()){ ArenaHalfHeight = _buf.ReadFloat(); } else { ArenaHalfHeight = null; }
+        if(_buf.ReadBool()){ PlayerStartX = _buf.ReadFloat(); } else { PlayerStartX = null; }
+        if(_buf.ReadBool()){ PlayerStartY = _buf.ReadFloat(); } else { PlayerStartY = null; }
+        if(_buf.ReadBool()){ ReplenishOnDeath = _buf.ReadBool(); } else { ReplenishOnDeath = null; }
+        if(_buf.ReadBool()){ PlayerHealthPolicy = (ETestHealthPolicy)_buf.ReadInt(); } else { PlayerHealthPolicy = null; }
+        if(_buf.ReadBool()){ PlayerInputPolicy = (ETestInputPolicy)_buf.ReadInt(); } else { PlayerInputPolicy = null; }
+        if(_buf.ReadBool()){ PresentationId = _buf.ReadInt(); } else { PresentationId = null; }
+        PresentationId_Ref = null;
+        if(_buf.ReadBool()){ SpawnRadiusPixels = _buf.ReadFloat(); } else { SpawnRadiusPixels = null; }
+        if(_buf.ReadBool()){ SpawnIntervalSeconds = _buf.ReadFloat(); } else { SpawnIntervalSeconds = null; }
+        if(_buf.ReadBool()){ SpawnBatchCount = _buf.ReadInt(); } else { SpawnBatchCount = null; }
+        if(_buf.ReadBool()){ SpawnUnitIntervalSeconds = _buf.ReadFloat(); } else { SpawnUnitIntervalSeconds = null; }
     }
 
     public static PerformanceScenarioConfig DeserializePerformanceScenarioConfig(ByteBuf _buf)
@@ -153,6 +174,75 @@ public sealed partial class PerformanceScenarioConfig : Luban.BeanBase
     /// 失去焦点后是否继续运行
     /// </summary>
     public readonly bool RunInBackground;
+    /// <summary>
+    /// Combat规则；旧移动基准留空
+    /// </summary>
+    public readonly int? CombatRulesId;
+    public CombatRulesConfig CombatRulesId_Ref;
+    /// <summary>
+    /// 测试玩家ID
+    /// </summary>
+    public readonly int? CharacterId;
+    public CharacterConfig CharacterId_Ref;
+    /// <summary>
+    /// 显式测试属性替换；非正式成长
+    /// </summary>
+    public readonly int? CharacterProfileOverrideId;
+    public AttributeProfileConfig CharacterProfileOverrideId_Ref;
+    /// <summary>
+    /// 显式测试怪物属性替换
+    /// </summary>
+    public readonly int? MonsterProfileOverrideId;
+    public AttributeProfileConfig MonsterProfileOverrideId_Ref;
+    /// <summary>
+    /// 开放场地半宽，世界单位
+    /// </summary>
+    public readonly float? ArenaHalfWidth;
+    /// <summary>
+    /// 开放场地半高，世界单位
+    /// </summary>
+    public readonly float? ArenaHalfHeight;
+    /// <summary>
+    /// 玩家出生X
+    /// </summary>
+    public readonly float? PlayerStartX;
+    /// <summary>
+    /// 玩家出生Y
+    /// </summary>
+    public readonly float? PlayerStartY;
+    /// <summary>
+    /// 当tick死亡怪物回收后补齐
+    /// </summary>
+    public readonly bool? ReplenishOnDeath;
+    /// <summary>
+    /// RestoreAfterDamage仅供压力测试
+    /// </summary>
+    public readonly ETestHealthPolicy? PlayerHealthPolicy;
+    /// <summary>
+    /// Stationary为固定玩家输入；手动为闭环测试
+    /// </summary>
+    public readonly ETestInputPolicy? PlayerInputPolicy;
+    /// <summary>
+    /// Combat表现方案；旧基准留空
+    /// </summary>
+    public readonly int? PresentationId;
+    public CombatPresentationConfig PresentationId_Ref;
+    /// <summary>
+    /// 跟随角色圆周出生半径，逻辑像素；空表示旧阵列
+    /// </summary>
+    public readonly float? SpawnRadiusPixels;
+    /// <summary>
+    /// 波间等待秒数；上一波最后一只之后计时，首波同样等待
+    /// </summary>
+    public readonly float? SpawnIntervalSeconds;
+    /// <summary>
+    /// 每波只数；不设存活上限，死亡槽复用
+    /// </summary>
+    public readonly int? SpawnBatchCount;
+    /// <summary>
+    /// 波内每只生成间隔，模拟秒
+    /// </summary>
+    public readonly float? SpawnUnitIntervalSeconds;
    
     public const int __ID__ = 1968250658;
     public override int GetTypeId() => __ID__;
@@ -165,6 +255,11 @@ public sealed partial class PerformanceScenarioConfig : Luban.BeanBase
         SkillIds_Ref = new System.Collections.Generic.List<SkillConfig>();
         foreach (var _v in SkillIds) { SkillIds_Ref.Add(tables.TbSkill.GetOrDefault(_v)); }
 
+        CombatRulesId_Ref = CombatRulesId!= null ? tables.TbCombatRules.GetOrDefault(CombatRulesId.Value) : null;
+        CharacterId_Ref = CharacterId!= null ? tables.TbCharacter.GetOrDefault(CharacterId.Value) : null;
+        CharacterProfileOverrideId_Ref = CharacterProfileOverrideId!= null ? tables.TbAttributeProfile.GetOrDefault(CharacterProfileOverrideId.Value) : null;
+        MonsterProfileOverrideId_Ref = MonsterProfileOverrideId!= null ? tables.TbAttributeProfile.GetOrDefault(MonsterProfileOverrideId.Value) : null;
+        PresentationId_Ref = PresentationId!= null ? tables.TbCombatPresentation.GetOrDefault(PresentationId.Value) : null;
     }
 
     public override string ToString()
@@ -195,6 +290,22 @@ public sealed partial class PerformanceScenarioConfig : Luban.BeanBase
         + "vSyncCount:" + VSyncCount + ","
         + "targetFrameRate:" + TargetFrameRate + ","
         + "runInBackground:" + RunInBackground + ","
+        + "combatRulesId:" + CombatRulesId + ","
+        + "characterId:" + CharacterId + ","
+        + "characterProfileOverrideId:" + CharacterProfileOverrideId + ","
+        + "monsterProfileOverrideId:" + MonsterProfileOverrideId + ","
+        + "arenaHalfWidth:" + ArenaHalfWidth + ","
+        + "arenaHalfHeight:" + ArenaHalfHeight + ","
+        + "playerStartX:" + PlayerStartX + ","
+        + "playerStartY:" + PlayerStartY + ","
+        + "replenishOnDeath:" + ReplenishOnDeath + ","
+        + "playerHealthPolicy:" + PlayerHealthPolicy + ","
+        + "playerInputPolicy:" + PlayerInputPolicy + ","
+        + "presentationId:" + PresentationId + ","
+        + "spawnRadiusPixels:" + SpawnRadiusPixels + ","
+        + "spawnIntervalSeconds:" + SpawnIntervalSeconds + ","
+        + "spawnBatchCount:" + SpawnBatchCount + ","
+        + "spawnUnitIntervalSeconds:" + SpawnUnitIntervalSeconds + ","
         + "}";
     }
 }

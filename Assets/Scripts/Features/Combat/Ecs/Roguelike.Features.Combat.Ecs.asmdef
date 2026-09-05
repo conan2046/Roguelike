@@ -1,0 +1,7 @@
+{
+  "name": "Roguelike.Features.Combat.Ecs",
+  "rootNamespace": "Roguelike.Features.Combat.Ecs",
+  "references": ["Roguelike.Features.Combat", "Roguelike.Core", "Roguelike.Animation", "Roguelike.Generated", "Luban.Runtime", "Unity.Burst", "Unity.Collections", "Unity.Entities", "Unity.Mathematics", "Unity.Transforms"],
+  "autoReferenced": true,
+  "noEngineReferences": false
+}

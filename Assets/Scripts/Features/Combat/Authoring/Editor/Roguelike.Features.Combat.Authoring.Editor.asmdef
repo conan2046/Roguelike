@@ -1,0 +1,1 @@
+{"name":"Roguelike.Features.Combat.Authoring.Editor","references":["Roguelike.Features.Combat.Authoring","Roguelike.Generated","Luban.Runtime","Roguelike.Animation","Roguelike.Animation.Rendering"],"includePlatforms":["Editor"],"autoReferenced":true}

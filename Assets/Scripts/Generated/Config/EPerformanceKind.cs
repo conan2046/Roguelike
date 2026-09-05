@@ -25,6 +25,10 @@ namespace cfg
         /// 混合怪物与技能
         /// </summary>
         MixedMonstersWithSkills = 3,
+        /// <summary>
+        /// 完整战斗测试
+        /// </summary>
+        Combat = 4,
     }
 
 } 

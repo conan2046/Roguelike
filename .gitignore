@@ -17,6 +17,8 @@ UserSettings/
 .vscode/
 .idea/
 *.csproj
+!/Tools/Config/CombatConfigChecks/CombatConfigChecks.csproj
+/Tools/Config/CombatConfigChecks/bin/
 *.sln
 *.slnx
 *.unityproj
@@ -43,3 +45,7 @@ Assets/Screenshots/
 *.log
 ~$*
 Thumbs.db
+
+# 编辑器预览从源资源按需重建，不提交解码纹理副本
+/Assets/Prefabs/Combat/**/Preview/
+/Assets/Prefabs/Combat/**/Preview.meta

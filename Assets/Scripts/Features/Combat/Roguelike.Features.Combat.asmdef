@@ -1,0 +1,7 @@
+{
+  "name": "Roguelike.Features.Combat",
+  "rootNamespace": "Roguelike.Features.Combat",
+  "references": ["Roguelike.Generated", "Luban.Runtime", "Roguelike.Animation"],
+  "autoReferenced": true,
+  "noEngineReferences": true
+}

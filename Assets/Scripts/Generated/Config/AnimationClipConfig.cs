@@ -49,15 +49,15 @@ public sealed partial class AnimationClipConfig : Luban.BeanBase
     public readonly int TextureResourceId;
     public ResourceConfig TextureResourceId_Ref;
     /// <summary>
-    /// 仅确认 fd=站立、pb=移动，其余为 Unknown
+    /// 按类别分类；Unused 不接入播放
     /// </summary>
     public readonly EAnimationAction Action;
     /// <summary>
-    /// 原始文件动作后缀，禁止据名称猜测语义
+    /// 主角 fd 待机；怪物 zd 待机；均 pb 移动
     /// </summary>
     public readonly string SourceSuffix;
     /// <summary>
-    /// 站立和移动循环播放
+    /// 待机和移动循环；施法不中断移动
     /// </summary>
     public readonly bool Loop;
    

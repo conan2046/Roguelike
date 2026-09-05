@@ -22,6 +22,11 @@ public sealed partial class AttributeConfig : Luban.BeanBase
         Id = _buf.ReadInt();
         Name = _buf.ReadString();
         DisplayFormat = _buf.ReadString();
+        AttributeType = (EAttributeType)_buf.ReadInt();
+        ValueKind = (EAttributeValueKind)_buf.ReadInt();
+        Unit = _buf.ReadString();
+        MinValue = _buf.ReadDouble();
+        MaxValue = _buf.ReadDouble();
     }
 
     public static AttributeConfig DeserializeAttributeConfig(ByteBuf _buf)
@@ -38,9 +43,29 @@ public sealed partial class AttributeConfig : Luban.BeanBase
     /// </summary>
     public readonly string Name;
     /// <summary>
-    /// 显示格式；无需求前保持空表
+    /// 显示格式；整数与实数按数值类型显示
     /// </summary>
     public readonly string DisplayFormat;
+    /// <summary>
+    /// 属性程序语义
+    /// </summary>
+    public readonly EAttributeType AttributeType;
+    /// <summary>
+    /// 整数属性在最终聚合时取整
+    /// </summary>
+    public readonly EAttributeValueKind ValueKind;
+    /// <summary>
+    /// 属性单位
+    /// </summary>
+    public readonly string Unit;
+    /// <summary>
+    /// 合法下限；调试值
+    /// </summary>
+    public readonly double MinValue;
+    /// <summary>
+    /// 合法上限；调试值
+    /// </summary>
+    public readonly double MaxValue;
    
     public const int __ID__ = 1818455262;
     public override int GetTypeId() => __ID__;
@@ -55,6 +80,11 @@ public sealed partial class AttributeConfig : Luban.BeanBase
         + "id:" + Id + ","
         + "name:" + Name + ","
         + "displayFormat:" + DisplayFormat + ","
+        + "attributeType:" + AttributeType + ","
+        + "valueKind:" + ValueKind + ","
+        + "unit:" + Unit + ","
+        + "minValue:" + MinValue + ","
+        + "maxValue:" + MaxValue + ","
         + "}";
     }
 }

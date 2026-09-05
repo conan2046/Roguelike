@@ -18,13 +18,45 @@ namespace cfg
         /// </summary>
         Unknown = 0,
         /// <summary>
-        /// 站立 fd
+        /// 待机：主角 fd，怪物 zd
         /// </summary>
         Stand = 1,
         /// <summary>
         /// 移动 pb
         /// </summary>
         Move = 2,
+        /// <summary>
+        /// 本轮不使用的动作
+        /// </summary>
+        Unused = 3,
+        /// <summary>
+        /// 攻击 gj
+        /// </summary>
+        Attack = 4,
+        /// <summary>
+        /// 被击 bj
+        /// </summary>
+        Hit = 5,
+        /// <summary>
+        /// 施法 sf1
+        /// </summary>
+        Cast1 = 6,
+        /// <summary>
+        /// 施法 sf2
+        /// </summary>
+        Cast2 = 7,
+        /// <summary>
+        /// 施法 sf3
+        /// </summary>
+        Cast3 = 8,
+        /// <summary>
+        /// 施法 sf4
+        /// </summary>
+        Cast4 = 9,
+        /// <summary>
+        /// 死亡 sw
+        /// </summary>
+        Death = 10,
     }
 
 } 

@@ -3,6 +3,7 @@
   "rootNamespace": "Roguelike.Features.Performance",
   "references": [
     "Roguelike.Core",
+    "Roguelike.Animation",
     "Roguelike.Generated",
     "Luban.Runtime",
     "Unity.Burst",

@@ -61,6 +61,34 @@ public partial class Tables
     /// TbPerformanceScenario generated from Excel
     /// </summary>
     public TbPerformanceScenario TbPerformanceScenario {get; }
+    /// <summary>
+    /// TbAttributeProfile generated from Excel
+    /// </summary>
+    public TbAttributeProfile TbAttributeProfile {get; }
+    /// <summary>
+    /// TbSkillCombat generated from Excel
+    /// </summary>
+    public TbSkillCombat TbSkillCombat {get; }
+    /// <summary>
+    /// TbCombatRules generated from Excel
+    /// </summary>
+    public TbCombatRules TbCombatRules {get; }
+    /// <summary>
+    /// TbAnimationDirection generated from Excel
+    /// </summary>
+    public TbAnimationDirection TbAnimationDirection {get; }
+    /// <summary>
+    /// TbCombatPresentation generated from Excel
+    /// </summary>
+    public TbCombatPresentation TbCombatPresentation {get; }
+    /// <summary>
+    /// TbAttackDirection generated from Excel
+    /// </summary>
+    public TbAttackDirection TbAttackDirection {get; }
+    /// <summary>
+    /// 神将五档武器与本体映射
+    /// </summary>
+    public TbHeroWeapon TbHeroWeapon {get; }
 
     public Tables(System.Func<string, ByteBuf> loader)
     {
@@ -76,6 +104,13 @@ public partial class Tables
         TbStage = new TbStage(loader("tbstage"));
         GameConfig = new GameConfig(loader("gameconfig"));
         TbPerformanceScenario = new TbPerformanceScenario(loader("tbperformancescenario"));
+        TbAttributeProfile = new TbAttributeProfile(loader("tbattributeprofile"));
+        TbSkillCombat = new TbSkillCombat(loader("tbskillcombat"));
+        TbCombatRules = new TbCombatRules(loader("tbcombatrules"));
+        TbAnimationDirection = new TbAnimationDirection(loader("tbanimationdirection"));
+        TbCombatPresentation = new TbCombatPresentation(loader("tbcombatpresentation"));
+        TbAttackDirection = new TbAttackDirection(loader("tbattackdirection"));
+        TbHeroWeapon = new TbHeroWeapon(loader("tbheroweapon"));
         ResolveRef();
     }
     
@@ -93,6 +128,13 @@ public partial class Tables
         TbStage.ResolveRef(this);
         GameConfig.ResolveRef(this);
         TbPerformanceScenario.ResolveRef(this);
+        TbAttributeProfile.ResolveRef(this);
+        TbSkillCombat.ResolveRef(this);
+        TbCombatRules.ResolveRef(this);
+        TbAnimationDirection.ResolveRef(this);
+        TbCombatPresentation.ResolveRef(this);
+        TbAttackDirection.ResolveRef(this);
+        TbHeroWeapon.ResolveRef(this);
     }
 }
 

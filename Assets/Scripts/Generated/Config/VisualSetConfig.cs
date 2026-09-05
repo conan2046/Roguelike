@@ -27,6 +27,8 @@ public sealed partial class VisualSetConfig : Luban.BeanBase
         MoveClipId_Ref = null;
         {int n0 = _buf.ReadSize(); ClipIds = new System.Collections.Generic.List<int>(n0);for(var i0 = 0 ; i0 < n0 ; i0++) { int _e0;  _e0 = _buf.ReadInt(); ClipIds.Add(_e0);}}
         ScalePermille = _buf.ReadInt();
+        if(_buf.ReadBool()){ AttackClipId = _buf.ReadInt(); } else { AttackClipId = null; }
+        AttackClipId_Ref = null;
     }
 
     public static VisualSetConfig DeserializeVisualSetConfig(ByteBuf _buf)
@@ -43,7 +45,7 @@ public sealed partial class VisualSetConfig : Luban.BeanBase
     /// </summary>
     public readonly EVisualCategory Category;
     /// <summary>
-    /// 已确认的站立片段；可空
+    /// 主角 fd、怪物 zd；缺少则留空
     /// </summary>
     public readonly int? StandClipId;
     public AnimationClipConfig StandClipId_Ref;
@@ -61,6 +63,11 @@ public sealed partial class VisualSetConfig : Luban.BeanBase
     /// 表现缩放，1000=原始大小
     /// </summary>
     public readonly int ScalePermille;
+    /// <summary>
+    /// 已核验怪物普攻 gj；其余留空
+    /// </summary>
+    public readonly int? AttackClipId;
+    public AnimationClipConfig AttackClipId_Ref;
    
     public const int __ID__ = 1968919236;
     public override int GetTypeId() => __ID__;
@@ -72,6 +79,7 @@ public sealed partial class VisualSetConfig : Luban.BeanBase
         ClipIds_Ref = new System.Collections.Generic.List<AnimationClipConfig>();
         foreach (var _v in ClipIds) { ClipIds_Ref.Add(tables.TbAnimationClip.GetOrDefault(_v)); }
 
+        AttackClipId_Ref = AttackClipId!= null ? tables.TbAnimationClip.GetOrDefault(AttackClipId.Value) : null;
     }
 
     public override string ToString()
@@ -83,6 +91,7 @@ public sealed partial class VisualSetConfig : Luban.BeanBase
         + "moveClipId:" + MoveClipId + ","
         + "clipIds:" + Luban.StringUtil.CollectionToString(ClipIds) + ","
         + "scalePermille:" + ScalePermille + ","
+        + "attackClipId:" + AttackClipId + ","
         + "}";
     }
 }

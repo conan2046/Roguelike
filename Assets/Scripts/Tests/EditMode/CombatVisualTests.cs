@@ -1,0 +1,234 @@
+using System;
+using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
+using cfg;
+using Luban;
+using NUnit.Framework;
+using Roguelike.Core.Resources;
+using Roguelike.Features.Combat.Ecs;
+using Roguelike.Features.Combat.Rendering;
+using Unity.Entities;
+using Unity.Mathematics;
+using Unity.Rendering;
+using UnityEngine;
+
+namespace Roguelike.Tests
+{
+    /// <summary>真实配置与美术驱动的播放、共享资源和实体绑定回归。</summary>
+    public sealed class CombatVisualTests
+    {
+        /// <summary>真实定时刷怪扩容后绑定新增槽，复用共享网格，并在重开后隐藏全部旧怪物。</summary>
+        [Test]
+        public void TimedSpawnBindsGrowingEntitiesAndHidesOnRestart()
+        {
+            var tables = LoadTables(true); var scenario = tables.TbPerformanceScenario.Get(4); var source = new Files(tables);
+            using var assets = CombatVisualResources.LoadAsync(scenario, source, CancellationToken.None).GetAwaiter().GetResult();
+            using var world = new World("Timed rendering growth");
+            using var session = CombatSessionFactory.CreateAsync(world, scenario, source, CancellationToken.None).GetAwaiter().GetResult();
+            using var visuals = new CombatEntityVisuals(world, session, scenario, assets);
+            int loads = source.Loads;
+            int waveTicks = (int)Math.Ceiling(((decimal)scenario.SpawnIntervalSeconds.Value + (scenario.SpawnBatchCount.Value - 1) * (decimal)scenario.SpawnUnitIntervalSeconds.Value) * scenario.CombatRulesId_Ref.SimulationHz);
+            for (int i = 0; i < waveTicks * 2; i++)
+            {
+                for (int slot = 0; slot < session.UnitCount; slot++)
+                { var u = session.ReadUnit(slot); u.MoveSpeed = 0; u.Cooldown = 1000; world.EntityManager.SetComponentData(session.UnitEntity(slot), u); }
+                session.Advance(session.StepSeconds, float2.zero); visuals.Synchronize();
+            }
+            Assert.That(session.Statistics.AliveMonsters, Is.EqualTo(2 * scenario.SpawnBatchCount.Value));
+            Assert.That(source.Loads, Is.EqualTo(loads));
+            for (int slot = 1; slot < session.UnitCount; slot++)
+            {
+                Assert.That(visuals.Read(slot).Visible, Is.True);
+                Assert.That(world.EntityManager.HasComponent<MaterialMeshInfo>(session.UnitEntity(slot)), Is.True);
+            }
+            session.Restart(); visuals.Synchronize();
+            for (int slot = 1; slot < session.UnitCount; slot++)
+                Assert.That(world.EntityManager.HasComponent<DisableRendering>(session.UnitEntity(slot)), Is.True);
+        }
+
+        /// <summary>核对共享加载数量、全帧预建和显式释放，不因怪物数量重复加载。</summary>
+        [Test]
+        public void SharedResourcesLoadOnceAndDispose()
+        {
+            var tables = LoadTables(); var source = new Files(tables);
+            var assets = CombatVisualResources.LoadAsync(tables.TbPerformanceScenario.Get(5), source, CancellationToken.None).GetAwaiter().GetResult();
+            Assert.That(source.Loads, Is.EqualTo(10));
+            Assert.That(source.ActiveHandles, Is.Zero);
+            Assert.That(assets.TextureCount, Is.EqualTo(5));
+            Assert.That(assets.Materials.Length, Is.EqualTo(5));
+            Assert.That(assets.Meshes.Length, Is.GreaterThan(100));
+            var mesh = assets.Meshes[0]; var material = assets.Materials[0]; var texture = material.mainTexture;
+            assets.Dispose(); assets.Dispose();
+            Assert.That(mesh == null && material == null && texture == null, Is.True);
+            Assert.Throws<ObjectDisposedException>(() => assets.Read(20001, 20002));
+        }
+
+        /// <summary>注入中途取消或加载错误后临时句柄和部分 Unity 对象全部释放。</summary>
+        /// <param name="cancel">是否模拟取消而不是资源读取失败。</param>
+        [TestCase(false)]
+        [TestCase(true)]
+        public void InterruptedLoadingReleasesPartialObjects(bool cancel)
+        {
+            var tables = LoadTables(); var source = new Files(tables) { FailAt = 4, Cancel = cancel };
+            int meshes = Resources.FindObjectsOfTypeAll<Mesh>().Length;
+            int textures = Resources.FindObjectsOfTypeAll<Texture2D>().Length;
+            int materials = Resources.FindObjectsOfTypeAll<Material>().Length;
+            Assert.Catch(() => CombatVisualResources.LoadAsync(tables.TbPerformanceScenario.Get(4), source, CancellationToken.None).GetAwaiter().GetResult());
+            Assert.That(source.ActiveHandles, Is.Zero);
+            Assert.That(Resources.FindObjectsOfTypeAll<Mesh>().Length, Is.EqualTo(meshes));
+            Assert.That(Resources.FindObjectsOfTypeAll<Texture2D>().Length, Is.EqualTo(textures));
+            Assert.That(Resources.FindObjectsOfTypeAll<Material>().Length, Is.EqualTo(materials));
+        }
+
+        /// <summary>读取真实模拟时序验证 zd 前摇、gj F4、暂停与死亡隐藏，表现不修改伤害计数。</summary>
+        [Test]
+        public void EntityPlaybackFollowsSimulationWithoutDealingDamage()
+        {
+            var tables = LoadTables(); var scenario = tables.TbPerformanceScenario.Get(4); var source = new Files(tables);
+            using var world = new World("Visual playback test");
+            using var assets = CombatVisualResources.LoadAsync(scenario, source, CancellationToken.None).GetAwaiter().GetResult();
+            using var session = CombatSessionFactory.CreateAsync(world, scenario, source, CancellationToken.None).GetAwaiter().GetResult();
+            using var visuals = new CombatEntityVisuals(world, session, scenario, assets);
+            var hero = session.ReadUnit(0); hero.Cooldown = 100;
+            world.EntityManager.SetComponentData(session.UnitEntity(0), hero);
+            for (int slot = 1; slot < session.UnitCount; slot++)
+            {
+                var unit = session.ReadUnit(slot); unit.Position = hero.Position; unit.MoveSpeed = 0;
+                if (slot > 1) unit.Target.Health = 0;
+                world.EntityManager.SetComponentData(session.UnitEntity(slot), unit);
+            }
+            session.Advance(session.StepSeconds, float2.zero); visuals.Synchronize();
+            var player = visuals.Read(1);
+            Assert.That(player.ClipId, Is.EqualTo(20007));
+            Assert.That(session.ReadUnit(1).AttackAge, Is.Zero);
+            var timing = session.ReadUnit(1);
+            int maximumTicks = (int)System.Math.Ceiling((timing.WindupSeconds + timing.AttackOption.DurationSeconds) * timing.Interval / timing.BaseInterval / session.StepSeconds) + 2;
+            for (int tick = 0; session.Statistics.MeleeJudgements == 0 && tick < maximumTicks; tick++)
+            {
+                session.Advance(session.StepSeconds, float2.zero); visuals.Synchronize();
+                var unit = session.ReadUnit(1);
+                Assert.That(player.ClipId, Is.EqualTo(unit.AttackAge < unit.WindupSeconds ? 20007 : 20002));
+            }
+            Assert.That(session.Statistics.MeleeJudgements, Is.GreaterThan(0), "Visual timeline did not reach the configured hit frame.");
+            var attack = session.ReadUnit(1);
+            var animation = assets.Read(20001, 20002).Animation;
+            Assert.That(player.GlobalFrame, Is.EqualTo(animation.HoldFrame(attack.AttackOption.ActionIndex, 4)));
+            var meshInfo = world.EntityManager.GetComponentData<MaterialMeshInfo>(session.UnitEntity(1));
+            Assert.That(MaterialMeshInfo.StaticIndexToArrayIndex(meshInfo.Mesh), Is.EqualTo(player.MeshIndex));
+            Assert.That(MaterialMeshInfo.StaticIndexToArrayIndex(meshInfo.Material), Is.EqualTo(player.MaterialIndex));
+            var before = session.Statistics; int frame = player.MeshIndex;
+            session.Paused = true; session.Advance(10, float2.zero);
+            for (int i = 0; i < 10; i++) visuals.Synchronize();
+            Assert.That(player.MeshIndex, Is.EqualTo(frame)); Assert.That(session.Statistics, Is.EqualTo(before));
+            session.Paused = false;
+            attack.Target.Health = 0; world.EntityManager.SetComponentData(session.UnitEntity(1), attack);
+            session.Advance(session.StepSeconds, float2.zero); visuals.Synchronize();
+            Assert.That(player.Visible, Is.False);
+            Assert.That(world.EntityManager.HasComponent<DisableRendering>(session.UnitEntity(1)), Is.True);
+            session.Restart(); visuals.Synchronize();
+            Assert.That(player.Visible, Is.True); Assert.That(player.ClipId, Is.EqualTo(20007));
+        }
+
+        /// <summary>主角八方向移动、静止保持方向，无攻击动作；预热后纯选帧不分配托管内存。</summary>
+        [Test]
+        public void HeroDirectionsAndSamplingAllocateNoGarbage()
+        {
+            var tables = LoadTables(); var scenario = tables.TbPerformanceScenario.Get(4); var source = new Files(tables);
+            using var world = new World("Hero visual directions");
+            using var assets = CombatVisualResources.LoadAsync(scenario, source, CancellationToken.None).GetAwaiter().GetResult();
+            using var session = CombatSessionFactory.CreateAsync(world, scenario, source, CancellationToken.None).GetAwaiter().GetResult();
+            var player = new CombatVisualPlayer(scenario.CharacterId_Ref.VisualSetId_Ref, assets);
+            var unit = session.ReadUnit(0); ulong tick = 0;
+            foreach (var direction in scenario.PresentationId_Ref.DirectionIds_Ref)
+            {
+                unit.PreviousPosition = float2.zero; unit.Position = new float2(direction.X, direction.Y);
+                player.Sample(unit, ++tick, session.StepSeconds);
+                Assert.That(player.ClipId, Is.EqualTo(10004)); Assert.That(player.ActionIndex, Is.EqualTo(direction.ActionIndex));
+                Assert.That(player.FlipX, Is.EqualTo(direction.FlipX));
+                unit.PreviousPosition = unit.Position; player.Sample(unit, ++tick, session.StepSeconds);
+                Assert.That(player.ClipId, Is.EqualTo(10002)); Assert.That(player.ActionIndex, Is.EqualTo(direction.ActionIndex));
+            }
+            for (int i = 0; i < 100; i++) player.Sample(unit, ++tick, session.StepSeconds);
+            long allocated = GC.GetAllocatedBytesForCurrentThread();
+            for (int i = 0; i < 10000; i++) player.Sample(unit, ++tick, session.StepSeconds);
+            Assert.That(GC.GetAllocatedBytesForCurrentThread() - allocated, Is.Zero);
+        }
+
+        /// <summary>补算跳过完整攻击仍读取模拟最终朝向；生命周期改变清空旧攻击片段与进度。</summary>
+        [Test]
+        public void SkippedAttackAndRecycledLifetimeKeepCorrectFacing()
+        {
+            var tables = LoadTables(); var scenario = tables.TbPerformanceScenario.Get(4); var source = new Files(tables);
+            using var world = new World("Visual skipped attack");
+            using var assets = CombatVisualResources.LoadAsync(scenario, source, CancellationToken.None).GetAwaiter().GetResult();
+            using var session = CombatSessionFactory.CreateAsync(world, scenario, source, CancellationToken.None).GetAwaiter().GetResult();
+            var visual = scenario.MonsterIds_Ref[0].VisualSetId_Ref;
+            var player = new CombatVisualPlayer(visual, assets);
+            var unit = session.ReadUnit(1); player.Sample(unit, 0, session.StepSeconds);
+            var expected = scenario.PresentationId_Ref.AttackDirectionIds_Ref[3].FacingDirectionId_Ref;
+            unit.PreviousPosition = unit.Position; unit.Facing = new float2(expected.X, expected.Y);
+            player.Sample(unit, 100, session.StepSeconds);
+            Assert.That(player.ActionIndex, Is.EqualTo(expected.ActionIndex)); Assert.That(player.FlipX, Is.EqualTo(expected.FlipX));
+            unit.Target.Lifetime++;
+            unit.Facing = new float2(scenario.PresentationId_Ref.InitialDirectionId_Ref.X, scenario.PresentationId_Ref.InitialDirectionId_Ref.Y);
+            player.Sample(unit, 101, session.StepSeconds);
+            Assert.That(player.ClipId, Is.EqualTo(visual.StandClipId.Value));
+            Assert.That(player.GlobalFrame, Is.EqualTo(assets.Read(visual.Id, visual.StandClipId.Value).Animation.HoldFrame(player.ActionIndex, 0)));
+        }
+
+        /// <summary>加载真实生成配置，旧选帧用例显式关闭定时生成以维持固定出生夹具。</summary>
+        /// <param name="timedSpawn">为真时保持场景 4 的正式圆周刷怪参数。</param>
+        /// <returns>解析完外键的表。</returns>
+        internal static Tables LoadTables(bool timedSpawn = false)
+        {
+            var tables = new Tables(name => new ByteBuf(File.ReadAllBytes(Path.Combine(Application.streamingAssetsPath, "Config", "Luban", name + ".bytes"))));
+            // 固定选帧夹具保留出生目标；动态绑定测试显式消费真实定时配置。
+            if (!timedSpawn)
+                foreach (string field in new[] { "SpawnRadiusPixels", "SpawnIntervalSeconds", "SpawnBatchCount", "SpawnUnitIntervalSeconds" })
+                    typeof(PerformanceScenarioConfig).GetField(field).SetValue(tables.TbPerformanceScenario.Get(4), null);
+            return tables;
+        }
+
+        /// <summary>测试专用资源适配器，正式资源层只接收资源 ID。</summary>
+        internal sealed class Files : IResourceService
+        {
+            private readonly Tables tables;
+            public int Loads, ActiveHandles, FailAt;
+            public bool Cancel;
+            /// <summary>保存测试表供 ID 解析。</summary>
+            /// <param name="tables">实际生成表。</param>
+            internal Files(Tables tables) { this.tables = tables; }
+            /// <summary>测试通过 ID 读取实际 ANI/PNG，支持受控异常注入。</summary>
+            /// <param name="resourceId">资源表 ID。</param>
+            /// <param name="cancellationToken">取消令牌。</param>
+            /// <returns>立即完成的测试句柄。</returns>
+            public Task<IRawResourceHandle> LoadRawFileAsync(int resourceId, CancellationToken cancellationToken)
+            {
+                cancellationToken.ThrowIfCancellationRequested(); Loads++;
+                if (Loads == FailAt) { if (Cancel) throw new OperationCanceledException(); throw new IOException("Injected resource failure"); }
+                var data = File.ReadAllBytes(Path.Combine(Application.streamingAssetsPath, tables.TbResource.Get(resourceId).Path));
+                ActiveHandles++; return Task.FromResult<IRawResourceHandle>(new Raw(this, data));
+            }
+            /// <summary>本测试不支持 Unity 导入资产，误用失败。</summary>
+            /// <typeparam name="TAsset">资产类型。</typeparam>
+            /// <param name="resourceId">资源 ID。</param>
+            /// <param name="cancellationToken">取消令牌。</param>
+            /// <returns>不返回。</returns>
+            /// <exception cref="NotSupportedException">误用对象加载。</exception>
+            public Task<IResourceHandle<TAsset>> LoadAssetAsync<TAsset>(int resourceId, CancellationToken cancellationToken) where TAsset : class => throw new NotSupportedException();
+        }
+        /// <summary>记录测试句柄生命周期。</summary>
+        private sealed class Raw : IRawResourceHandle
+        {
+            private Files owner;
+            public byte[] Data { get; }
+            /// <summary>构造时接管已读数据。</summary>
+            /// <param name="owner">计数器所有者。</param>
+            /// <param name="data">文件内容。</param>
+            public Raw(Files owner, byte[] data) { this.owner = owner; Data = data; }
+            /// <summary>释放时减计数，重复释放无副作用。</summary>
+            public void Dispose() { if (owner == null) return; owner.ActiveHandles--; owner = null; }
+        }
+    }
+}

@@ -1,0 +1,7 @@
+{
+  "name": "Roguelike.Animation",
+  "rootNamespace": "Roguelike.Animation",
+  "references": [],
+  "autoReferenced": true,
+  "noEngineReferences": true
+}

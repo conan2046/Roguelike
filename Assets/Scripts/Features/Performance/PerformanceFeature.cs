@@ -7,6 +7,8 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using cfg;
+using ProjectX.Migration;
+using Roguelike.Animation;
 using Roguelike.Core;
 using Roguelike.Core.Features;
 using Roguelike.Core.Resources;
@@ -222,11 +224,18 @@ namespace Roguelike.Features.Performance
         }
 
         /// <summary>
-        /// Rejects invalid performance-table values before any Player state is changed.
+        /// Rejects unsupported scenario kinds and invalid TbPerformanceScenario values before Player state changes.
         /// </summary>
-        /// <exception cref="InvalidOperationException">Thrown when Luban TbPerformanceScenario contains unsafe or contradictory values.</exception>
+        /// <exception cref="InvalidOperationException">Thrown when TbPerformanceScenario requests the unimplemented combat runner or contains invalid values.</exception>
         private void ValidateScenario()
         {
+            // Combat rows are data-ready, but require the real combat runner rather than this movement benchmark.
+            if (scenario.Kind == EPerformanceKind.Combat)
+            {
+                throw new InvalidOperationException(
+                    $"TbPerformanceScenario {scenario.Id} requires the combat runner, which is not implemented yet.");
+            }
+
             if (scenario.EntityCount <= 0 ||
                 scenario.WarmupSeconds < 0f ||
                 scenario.SampleSeconds <= 0f ||
@@ -294,9 +303,9 @@ namespace Roguelike.Features.Performance
                     }
 
                     var material = CreateTransparentMaterial(shader, texture, monster.Id);
-                    ConfigureFirstAnimationFrame(material, animationHandle.Data, texture);
                     textures.Add(texture);
                     materials.Add(material);
+                    ConfigureFirstAnimationFrame(material, animationHandle.Data, texture);
                 }
             }
         }
@@ -353,7 +362,7 @@ namespace Roguelike.Features.Performance
         }
 
         /// <summary>
-        /// Reads the first atlas frame bounds from the paired ANI resource and applies them as material UV scale and offset.
+        /// Uses the shared ANI parser to select the first action frame for the explicitly single-frame movement baseline.
         /// </summary>
         /// <param name="material">Runtime material whose BaseMap transform selects the displayed frame.</param>
         /// <param name="animationData">Raw bytes loaded through TbAnimationClip.aniResourceId and TbResource.path.</param>
@@ -362,48 +371,17 @@ namespace Roguelike.Features.Performance
         /// <remarks>Changes only the runner-owned material and does not modify the source texture or files.</remarks>
         private static void ConfigureFirstAnimationFrame(
             Material material,
-            IReadOnlyList<byte> animationData,
+            byte[] animationData,
             Texture2D texture)
         {
-            if (animationData == null || animationData.Count < 10)
-            {
-                throw new InvalidOperationException("ANI resource is too short to contain a first-frame rectangle.");
-            }
-
-            int frameCount =
-                animationData[0] |
-                (animationData[1] << 8) |
-                (animationData[2] << 16) |
-                (animationData[3] << 24);
-            int top = ReadBigEndianUInt16(animationData, 4);
-            int width = ReadBigEndianUInt16(animationData, 6);
-            int height = ReadBigEndianUInt16(animationData, 8);
-            if (frameCount <= 0 ||
-                width <= 0 ||
-                height <= 0 ||
-                width > texture.width ||
-                top + height > texture.height)
-            {
-                throw new InvalidOperationException(
-                    $"ANI first-frame bounds are invalid: frames={frameCount}, top={top}, width={width}, " +
-                    $"height={height}, texture={texture.width}x{texture.height}.");
-            }
-
-            var scale = new Vector2(width / (float)texture.width, height / (float)texture.height);
-            var offset = new Vector2(0f, 1f - ((top + height) / (float)texture.height));
+            var data = CocosAniData.Parse(animationData);
+            AniFrameLayout.ValidateAtlas(data, texture.width, texture.height);
+            var quads = AniFrameLayout.Build(data, 0, 0, texture.width, texture.height);
+            if (quads.Length != 1) throw new InvalidOperationException("Single-quad movement baseline cannot render a multi-module ANI frame.");
+            var scale = new Vector2(quads[0].UWidth, quads[0].VHeight);
+            var offset = new Vector2(quads[0].U, quads[0].V);
             material.SetTextureScale(BaseMapProperty, scale);
             material.SetTextureOffset(BaseMapProperty, offset);
-        }
-
-        /// <summary>
-        /// Reads one unsigned 16-bit big-endian value used by legacy ANI frame metadata.
-        /// </summary>
-        /// <param name="data">ANI byte sequence containing the value.</param>
-        /// <param name="offset">Zero-based byte offset of the high byte.</param>
-        /// <returns>The decoded unsigned value represented as an integer.</returns>
-        private static int ReadBigEndianUInt16(IReadOnlyList<byte> data, int offset)
-        {
-            return (data[offset] << 8) | data[offset + 1];
         }
 
         /// <summary>

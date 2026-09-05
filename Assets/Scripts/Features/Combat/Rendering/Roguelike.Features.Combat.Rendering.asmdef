@@ -1,0 +1,6 @@
+{
+  "name": "Roguelike.Features.Combat.Rendering",
+  "rootNamespace": "Roguelike.Features.Combat.Rendering",
+  "references": ["Roguelike.Core", "Roguelike.Generated", "Luban.Runtime", "Roguelike.Animation", "Roguelike.Animation.Rendering", "Roguelike.Features.Combat", "Roguelike.Features.Combat.Ecs", "Unity.Entities", "Unity.Collections", "Unity.Entities.Graphics", "Unity.Mathematics", "Unity.Mathematics.Extensions", "Unity.Transforms"],
+  "autoReferenced": true
+}
