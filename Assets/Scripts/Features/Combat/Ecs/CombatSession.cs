@@ -122,8 +122,9 @@ namespace Roguelike.Features.Combat.Ecs
                     }
                 }
                 var player = settings.Character;
+                // TbVisualSet.scalePermille 同比缩放战斗判定半径，与视觉缩放保持同一来源，避免脱节。
                 templates[0] = BuildUnit(settings.CharacterProfile, settings.PlayerSkill,
-                    player.BodyRadius.Value, CombatCylinder.FromConfig(player.MoveRadiusPixels, player.MoveHeightPixels, player.MoveOffsetXPixels, player.MoveOffsetYPixels, player.MoveElevationPixels, rules.WorldUnitsPerPixel), settings.PlayerStart, true);
+                    player.BodyRadius.Value * player.VisualSetId_Ref.ScalePermille / 1000f, CombatCylinder.FromConfig(player.MoveRadiusPixels, player.MoveHeightPixels, player.MoveOffsetXPixels, player.MoveOffsetYPixels, player.MoveElevationPixels, rules.WorldUnitsPerPixel), settings.PlayerStart, true);
                 var playerTemplate = templates[0];
                 playerTemplate.ConfigId = player.Id;
                 playerTemplate.VisualSetId = player.VisualSetId;
@@ -146,7 +147,7 @@ namespace Roguelike.Features.Combat.Ecs
                     var position = new float2(((slot - 1) % settings.SpawnColumns - (settings.SpawnColumns - 1) * 0.5f) * settings.HorizontalSpacing,
                         ((slot - 1) / settings.SpawnColumns - (rows - 1) * 0.5f) * settings.VerticalSpacing);
                     templates[slot] = BuildUnit(settings.GetMonsterProfile(monster), monster.DefaultSkillId_Ref,
-                        monster.BodyRadius.Value, CombatCylinder.FromConfig(monster.MoveRadiusPixels, monster.MoveHeightPixels, monster.MoveOffsetXPixels, monster.MoveOffsetYPixels, monster.MoveElevationPixels, rules.WorldUnitsPerPixel), position, false);
+                        monster.BodyRadius.Value * monster.VisualSetId_Ref.ScalePermille / 1000f, CombatCylinder.FromConfig(monster.MoveRadiusPixels, monster.MoveHeightPixels, monster.MoveOffsetXPixels, monster.MoveOffsetYPixels, monster.MoveElevationPixels, rules.WorldUnitsPerPixel), position, false);
                     var template = templates[slot];
                     template.ConfigId = monster.Id;
                     template.VisualSetId = monster.VisualSetId;
@@ -445,7 +446,7 @@ namespace Roguelike.Features.Combat.Ecs
         private int AddMonsterSlot(MonsterConfig monster)
         {
             var template = BuildUnit(settings.GetMonsterProfile(monster), monster.DefaultSkillId_Ref,
-                monster.BodyRadius.Value, CombatCylinder.FromConfig(monster.MoveRadiusPixels, monster.MoveHeightPixels,
+                monster.BodyRadius.Value * monster.VisualSetId_Ref.ScalePermille / 1000f, CombatCylinder.FromConfig(monster.MoveRadiusPixels, monster.MoveHeightPixels,
                     monster.MoveOffsetXPixels, monster.MoveOffsetYPixels, monster.MoveElevationPixels, rules.WorldUnitsPerPixel),
                 float2.zero, false);
             template.ConfigId = monster.Id;
@@ -658,14 +659,15 @@ namespace Roguelike.Features.Combat.Ecs
                 CombatMath.Positive(skillConfig.ProjectileRadius.Value);
                 weapon.ProjectileSpeed = combat.ProjectileSpeed.Value;
                 weapon.ProjectileLifetime = combat.ProjectileLifetime.Value;
-                weapon.ProjectileRadius = skillConfig.ProjectileRadius.Value;
+                // 与视觉同源：TbVisualSet.scalePermille 同比缩放弹丸判定半径，保证视觉与判定不脱节。
+                weapon.ProjectileRadius = skillConfig.ProjectileRadius.Value * skillConfig.VisualSetId_Ref.ScalePermille / 1000f;
                 weapon.ProjectileOffset = new float2(skillConfig.ProjectileOffsetX.Value,
                     skillConfig.ProjectileOffsetY.Value);
                 return weapon;
             }
             if (combat.DeliveryType != ESkillDeliveryType.TargetArea || !skillConfig.AreaRadiusMilli.HasValue)
                 throw new InvalidOperationException($"TbSkill {skillConfig.Id}: incomplete target-area weapon.");
-            weapon.AreaRadius = ConfigNumber.Decode(skillConfig.AreaRadiusMilli.Value);
+            weapon.AreaRadius = ConfigNumber.Decode(skillConfig.AreaRadiusMilli.Value) * skillConfig.VisualSetId_Ref.ScalePermille / 1000f;
             CombatMath.Positive(weapon.AreaRadius);
             return weapon;
         }
@@ -715,7 +717,7 @@ namespace Roguelike.Features.Combat.Ecs
                 SkillId = skillConfig.Id,
                 ProjectileOffset = player ? new float2(skillConfig.ProjectileOffsetX.Value, skillConfig.ProjectileOffsetY.Value) : float2.zero,
                 ProjectileSpeed = player ? skill.ProjectileSpeed.Value : 0,
-                ProjectileLifetime = player ? skill.ProjectileLifetime.Value : 0, ProjectileRadius = player ? skillConfig.ProjectileRadius.Value : 0 };
+                ProjectileLifetime = player ? skill.ProjectileLifetime.Value : 0, ProjectileRadius = player ? skillConfig.ProjectileRadius.Value * skillConfig.VisualSetId_Ref.ScalePermille / 1000f : 0 };
         }
 
         /// <summary>所有公开变更入口先验证生命周期，避免访问已释放原生内存。</summary>

@@ -158,7 +158,9 @@ namespace Roguelike.Features.Combat.Rendering
             IResourceService resources, Shader shader, FilterMode filter, CancellationToken token)
         {
             if (skill?.CombatProfileId_Ref == null) throw new InvalidOperationException("TbSkill: missing combat profile.");
-            float scale = rules.WorldUnitsPerPixel;
+            // 与角色/怪物保持同一来源：TbVisualSet.scalePermille 同时缩放技能视觉与 TbSkill 判定半径，
+            // 避免"视觉缩放、判定不变"或"编辑器预览与运行时不一致"。
+            float scale = rules.WorldUnitsPerPixel * skill.VisualSetId_Ref.ScalePermille / 1000f;
             CombatMath.Positive(scale);
             if (skill.CombatProfileId_Ref.DeliveryType == ESkillDeliveryType.Projectile)
             {

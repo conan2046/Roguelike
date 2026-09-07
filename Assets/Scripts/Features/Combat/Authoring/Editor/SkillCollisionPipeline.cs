@@ -19,6 +19,8 @@ namespace Roguelike.Features.Combat.Authoring.Editor
     {
         public const string Root = "Assets/Prefabs/Combat/Skill";
         private static readonly string[] Fields = { "projectileRadiusMilli", "projectileOffsetXMilli", "projectileOffsetYMilli" };
+        /// <summary>缩放写入 TbVisualSet 而非 TbSkill；与半径字段分表导出，避免相互覆盖或重复烘焙。</summary>
+        public static readonly string[] VisualFields = { "scalePermille" };
 
         /// <summary>菜单批量创建 TbSkill 目录内缺失的预制体，按保存组件的 ID 识别用户重命名资产。</summary>
         /// <remarks>只创建技能预制体；首帧预览在打开 Prefab Stage 时临时生成；已有资产不覆盖，临时对象在 finally 清理，不保存 Scene。</remarks>
@@ -95,12 +97,31 @@ namespace Roguelike.Features.Combat.Authoring.Editor
         {
             var node = shape.transform; var root = node.parent;
             if (root == null || root.parent != null || root.localPosition != Vector3.zero ||
-                root.localScale != Vector3.one || node.localScale != Vector3.one || node.localPosition.y != 0 ||
+                node.localScale != Vector3.one || node.localPosition.y != 0 ||
                 Quaternion.Angle(root.localRotation, Quaternion.identity) != 0 || Quaternion.Angle(node.localRotation, Quaternion.identity) != 0)
-                throw new InvalidOperationException("技能碰撞节点必须为根直接子节点；根位置、旋转归零，缩放为一，碰撞节点 Y 为零。");
+                throw new InvalidOperationException("技能碰撞节点必须为根直接子节点；根位置、旋转归零，碰撞节点缩放为一、Y 为零。");
+            // 根节点允许等比缩放，但只作为 TbVisualSet.scalePermille 单独导出；半径仍按未缩放的编辑值量化，
+            // 这样重复导出不会把缩放重复烘焙进半径导致累积放大。
             int radius = ConfigNumber.Encode(shape.Radius);
             if (radius <= 0) throw new InvalidOperationException("技能半径量化后必须大于零。");
             return new[] { radius, ConfigNumber.Encode(node.localPosition.x), ConfigNumber.Encode(node.localPosition.z) };
+        }
+
+        /// <summary>读取预制体根节点的等比缩放，量化为 TbVisualSet.scalePermille 千分整数。</summary>
+        /// <param name="shape">技能碰撞组件，以其父级根节点的缩放作为表现缩放。</param>
+        /// <returns>千分整数缩放；1000 表示原始大小，500 表示缩小一半。</returns>
+        /// <exception cref="InvalidOperationException">缺少根节点、缩放非等比或量化后不为正。</exception>
+        /// <remarks>与 Values 分离导出，使缩放同时驱动视觉与 TbSkill 判定半径，避免二者脱节。</remarks>
+        public static int ScalePermille(SkillCollisionAuthoring shape)
+        {
+            var root = shape.transform.parent;
+            if (root == null) throw new InvalidOperationException("技能碰撞节点缺少根节点。");
+            Vector3 rootScale = root.localScale;
+            if (Mathf.Abs(rootScale.x - rootScale.y) > 0.0001f || Mathf.Abs(rootScale.x - rootScale.z) > 0.0001f)
+                throw new InvalidOperationException("技能预制体根节点缩放必须等比（X=Y=Z）。");
+            int permille = ConfigNumber.Encode(rootScale.x);
+            if (permille <= 0) throw new InvalidOperationException("技能缩放量化后必须大于零。");
+            return permille;
         }
 
         /// <summary>菜单将已保存的弹丸技能节点写入源表并生成 Luban，非弹丸与目录条目保持空碰撞配置。</summary>
@@ -111,18 +132,23 @@ namespace Roguelike.Features.Combat.Authoring.Editor
             EnsureEditable();
             var tables = CombatCylinderPipeline.ReadTables();
             var updates = new Dictionary<int, int[]>();
+            var visualUpdates = new Dictionary<int, int[]>();
             foreach (var shape in Shapes())
             {
                 var skill = tables.TbSkill.Get(shape.SkillId);
+                // 缩放按技能所属表现集合导出，与角色/怪物共用 TbVisualSet.scalePermille 同一来源。
+                visualUpdates[skill.VisualSetId] = new[] { ScalePermille(shape) };
                 if (skill.CombatProfileId_Ref?.DeliveryType == ESkillDeliveryType.Projectile) updates.Add(skill.Id, Values(shape));
             }
             foreach (var skill in tables.TbSkill.DataList.Where(s => s.CombatProfileId_Ref?.DeliveryType == ESkillDeliveryType.Projectile))
                 if (!updates.ContainsKey(skill.Id)) throw new InvalidOperationException("缺少弹丸技能预制体: " + skill.Id);
             string path = Directory.GetFiles("Config/Datas/Tables", "*_SkillConfig.xlsx").Single();
-            byte[] backup = File.ReadAllBytes(path);
+            string visualPath = Directory.GetFiles("Config/Datas/Tables", "*_VisualSetConfig.xlsx").Single();
+            var backups = new Dictionary<string, byte[]> { [path] = File.ReadAllBytes(path), [visualPath] = File.ReadAllBytes(visualPath) };
             try
             {
                 ConfigWorkbookWriter.Patch(path, Fields, updates);
+                ConfigWorkbookWriter.Patch(visualPath, VisualFields, visualUpdates);
                 var info = new ProcessStartInfo("pwsh", "-NoProfile -File Tools/Config/generate.ps1")
                 { WorkingDirectory = Directory.GetCurrentDirectory(), UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
                 using var process = Process.Start(info);
@@ -130,9 +156,9 @@ namespace Roguelike.Features.Combat.Authoring.Editor
                 process.WaitForExit(); File.WriteAllText("Library/SkillCollisionExport.log", stdout.Result + stderr.Result);
                 if (process.ExitCode != 0) throw new InvalidOperationException("Luban 生成失败，查看 Library/SkillCollisionExport.log。");
             }
-            catch { File.WriteAllBytes(path, backup); throw; }
+            catch { foreach (var pair in backups) File.WriteAllBytes(pair.Key, pair.Value); throw; }
             AssetDatabase.Refresh(); ValidateSaved();
-            Debug.Log("技能碰撞已按三位小数导出为千分整数。重新进入战斗生效。");
+            Debug.Log("技能碰撞已按三位小数导出为千分整数，根节点缩放已写入 TbVisualSet.scalePermille。重新进入战斗生效。");
         }
 
         /// <summary>菜单或测试对比保存节点与当前 bytes 的量化值；不修改表或资产。</summary>

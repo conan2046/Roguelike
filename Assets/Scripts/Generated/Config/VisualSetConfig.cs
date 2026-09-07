@@ -60,7 +60,7 @@ public sealed partial class VisualSetConfig : Luban.BeanBase
     public readonly System.Collections.Generic.List<int> ClipIds;
     public System.Collections.Generic.List<AnimationClipConfig> ClipIds_Ref;
     /// <summary>
-    /// 表现缩放，1000=原始大小
+    /// 表现缩放，1000=原始大小；同比缩放视觉与战斗判定半径（技能projectileRadius、角色怪物bodyRadius），由预制体根节点等比缩放导出
     /// </summary>
     public readonly int ScalePermille;
     /// <summary>

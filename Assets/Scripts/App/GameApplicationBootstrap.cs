@@ -42,6 +42,20 @@ namespace Roguelike.App
             installed = false;
         }
 
+        /// <summary>解析本次会话的启动分支；编辑器下命令行未指定模式时，改用编辑器显式选择的覆盖参数。</summary>
+        /// <returns>唯一启动分支；命令行与覆盖都未指定时为普通启动。</returns>
+        /// <remarks>Unity Hub 无法向编辑器进程附加命令行参数，故提供等价覆盖通道；
+        /// 该分支只在 UNITY_EDITOR 下编译，真机始终只解析命令行。</remarks>
+        private static ApplicationLaunchOptions ResolveLaunchOptions()
+        {
+            var launch = ApplicationLaunchOptions.Parse(Environment.GetCommandLineArgs());
+#if UNITY_EDITOR
+            if (launch.Mode == ApplicationMode.Normal)
+                launch = ApplicationLaunchOptions.Parse(EditorLaunchOverride.Read());
+#endif
+            return launch;
+        }
+
         /// <summary>
         /// Creates the persistent application root before the first scene loads, except in editor batch runs owned by tests or tooling.
         /// </summary>
@@ -62,7 +76,7 @@ namespace Roguelike.App
             }
 
             // 先验证互斥参数，再创建对象或停用旧场景；命令行标识是启动协议，不是玩法默认值。
-            var launch = ApplicationLaunchOptions.Parse(Environment.GetCommandLineArgs());
+            var launch = ResolveLaunchOptions();
             installed = true;
             var root = new GameObject("[Roguelike.Application]");
             DontDestroyOnLoad(root);
@@ -87,7 +101,7 @@ namespace Roguelike.App
                 new EventBus(),
                 new ObjectPoolService());
 
-            launch = launch ?? ApplicationLaunchOptions.Parse(Environment.GetCommandLineArgs());
+            launch = launch ?? ResolveLaunchOptions();
             var features = new List<IGameFeature>();
             switch (launch.Mode)
             {

@@ -19,6 +19,8 @@ namespace Roguelike.Features.Combat.Authoring.Editor
     {
         public const string Root = "Assets/Prefabs/Combat";
         private static readonly string[] Fields = { "moveRadiusPixelsMilli", "moveHeightPixelsMilli", "moveOffsetXPixelsMilli", "moveOffsetYPixelsMilli", "moveElevationPixelsMilli" };
+        /// <summary>缩放写入 TbVisualSet 而非角色/怪物表；与像素字段分表导出，避免相互覆盖或重复烘焙。</summary>
+        public static readonly string[] VisualFields = { "scalePermille" };
 
         /// <summary>编辑器工具从当前生成 bytes 读取表；不持有缓存，避免导出后沿用旧值。</summary>
         /// <returns>解析引用后的 Luban 表集合。</returns>
@@ -151,16 +153,35 @@ namespace Roguelike.Features.Combat.Authoring.Editor
         {
             if (!(shape.Radius > 0) || !(shape.Height > 0)) throw new InvalidOperationException("圆柱半径和高度必须大于零。");
             if (shape.transform.parent == null || shape.transform.parent.parent != null ||
-                shape.transform.localScale != Vector3.one || shape.transform.parent.localScale != Vector3.one ||
+                shape.transform.localScale != Vector3.one ||
                 Quaternion.Angle(shape.transform.localRotation, Quaternion.identity) != 0 ||
                 Quaternion.Angle(shape.transform.parent.localRotation, Quaternion.identity) != 0 || shape.transform.parent.localPosition != Vector3.zero)
-                throw new InvalidOperationException("圆柱必须是根节点直接子节点；根位置归零，旋转归零，缩放为一。请使用 Radius/Height 调整。");
+                throw new InvalidOperationException("圆柱必须是根节点直接子节点；根位置归零，旋转归零，圆柱节点缩放为一。请使用 Radius/Height 调整。");
+            // 根节点允许等比缩放，但只作为 TbVisualSet.scalePermille 单独导出；圆柱像素值仍按未缩放的编辑值换算，
+            // 避免重复导出把缩放烘焙进像素字段导致累积放大。
             float scale = tables.TbCombatRules.Get(shape.CombatRulesId).WorldUnitsPerPixel;
             if (!(scale > 0)) throw new InvalidOperationException("世界像素比例非法。");
             Vector3 center = shape.transform.localPosition;
             var result = new[] {shape.Radius / scale, shape.Height / scale, center.x / scale, center.z / scale, (center.y - shape.Height / 2) / scale};
             if (result.Any(v => float.IsNaN(v) || float.IsInfinity(v))) throw new InvalidOperationException("圆柱必须为有限数值。");
             return result;
+        }
+
+        /// <summary>读取预制体根节点的等比缩放，量化为 TbVisualSet.scalePermille 千分整数。</summary>
+        /// <param name="shape">圆柱组件，以其父级根节点的缩放作为表现缩放。</param>
+        /// <returns>千分整数缩放；1000 表示原始大小，500 表示缩小一半。</returns>
+        /// <exception cref="InvalidOperationException">缺少根节点、缩放非等比或量化后不为正。</exception>
+        /// <remarks>与 Values 分离导出，使缩放同时驱动角色/怪物的视觉与 bodyRadiusMilli 判定半径，避免二者脱节。</remarks>
+        public static int ScalePermille(CombatCylinderAuthoring shape)
+        {
+            var root = shape.transform.parent;
+            if (root == null) throw new InvalidOperationException("圆柱节点缺少根节点。");
+            Vector3 rootScale = root.localScale;
+            if (Mathf.Abs(rootScale.x - rootScale.y) > 0.0001f || Mathf.Abs(rootScale.x - rootScale.z) > 0.0001f)
+                throw new InvalidOperationException("角色/怪物预制体根节点缩放必须等比（X=Y=Z）。");
+            int permille = ConfigNumber.Encode(rootScale.x);
+            if (permille <= 0) throw new InvalidOperationException("角色/怪物缩放量化后必须大于零。");
+            return permille;
         }
 
         /// <summary>扫描两个编辑目录内的已保存模板，拒绝重复 ID 和多个碰撞节点。</summary>
@@ -190,6 +211,7 @@ namespace Roguelike.Features.Combat.Authoring.Editor
             if (stage != null && stage.scene.isDirty) throw new InvalidOperationException("请先保存正在编辑的 Prefab，再导出。");
             var tables = ReadTables(); var shapes = Shapes();
             var backups = new Dictionary<string, byte[]>();
+            var visualUpdates = new Dictionary<int, int[]>();
             try
             {
                 foreach (var group in shapes.GroupBy(s => s.IsHero))
@@ -199,7 +221,13 @@ namespace Roguelike.Features.Combat.Authoring.Editor
                     backups.Add(path, File.ReadAllBytes(path));
                     var updates = group.ToDictionary(s => s.ConfigId, s => Values(s, tables).Select(v => ConfigNumber.Encode(v)).ToArray());
                     ConfigWorkbookWriter.Patch(path, Fields, updates);
+                    // 缩放按单位所属表现集合导出，与技能共用 TbVisualSet.scalePermille 同一来源。
+                    foreach (var shape in group)
+                        visualUpdates[group.Key ? tables.TbCharacter.Get(shape.ConfigId).VisualSetId : tables.TbMonster.Get(shape.ConfigId).VisualSetId] = new[] { ScalePermille(shape) };
                 }
+                string visualPath = Directory.GetFiles("Config/Datas/Tables", "*_VisualSetConfig.xlsx").Single();
+                backups.Add(visualPath, File.ReadAllBytes(visualPath));
+                ConfigWorkbookWriter.Patch(visualPath, VisualFields, visualUpdates);
                 var info = new ProcessStartInfo("pwsh", "-NoProfile -File Tools/Config/generate.ps1")
                 { WorkingDirectory = Directory.GetCurrentDirectory(), UseShellExecute = false, CreateNoWindow = true,
                     RedirectStandardOutput = true, RedirectStandardError = true };

@@ -31,18 +31,22 @@ if [[ "$CODE_DIR" != "$EXPECTED_CODE_DIR" || "$DATA_DIR" != "$EXPECTED_DATA_DIR"
 fi
 
 GENERATION_ROOT="$(mktemp -d)"
-trap 'rm -rf "$GENERATION_ROOT"' EXIT
+trap 'rm -rf "$GENERATION_ROOT" 2>/dev/null || true' EXIT
 GENERATED_CODE="$GENERATION_ROOT/code"
 GENERATED_DATA="$GENERATION_ROOT/data"
 mkdir -p "$GENERATED_CODE" "$GENERATED_DATA"
 
-dotnet "$LUBAN_DLL" \
+# Git Bash 传入 Unix 风格路径时，Windows 版 dotnet 会把它当作项目目录解析，
+# 并因仓库根目录存在多个 csproj/slnx 而报 MSB1011；必须先转成 Windows 原生路径。
+to_win() { cygpath -w "$1" 2>/dev/null || echo "$1"; }
+
+dotnet "$(to_win "$LUBAN_DLL")" \
   -t client \
   -c cs-bin \
   -d bin \
-  --conf "$CONFIG_FILE" \
-  -x "outputCodeDir=$GENERATED_CODE" \
-  -x "outputDataDir=$GENERATED_DATA"
+  --conf "$(to_win "$CONFIG_FILE")" \
+  -x "outputCodeDir=$(to_win "$GENERATED_CODE")" \
+  -x "outputDataDir=$(to_win "$GENERATED_DATA")"
 
 sync_generated_directory() {
   local source="$1"
