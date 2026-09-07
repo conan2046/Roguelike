@@ -33,6 +33,7 @@ public sealed partial class CharacterConfig : Luban.BeanBase
         if(_buf.ReadBool()){ MoveOffsetXPixelsMilli = _buf.ReadInt(); } else { MoveOffsetXPixelsMilli = null; }
         if(_buf.ReadBool()){ MoveOffsetYPixelsMilli = _buf.ReadInt(); } else { MoveOffsetYPixelsMilli = null; }
         if(_buf.ReadBool()){ MoveElevationPixelsMilli = _buf.ReadInt(); } else { MoveElevationPixelsMilli = null; }
+        if(_buf.ReadBool()){ DamageFloatHeight = _buf.ReadFloat(); } else { DamageFloatHeight = null; }
     }
 
     public static CharacterConfig DeserializeCharacterConfig(ByteBuf _buf)
@@ -87,6 +88,10 @@ public sealed partial class CharacterConfig : Luban.BeanBase
     /// 圆柱底面离地高度，逻辑像素；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
     /// </summary>
     public readonly int? MoveElevationPixelsMilli;
+    /// <summary>
+    /// 掉血/伤害数字浮动锚点高度（世界单位，Y轴向上）；由预制体 DamageFloatAnchor 节点 localPosition.y 导出；运行时叠加到单位世界坐标上方定位伤害数字。
+    /// </summary>
+    public readonly float? DamageFloatHeight;
    
     public const int __ID__ = 676994987;
     public override int GetTypeId() => __ID__;
@@ -112,6 +117,7 @@ public sealed partial class CharacterConfig : Luban.BeanBase
         + "moveOffsetXPixelsMilli:" + MoveOffsetXPixelsMilli + ","
         + "moveOffsetYPixelsMilli:" + MoveOffsetYPixelsMilli + ","
         + "moveElevationPixelsMilli:" + MoveElevationPixelsMilli + ","
+        + "damageFloatHeight:" + DamageFloatHeight + ","
         + "}";
     }
 }

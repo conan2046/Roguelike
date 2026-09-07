@@ -62,6 +62,7 @@ Transform:
   m_Children:
   - {fileID: 4544556402452913002}
   - {fileID: 1632662930300281778}
+  - {fileID: 8185510776919235245}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &5744931022116505529
@@ -113,3 +114,37 @@ MonoBehaviour:
   CombatRulesId: 1
   Radius: 0.37
   Height: 1.56
+
+--- !u!1 &8185510776919235244
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 8185510776919235245}
+  m_Layer: 0
+  m_Name: DamageFloatAnchor
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+
+--- !u!4 &8185510776919235245
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8185510776919235244}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 1.86, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1346000967313440816}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+

@@ -21,6 +21,7 @@ namespace Roguelike.Features.Combat.Runtime
         private CombatPresentationConfig presentation;
         private CombatVisualResources assets;
         private CombatEntityVisuals visuals;
+        private CombatFeedbackVisuals feedback;
         private CombatTilemapBackground mapBackground;
         private CombatUiRuntime ui;
         private ICombatInput input;
@@ -72,6 +73,7 @@ namespace Roguelike.Features.Combat.Runtime
                 Session = await CombatSessionFactory.CreateAsync(world, scenario, resources, linked.Token);
                 linked.Token.ThrowIfCancellationRequested();
                 visuals = new CombatEntityVisuals(world, Session, scenario, assets);
+                feedback = await CombatFeedbackVisuals.CreateAsync(world, Session, scenario, resources, linked.Token);
                 CreateCamera();
                 ApplyScenarioSettings();
                 RefreshStatus();
@@ -114,6 +116,7 @@ namespace Roguelike.Features.Combat.Runtime
                 RunModel = new CombatRunModel(definition);
                 Coordinator = new CombatRunCoordinator(RunModel, Session);
                 visuals = new CombatEntityVisuals(world, Session, definition, assets);
+                feedback = await CombatFeedbackVisuals.CreateAsync(world, Session, definition, resources, linked.Token);
                 CreateCamera();
                 ui = await CombatUiRuntime.CreateAsync(definition, resources, transform, ViewCamera,
                     ChooseUpgrade, Restart, linked.Token);
@@ -248,6 +251,7 @@ namespace Roguelike.Features.Combat.Runtime
             if (Coordinator != null) Coordinator.Advance(elapsedSeconds, frame.Movement);
             else Session.Advance(elapsedSeconds, frame.Movement);
             visuals.Synchronize();
+            feedback?.Synchronize();
             RefreshStatus();
         }
 
@@ -329,6 +333,7 @@ namespace Roguelike.Features.Combat.Runtime
                 Session.Restart();
             }
             visuals.Synchronize();
+            feedback?.Synchronize();
             RefreshStatus();
             return true;
         }
@@ -341,6 +346,7 @@ namespace Roguelike.Features.Combat.Runtime
         {
             if (!Ready || Coordinator == null || !Coordinator.ChooseUpgrade(panelGeneration, optionId)) return false;
             visuals.Synchronize();
+            feedback?.Synchronize();
             RefreshStatus();
             return true;
         }
@@ -412,6 +418,8 @@ namespace Roguelike.Features.Combat.Runtime
             mapBackground = null;
             visuals?.Dispose();
             visuals = null;
+            feedback?.Dispose();
+            feedback = null;
             Session?.Dispose();
             Session = null;
             Coordinator = null;

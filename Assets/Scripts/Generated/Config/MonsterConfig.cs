@@ -34,6 +34,7 @@ public sealed partial class MonsterConfig : Luban.BeanBase
         if(_buf.ReadBool()){ MoveOffsetYPixelsMilli = _buf.ReadInt(); } else { MoveOffsetYPixelsMilli = null; }
         if(_buf.ReadBool()){ MoveElevationPixelsMilli = _buf.ReadInt(); } else { MoveElevationPixelsMilli = null; }
         if(_buf.ReadBool()){ MovementType = (EMovementType)_buf.ReadInt(); } else { MovementType = null; }
+        if(_buf.ReadBool()){ DamageFloatHeight = _buf.ReadFloat(); } else { DamageFloatHeight = null; }
     }
 
     public static MonsterConfig DeserializeMonsterConfig(ByteBuf _buf)
@@ -92,6 +93,10 @@ public sealed partial class MonsterConfig : Luban.BeanBase
     /// 移动分类；正式出战怪必填，资源目录行可空
     /// </summary>
     public readonly EMovementType? MovementType;
+    /// <summary>
+    /// 掉血/伤害数字浮动锚点高度（世界单位，Y轴向上）；由预制体 DamageFloatAnchor 节点 localPosition.y 导出；运行时叠加到单位世界坐标上方定位伤害数字。
+    /// </summary>
+    public readonly float? DamageFloatHeight;
    
     public const int __ID__ = -55174244;
     public override int GetTypeId() => __ID__;
@@ -118,6 +123,7 @@ public sealed partial class MonsterConfig : Luban.BeanBase
         + "moveOffsetYPixelsMilli:" + MoveOffsetYPixelsMilli + ","
         + "moveElevationPixelsMilli:" + MoveElevationPixelsMilli + ","
         + "movementType:" + MovementType + ","
+        + "damageFloatHeight:" + DamageFloatHeight + ","
         + "}";
     }
 }
