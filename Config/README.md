@@ -40,13 +40,13 @@
 | TbAttributeProfile | ID 1–9 | 玩家/怪物闭环调试、概率压测、M1 四类普通怪与独立 Boss |
 | TbSkillCombat | ID 1–3 | 直线弹丸、近战、目标位置群体释放参数 |
 | TbCombatRules | ID 1 | 随机 80%–120%、暴击 150%、零分母概率、模拟与坐标设置 |
-| TbCharacter / TbMonster | 角色 10001；怪物 10001、10010–10013、10032 | 关联属性方案、默认技能、碰撞体半径和移动类型 |
+| TbCharacter / TbMonster | 角色 10001；怪物 10001、10010–10013、10032 | 关联属性方案、默认技能、碰撞体和移动类型；测试关卡引用单位使用 `VerticalCapsule` 合并碰撞 |
 | TbSkill | 启用 ID 20001、20002、20014、20028、20032、20043 | 三个弹道、一个近战、两个目标位置群体技能 |
 | TbPerformanceScenario | 新增 ID 4、5 | 10 怪基础闭环、1000 怪概率战斗压测；旧 ID 1–3 原值保留 |
 
 `TbAttributeProfile.values` 使用 `属性ID:数值;属性ID:数值`，由 `AttributeValue` 结构解析；必需属性完整填写，不保留代码默认值。其余未启用的角色、怪物和技能战斗字段为空，表示仅有资源目录数据，不能作为战斗单位使用。完整角色组装仍需在运行时阶段验收。
 
-新增 `EAttributeType`、`EAttributeValueKind`、`ESkillDeliveryType`、`ETestHealthPolicy`、`ETestInputPolicy`、`EUpgradeOptionType`、`EAttributeModifyOperation`、`ERunResultType`、`EMovementType`，以及 `EPerformanceKind.Combat`。未增加元素属性或元素伤害分支。
+新增 `EAttributeType`、`EAttributeValueKind`、`ESkillDeliveryType`、`ETestHealthPolicy`、`ETestInputPolicy`、`EUpgradeOptionType`、`EAttributeModifyOperation`、`ERunResultType`、`EMovementType`、`EUnitCollisionShape`，以及 `EPerformanceKind.Combat`。`EUnitCollisionShape.VerticalCapsule` 当前只标记 TbStage 1 的角色 10001 与怪物 10010–10013/10032；其他单位尚未批量迁移。未增加元素属性或元素伤害分支。
 
 初始调试参数：玩家生命/攻击为 100/20，怪物为 40/8；默认必中且不暴击。概率压测方案使用命中/闪避 100/25、暴击/抗暴 25/100，各参数为 1，即 80% 命中、20% 暴击。所有这些值都是工程调试输入，不是最终平衡数值。
 
@@ -66,7 +66,7 @@
 
 - `TbAnimationDirection`：方向 ID、向量、ANI 动作索引与水平镜像，映射来自既有 `CocosModelAniPlayer.FaceActionIndex/FaceFlipped`，不在新运行时代码中复制方向分支。
 - `TbAnimationClip.flipX`：片段自身的强制水平镜像，只切换预建镜像网格，不改变弹道角度、速度或碰撞轨迹。当前仅 `30002 / skill_1_f` 为 `true`，用于修正源 ANI 朝向。
-- `TbCombatPresentation`：源时钟、时长兼容规则、出生方向、方向列表、怪物静止策略、输入轴/按键、界面文本/尺寸和相机/诊断弹丸颜色。规则来自既有播放器及本轮确认的基础表现范围。
+- `TbCombatPresentation`：源时钟、时长兼容规则、出生方向、方向列表、怪物静止策略、输入轴/按键、界面文本/尺寸、血条像素宽高和相机/诊断弹丸颜色。规则来自既有播放器及本轮确认的基础表现范围。
 - `TbPerformanceScenario.presentationId`：Combat 场景 4/5 引用方案 1，旧场景 1–3 留空；新增字段改变 bytes 布局，生成 C# 和 bytes 必须一起发布。
 - `CombatAnimation` 加载时构造累计时长，以调用方提供的模拟秒数采样；`CombatDirections` 校验并归一化方向向量，静止保留历史朝向。`idleFrameIndex` 指动作内帧索引，不是 ANI 全局帧索引。
 - 最终确认：主角默认待机 `_fd`，怪物默认待机 `_zd`，两者移动均 `_pb`。此前“怪物没有站立片段”“fd 仅乘骑”“主角改用两方向 zd”的判断均不再适用；已补齐怪物待机引用并关闭移动帧占位。
@@ -87,10 +87,13 @@ ECS 层位于独立程序集 `Features/Combat/Ecs`，由 Unity EditMode 的 `Com
 
 渲染参数位于 `TbCombatPresentation`：`shaderName` 必填且运行时可找到，并须支持 URP Unlit 材质接口；`textureFilterMode` 为 `Point` 或 `Bilinear`。当前方案沿用 URP Unlit/Bilinear，未知配置明确拒绝，不回退默认 Shader。Unity 材质属性名与透明混合枚举经确认属于渲染接口常量，不要求策划配置。
 
+血条尺寸位于 `TbCombatPresentation.healthBarWidthPixelsMilli` 和 `healthBarHeightPixelsMilli`，存储逻辑像素乘 1000。编辑源为 `CombatHealthBar.prefab` 的中文 Inspector；根节点缩放固定为 1，内部画布仅负责读取战斗规则完成场景显示换算。点击“导出血条像素到 Luban”后，运行时 DOTS 只消费生成配置，不读取或实例化该 Prefab。
+
 - `TbSkillCombat.attackWindupSeconds`：对齐朝向后保持怪物 `_zd`，到开始 `_gj` 的基础前摇秒数。近战必填、有限且非负；当前普通普攻机制 ID 2 配 `0.2`，弹丸机制留空。Boss 后续使用独立技能战斗行，不在代码里判断 Boss 或补默认值。
 - `TbAttackDirection.hitFrameIndex`：进入 `_gj` 的动作帧时判定一次，零基索引；当前四方向映射 ID 1–4 均为 F4。不是图集帧编号，也不是前摇时长。
 - 命中基础时点 = 前摇 + ANI 中 F4 之前累计时长；完整动作时点 = 前摇 + ANI 总时长。ANI 单位换算读取 `TbCombatPresentation`。攻速按基础间隔/有效间隔推进原速进度，200 毫秒为 1 倍速基础值。
 - 改前摇、帧号或方向后运行生成、产物一致性校验和战斗配置校验；缺配/越界拒绝入局，不回退即时伤害。当前启用既有 btm1 与 M1 五个怪物的已核对攻击资源。
+- 测试关卡单位的命中特效位置由角色/怪物 Prefab 的 `命中特效挂点` 导出为 `hitEffectOffsetXPixelsMilli/Y`；技能的弹丸、命中、范围表现分别由中文表现节点导出位置与缩放。表现参数不改变 CircleCollider2D 或 DOTS 判定范围。
 
 ## M1 单局配置
 

@@ -27,7 +27,7 @@ public sealed partial class MonsterConfig : Luban.BeanBase
         AttributeProfileId_Ref = null;
         if(_buf.ReadBool()){ DefaultSkillId = _buf.ReadInt(); } else { DefaultSkillId = null; }
         DefaultSkillId_Ref = null;
-        if(_buf.ReadBool()){ BodyRadiusMilli = _buf.ReadInt(); } else { BodyRadiusMilli = null; }
+        if(_buf.ReadBool()){ BodyRadiusPixelsMilli = _buf.ReadInt(); } else { BodyRadiusPixelsMilli = null; }
         if(_buf.ReadBool()){ MoveRadiusPixelsMilli = _buf.ReadInt(); } else { MoveRadiusPixelsMilli = null; }
         if(_buf.ReadBool()){ MoveHeightPixelsMilli = _buf.ReadInt(); } else { MoveHeightPixelsMilli = null; }
         if(_buf.ReadBool()){ MoveOffsetXPixelsMilli = _buf.ReadInt(); } else { MoveOffsetXPixelsMilli = null; }
@@ -35,6 +35,11 @@ public sealed partial class MonsterConfig : Luban.BeanBase
         if(_buf.ReadBool()){ MoveElevationPixelsMilli = _buf.ReadInt(); } else { MoveElevationPixelsMilli = null; }
         if(_buf.ReadBool()){ MovementType = (EMovementType)_buf.ReadInt(); } else { MovementType = null; }
         if(_buf.ReadBool()){ DamageFloatHeight = _buf.ReadFloat(); } else { DamageFloatHeight = null; }
+        if(_buf.ReadBool()){ BodyOffsetXPixelsMilli = _buf.ReadInt(); } else { BodyOffsetXPixelsMilli = null; }
+        if(_buf.ReadBool()){ BodyOffsetYPixelsMilli = _buf.ReadInt(); } else { BodyOffsetYPixelsMilli = null; }
+        if(_buf.ReadBool()){ CollisionShape = (EUnitCollisionShape)_buf.ReadInt(); } else { CollisionShape = null; }
+        if(_buf.ReadBool()){ HitEffectOffsetXPixelsMilli = _buf.ReadInt(); } else { HitEffectOffsetXPixelsMilli = null; }
+        if(_buf.ReadBool()){ HitEffectOffsetYPixelsMilli = _buf.ReadInt(); } else { HitEffectOffsetYPixelsMilli = null; }
     }
 
     public static MonsterConfig DeserializeMonsterConfig(ByteBuf _buf)
@@ -66,9 +71,9 @@ public sealed partial class MonsterConfig : Luban.BeanBase
     public readonly int? DefaultSkillId;
     public SkillConfig DefaultSkillId_Ref;
     /// <summary>
-    /// <br/>        伤害判定身体半径，世界单位；独立于移动圆柱；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
+    /// 受击判定半径（像素）；由怪物预制体“受击判定范围”节点导出；像素值&#215;1000存整数，实际值=表值/1000，最多3位小数。
     /// </summary>
-    public readonly int? BodyRadiusMilli;
+    public readonly int? BodyRadiusPixelsMilli;
     /// <summary>
     /// <br/>        移动圆柱半径，逻辑像素；由预制体导出；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
     /// </summary>
@@ -97,6 +102,26 @@ public sealed partial class MonsterConfig : Luban.BeanBase
     /// 掉血/伤害数字浮动锚点高度（世界单位，Y轴向上）；由预制体 DamageFloatAnchor 节点 localPosition.y 导出；运行时叠加到单位世界坐标上方定位伤害数字。
     /// </summary>
     public readonly float? DamageFloatHeight;
+    /// <summary>
+    /// 受击判定中心横向偏移（像素）；由怪物预制体“受击判定范围”节点导出；像素值&#215;1000存整数。
+    /// </summary>
+    public readonly int? BodyOffsetXPixelsMilli;
+    /// <summary>
+    /// 受击判定中心前向偏移（像素）；由怪物预制体“受击判定范围”节点导出；像素值&#215;1000存整数。
+    /// </summary>
+    public readonly int? BodyOffsetYPixelsMilli;
+    /// <summary>
+    /// 统一碰撞形状；VerticalCapsule 表示移动阻挡与受击判定共用预制体 CapsuleCollider2D。
+    /// </summary>
+    public readonly EUnitCollisionShape? CollisionShape;
+    /// <summary>
+    /// 命中特效挂点横向偏移（逻辑像素）；由怪物预制体“命中特效挂点”节点 localPosition.x 导出；像素值&#215;1000存整数。
+    /// </summary>
+    public readonly int? HitEffectOffsetXPixelsMilli;
+    /// <summary>
+    /// 命中特效挂点纵向偏移（逻辑像素）；由怪物预制体“命中特效挂点”节点 localPosition.y 导出；像素值&#215;1000存整数。
+    /// </summary>
+    public readonly int? HitEffectOffsetYPixelsMilli;
    
     public const int __ID__ = -55174244;
     public override int GetTypeId() => __ID__;
@@ -116,7 +141,7 @@ public sealed partial class MonsterConfig : Luban.BeanBase
         + "visualSetId:" + VisualSetId + ","
         + "attributeProfileId:" + AttributeProfileId + ","
         + "defaultSkillId:" + DefaultSkillId + ","
-        + "bodyRadiusMilli:" + BodyRadiusMilli + ","
+        + "bodyRadiusPixelsMilli:" + BodyRadiusPixelsMilli + ","
         + "moveRadiusPixelsMilli:" + MoveRadiusPixelsMilli + ","
         + "moveHeightPixelsMilli:" + MoveHeightPixelsMilli + ","
         + "moveOffsetXPixelsMilli:" + MoveOffsetXPixelsMilli + ","
@@ -124,6 +149,11 @@ public sealed partial class MonsterConfig : Luban.BeanBase
         + "moveElevationPixelsMilli:" + MoveElevationPixelsMilli + ","
         + "movementType:" + MovementType + ","
         + "damageFloatHeight:" + DamageFloatHeight + ","
+        + "bodyOffsetXPixelsMilli:" + BodyOffsetXPixelsMilli + ","
+        + "bodyOffsetYPixelsMilli:" + BodyOffsetYPixelsMilli + ","
+        + "collisionShape:" + CollisionShape + ","
+        + "hitEffectOffsetXPixelsMilli:" + HitEffectOffsetXPixelsMilli + ","
+        + "hitEffectOffsetYPixelsMilli:" + HitEffectOffsetYPixelsMilli + ","
         + "}";
     }
 }

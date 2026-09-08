@@ -8,6 +8,8 @@ namespace Roguelike.Features.Combat.Ecs
     {
         public float Radius, Height, Elevation;
         public float2 Offset;
+        public float HalfSegment2D;
+        public bool UsesCapsule2D;
 
         /// <summary>入局从 TbCharacter/TbMonster 的 move*Pixels 字段换算，拒绝缺失配置。</summary>
         /// <param name="radius">半径像素。</param><param name="height">高度像素。</param>
@@ -28,16 +30,42 @@ namespace Roguelike.Features.Combat.Ecs
 
         /// <summary>移动扫掠前判断圆柱高度区间是否相交；仅底面/顶面相切不产生水平阻挡。</summary>
         /// <param name="other">另一个单位的圆柱。</param><returns>竖直区间存在正长度交集。</returns>
-        public bool HeightOverlaps(in CombatCylinder other) => Elevation < other.Elevation + other.Height && other.Elevation < Elevation + Height;
+        public bool HeightOverlaps(in CombatCylinder other) => UsesCapsule2D || other.UsesCapsule2D ||
+            Elevation < other.Elevation + other.Height && other.Elevation < Elevation + Height;
+
+        /// <summary>将表内纵向 CapsuleCollider2D 尺寸标记为 DOTS 统一胶囊。</summary>
+        /// <returns>保留像素换算后尺寸和中心偏移的新形状。</returns>
+        /// <remarks>只改变纯值形状语义，不创建或查询 Physics2D 对象。</remarks>
+        public CombatCylinder AsVerticalCapsule2D()
+        {
+            UsesCapsule2D = true;
+            HalfSegment2D = math.max(0f, Height * 0.5f - Radius);
+            Elevation = 0f;
+            return this;
+        }
 
         /// <summary>计算圆柱平移的首个侧面接触；初始相切允许切向和远离移动。</summary>
         /// <param name="relative">两圆柱底心差。</param><param name="motion">本次水平位移。</param>
         /// <param name="radius">半径和。</param><param name="fraction">首接触比例。</param><returns>是否阻挡本次移动。</returns>
-        public static bool Sweep(float2 relative, float2 motion, float radius, out float fraction)
+        public static bool Sweep(float2 relative, float2 motion, float radius, float halfSegment,
+            out float fraction, out float2 normal)
         {
             fraction = 0;
-            if (math.dot(relative, motion) >= 0) return false;
-            return CombatGeometry.Sweep(relative, relative + motion, radius, out fraction);
+            normal = CombatGeometry.VerticalCapsuleNormal(relative, halfSegment, -motion);
+            if (math.dot(normal, motion) >= 0) return false;
+            return CombatGeometry.SweepVerticalCapsule(relative, motion, radius, halfSegment,
+                out fraction, out normal);
+        }
+
+        /// <summary>保留旧圆柱移动的圆形扫掠入口。</summary>
+        /// <param name="relative">两圆心起点差。</param>
+        /// <param name="motion">本 tick 位移。</param>
+        /// <param name="radius">两圆半径之和。</param>
+        /// <param name="fraction">首次接触比例。</param>
+        /// <returns>是否在本段位移内发生阻挡。</returns>
+        public static bool Sweep(float2 relative, float2 motion, float radius, out float fraction)
+        {
+            return Sweep(relative, motion, radius, 0f, out fraction, out _);
         }
     }
 }

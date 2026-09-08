@@ -18,7 +18,10 @@ namespace Roguelike.Features.Combat.Authoring.Editor
     public static class CombatCylinderPipeline
     {
         public const string Root = "Assets/Prefabs/Combat";
-        private static readonly string[] Fields = { "moveRadiusPixelsMilli", "moveHeightPixelsMilli", "moveOffsetXPixelsMilli", "moveOffsetYPixelsMilli", "moveElevationPixelsMilli" };
+        internal static readonly string[] MovementFields = { "moveRadiusPixelsMilli", "moveHeightPixelsMilli", "moveOffsetXPixelsMilli", "moveOffsetYPixelsMilli", "moveElevationPixelsMilli" };
+        internal static readonly string[] BodyFields = { "bodyRadiusPixelsMilli", "bodyOffsetXPixelsMilli", "bodyOffsetYPixelsMilli" };
+        internal static readonly string[] HitEffectFields = { "hitEffectOffsetXPixelsMilli", "hitEffectOffsetYPixelsMilli" };
+        internal static readonly string[] CollisionShapeFields = { "collisionShape" };
         /// <summary>缩放写入 TbVisualSet 而非角色/怪物表；与像素字段分表导出，避免相互覆盖或重复烘焙。</summary>
         public static readonly string[] VisualFields = { "scalePermille" };
 
@@ -90,11 +93,17 @@ namespace Roguelike.Features.Combat.Authoring.Editor
                     PrefabUtility.SaveAsPrefabAsset(root, path);
                     return;
                 }
-                var node = new GameObject("MovementCollision"); node.transform.SetParent(root.transform, false);
-                node.transform.localPosition = new Vector3(x.Value, elevation.Value + height.Value / 2, y.Value) * scale;
+                var node = new GameObject("移动阻挡范围"); node.transform.SetParent(root.transform, false);
                 var shape = node.AddComponent<CombatCylinderAuthoring>();
                 shape.ConfigId = id; shape.IsHero = hero; shape.CombatRulesId = rules.Id;
-                shape.Radius = radius.Value * scale; shape.Height = height.Value * scale;
+                shape.RadiusPixels = radius.Value; shape.HeightPixels = height.Value;
+                shape.OffsetXPixels = x.Value; shape.OffsetYPixels = y.Value; shape.ElevationPixels = elevation.Value;
+                shape.DataVersion = CombatCollisionPipeline.CurrentDataVersion;
+                var bodyNode = new GameObject("受击判定范围"); bodyNode.transform.SetParent(root.transform, false);
+                var body = bodyNode.AddComponent<CombatBodyCollisionAuthoring>();
+                body.RadiusPixels = hero
+                    ? ReadTables().TbCharacter.Get(id).BodyRadiusPixels ?? radius.Value
+                    : ReadTables().TbMonster.Get(id).BodyRadiusPixels ?? radius.Value;
                 PrefabUtility.SaveAsPrefabAsset(root, path);
             }
             finally { UnityEngine.Object.DestroyImmediate(root); }
@@ -147,31 +156,94 @@ namespace Roguelike.Features.Combat.Authoring.Editor
 
         /// <summary>从已保存 Prefab 获取有效圆柱并换算为表内像素字段，同时拒绝不支持的旋转/缩放。</summary>
         /// <param name="shape">预制体中的唯一圆柱节点。</param><param name="tables">当前转换规则。</param>
-        /// <returns>与 Fields 顺序一致的五个数值。</returns>
+        /// <returns>与 MovementFields 顺序一致的五个像素值。</returns>
         /// <exception cref="InvalidOperationException">配置标识、形状或节点变换非法。</exception>
         public static float[] Values(CombatCylinderAuthoring shape, Tables tables)
         {
-            if (!(shape.Radius > 0) || !(shape.Height > 0)) throw new InvalidOperationException("圆柱半径和高度必须大于零。");
+            CapsuleCollider2D capsule = shape.GetComponent<CapsuleCollider2D>();
+            if (capsule != null)
+            {
+                if (capsule.direction != CapsuleDirection2D.Vertical || !capsule.isTrigger ||
+                    !(capsule.size.x > 0f) || capsule.size.y + 0.00001f < capsule.size.x)
+                    throw new InvalidOperationException("统一碰撞范围必须是启用 Is Trigger 的纵向 CapsuleCollider2D，且 Size Y 不小于 Size X。");
+                if (shape.transform.parent == null || shape.transform.parent.parent != null ||
+                    shape.transform.localScale != Vector3.one ||
+                    Quaternion.Angle(shape.transform.localRotation, Quaternion.identity) != 0 ||
+                    Quaternion.Angle(shape.transform.parent.localRotation, Quaternion.identity) != 0 ||
+                    shape.transform.parent.localPosition != Vector3.zero)
+                    throw new InvalidOperationException("统一碰撞范围必须是根节点直接子节点，节点只能修改 CapsuleCollider2D Offset/Size。");
+                float scale = tables.TbCombatRules.Get(shape.CombatRulesId).WorldUnitsPerPixel;
+                Vector2 center = (Vector2)shape.transform.localPosition + capsule.offset;
+                float[] capsuleValues =
+                {
+                    capsule.size.x * 0.5f / scale,
+                    capsule.size.y / scale,
+                    center.x / scale,
+                    center.y / scale,
+                    0f
+                };
+                if (capsuleValues.Any(value => float.IsNaN(value) || float.IsInfinity(value)))
+                    throw new InvalidOperationException("统一碰撞范围必须为有限数值。");
+                return capsuleValues;
+            }
+            if (!(shape.RadiusPixels > 0) || !(shape.HeightPixels > 0)) throw new InvalidOperationException("移动阻挡范围的半径和高度必须大于零像素。");
             if (shape.transform.parent == null || shape.transform.parent.parent != null ||
                 shape.transform.localScale != Vector3.one ||
                 Quaternion.Angle(shape.transform.localRotation, Quaternion.identity) != 0 ||
                 Quaternion.Angle(shape.transform.parent.localRotation, Quaternion.identity) != 0 || shape.transform.parent.localPosition != Vector3.zero)
-                throw new InvalidOperationException("圆柱必须是根节点直接子节点；根位置归零，旋转归零，圆柱节点缩放为一。请使用 Radius/Height 调整。");
-            // 根节点允许等比缩放，但只作为 TbVisualSet.scalePermille 单独导出；圆柱像素值仍按未缩放的编辑值换算，
-            // 避免重复导出把缩放烘焙进像素字段导致累积放大。
-            float scale = tables.TbCombatRules.Get(shape.CombatRulesId).WorldUnitsPerPixel;
-            if (!(scale > 0)) throw new InvalidOperationException("世界像素比例非法。");
-            Vector3 center = shape.transform.localPosition;
-            var result = new[] {shape.Radius / scale, shape.Height / scale, center.x / scale, center.z / scale, (center.y - shape.Height / 2) / scale};
+                throw new InvalidOperationException("移动阻挡范围必须是根节点直接子节点；根位置、旋转归零，范围节点缩放为一。请只修改中文像素参数。");
+            var result = new[] { shape.RadiusPixels, shape.HeightPixels, shape.OffsetXPixels, shape.OffsetYPixels, shape.ElevationPixels };
             if (result.Any(v => float.IsNaN(v) || float.IsInfinity(v))) throw new InvalidOperationException("圆柱必须为有限数值。");
             return result;
+        }
+
+        /// <summary>读取同一单位预制体上的受击范围，并按表字段顺序返回像素值。</summary>
+        /// <param name="shape">单位移动阻挡组件，用于定位根节点。</param>
+        /// <param name="tables">提供 TbCombatRules 像素换算比例的 Luban 快照。</param>
+        /// <returns>受击半径、横向偏移和前向偏移。</returns>
+        /// <exception cref="InvalidOperationException">缺少唯一受击节点或数值非法。</exception>
+        public static float[] BodyValues(CombatCylinderAuthoring shape, Tables tables)
+        {
+            if (shape.GetComponent<CapsuleCollider2D>() != null)
+            {
+                float[] unified = Values(shape, tables);
+                return new[] { unified[0], unified[2], unified[3] };
+            }
+            var bodies = shape.transform.parent.GetComponentsInChildren<CombatBodyCollisionAuthoring>(true);
+            if (bodies.Length != 1 || bodies[0].RadiusPixels < 0f)
+                throw new InvalidOperationException(shape.transform.parent.name + " 必须包含一个非负的“受击判定范围”节点。");
+            float[] result = { bodies[0].RadiusPixels, bodies[0].OffsetXPixels, bodies[0].OffsetYPixels };
+            if (result.Any(value => float.IsNaN(value) || float.IsInfinity(value)))
+                throw new InvalidOperationException("受击判定范围必须为有限像素值。");
+            return result;
+        }
+
+        /// <summary>从单位根节点的唯一命中特效挂点读取偏移并换算为逻辑像素。</summary>
+        /// <param name="shape">用于定位单位 Prefab 根节点和战斗规则的碰撞组件。</param>
+        /// <param name="tables">提供 TbCombatRules.worldUnitsPerPixel 的当前配置。</param>
+        /// <returns>横向与纵向偏移的逻辑像素值；没有挂点时返回空数组。</returns>
+        /// <exception cref="InvalidOperationException">挂点重复、层级、旋转、缩放或 Z 偏移不符合协议。</exception>
+        public static float[] HitEffectValues(CombatCylinderAuthoring shape, Tables tables)
+        {
+            Transform root = shape.transform.parent;
+            if (root == null) throw new InvalidOperationException(shape.name + " 缺少单位根节点。");
+            CombatHitEffectAnchorAuthoring[] anchors = root.GetComponentsInChildren<CombatHitEffectAnchorAuthoring>(true);
+            if (anchors.Length == 0) return Array.Empty<float>();
+            if (anchors.Length != 1) throw new InvalidOperationException(root.name + " 的命中特效挂点不唯一。");
+            Transform anchor = anchors[0].transform;
+            if (anchor.parent != root || Mathf.Abs(anchor.localPosition.z) > 0.0001f ||
+                Quaternion.Angle(anchor.localRotation, Quaternion.identity) > 0.0001f || anchor.localScale != Vector3.one)
+                throw new InvalidOperationException(root.name + " 的命中特效挂点必须是根节点直接子级，Z/旋转归零且缩放为一。");
+            float pixelScale = tables.TbCombatRules.Get(shape.CombatRulesId).WorldUnitsPerPixel;
+            float rootScale = root.localScale.x;
+            return new[] { anchor.localPosition.x * rootScale / pixelScale, anchor.localPosition.y * rootScale / pixelScale };
         }
 
         /// <summary>读取预制体根节点的等比缩放，量化为 TbVisualSet.scalePermille 千分整数。</summary>
         /// <param name="shape">圆柱组件，以其父级根节点的缩放作为表现缩放。</param>
         /// <returns>千分整数缩放；1000 表示原始大小，500 表示缩小一半。</returns>
         /// <exception cref="InvalidOperationException">缺少根节点、缩放非等比或量化后不为正。</exception>
-        /// <remarks>与 Values 分离导出，使缩放同时驱动角色/怪物的视觉与 bodyRadiusMilli 判定半径，避免二者脱节。</remarks>
+        /// <remarks>根缩放只写表现表；碰撞组件保存的是最终像素值，不再重复乘入视觉缩放。</remarks>
         public static int ScalePermille(CombatCylinderAuthoring shape)
         {
             var root = shape.transform.parent;
@@ -186,7 +258,7 @@ namespace Roguelike.Features.Combat.Authoring.Editor
 
         /// <summary>扫描两个编辑目录内的已保存模板，拒绝重复 ID 和多个碰撞节点。</summary>
         /// <returns>通过结构校验的模板组件。</returns>
-        private static List<CombatCylinderAuthoring> Shapes()
+        internal static List<CombatCylinderAuthoring> Shapes()
         {
             var result = new List<CombatCylinderAuthoring>(); var ids = new HashSet<string>();
             foreach (string guid in AssetDatabase.FindAssets("t:Prefab", new[] {Root + "/Hero", Root + "/Monster"}))
@@ -204,45 +276,7 @@ namespace Roguelike.Features.Combat.Authoring.Editor
 
         /// <summary>按钮或菜单调用时将保存模板量化到三位小数，按千分整数写回源 Excel 并生成 Luban，异常时恢复源表。</summary>
         /// <remarks>不保存 Scene/Prefab；未保存的 Prefab Stage 会拒绝导出，防止导出旧值。生成日志写入 Library。</remarks>
-        public static void Export()
-        {
-            if (EditorApplication.isPlayingOrWillChangePlaymode) throw new InvalidOperationException("请先退出 Play Mode。");
-            var stage = UnityEditor.SceneManagement.PrefabStageUtility.GetCurrentPrefabStage();
-            if (stage != null && stage.scene.isDirty) throw new InvalidOperationException("请先保存正在编辑的 Prefab，再导出。");
-            var tables = ReadTables(); var shapes = Shapes();
-            var backups = new Dictionary<string, byte[]>();
-            var visualUpdates = new Dictionary<int, int[]>();
-            try
-            {
-                foreach (var group in shapes.GroupBy(s => s.IsHero))
-                {
-                    string kind = group.Key ? "Character" : "Monster";
-                    string path = Directory.GetFiles("Config/Datas/Tables", "*_" + kind + "Config.xlsx").Single();
-                    backups.Add(path, File.ReadAllBytes(path));
-                    var updates = group.ToDictionary(s => s.ConfigId, s => Values(s, tables).Select(v => ConfigNumber.Encode(v)).ToArray());
-                    ConfigWorkbookWriter.Patch(path, Fields, updates);
-                    // 缩放按单位所属表现集合导出，与技能共用 TbVisualSet.scalePermille 同一来源。
-                    foreach (var shape in group)
-                        visualUpdates[group.Key ? tables.TbCharacter.Get(shape.ConfigId).VisualSetId : tables.TbMonster.Get(shape.ConfigId).VisualSetId] = new[] { ScalePermille(shape) };
-                }
-                string visualPath = Directory.GetFiles("Config/Datas/Tables", "*_VisualSetConfig.xlsx").Single();
-                backups.Add(visualPath, File.ReadAllBytes(visualPath));
-                ConfigWorkbookWriter.Patch(visualPath, VisualFields, visualUpdates);
-                var info = new ProcessStartInfo("pwsh", "-NoProfile -File Tools/Config/generate.ps1")
-                { WorkingDirectory = Directory.GetCurrentDirectory(), UseShellExecute = false, CreateNoWindow = true,
-                    RedirectStandardOutput = true, RedirectStandardError = true };
-                using (var process = Process.Start(info))
-                {
-                    var stdout = process.StandardOutput.ReadToEndAsync(); var stderr = process.StandardError.ReadToEndAsync();
-                    process.WaitForExit();
-                    File.WriteAllText("Library/CombatCylinderExport.log", stdout.Result + stderr.Result);
-                    if (process.ExitCode != 0) throw new InvalidOperationException("Luban 生成失败，参见 Library/CombatCylinderExport.log。");
-                }
-            }
-            catch { foreach (var pair in backups) File.WriteAllBytes(pair.Key, pair.Value); throw; }
-            AssetDatabase.Refresh(); ValidateSaved();
-            Debug.Log("圆柱配置已导出并生成 Luban。重新进入战斗生效。");
-        }
+        public static void Export() => CombatCollisionPipeline.ExportAll();
 
         /// <summary>校验已保存 Prefab 与当前生成 bytes 的圆柱字段一致，供导出及人工验收调用。</summary>
         /// <remarks>只读资产和数据；浮点容差只覆盖像素/世界换算舍入。</remarks>
@@ -252,12 +286,39 @@ namespace Roguelike.Features.Combat.Authoring.Editor
             foreach (var shape in Shapes())
             {
                 float?[] expected;
-                if (shape.IsHero) { var c = tables.TbCharacter.Get(shape.ConfigId); expected = new[] {c.MoveRadiusPixels,c.MoveHeightPixels,c.MoveOffsetXPixels,c.MoveOffsetYPixels,c.MoveElevationPixels}; }
-                else { var c = tables.TbMonster.Get(shape.ConfigId); expected = new[] {c.MoveRadiusPixels,c.MoveHeightPixels,c.MoveOffsetXPixels,c.MoveOffsetYPixels,c.MoveElevationPixels}; }
+                float?[] bodyExpected;
+                float?[] hitEffectExpected;
+                EUnitCollisionShape? collisionShapeExpected;
+                if (shape.IsHero) { var c = tables.TbCharacter.Get(shape.ConfigId); expected = new[] {c.MoveRadiusPixels,c.MoveHeightPixels,c.MoveOffsetXPixels,c.MoveOffsetYPixels,c.MoveElevationPixels}; bodyExpected = new[] { c.BodyRadiusPixels, c.BodyOffsetXPixels, c.BodyOffsetYPixels }; hitEffectExpected = new[] { c.HitEffectOffsetXPixels, c.HitEffectOffsetYPixels }; collisionShapeExpected = c.CollisionShape; }
+                else { var c = tables.TbMonster.Get(shape.ConfigId); expected = new[] {c.MoveRadiusPixels,c.MoveHeightPixels,c.MoveOffsetXPixels,c.MoveOffsetYPixels,c.MoveElevationPixels}; bodyExpected = new[] { c.BodyRadiusPixels, c.BodyOffsetXPixels, c.BodyOffsetYPixels }; hitEffectExpected = new[] { c.HitEffectOffsetXPixels, c.HitEffectOffsetYPixels }; collisionShapeExpected = c.CollisionShape; }
+                bool usesCapsule = shape.GetComponent<CapsuleCollider2D>() != null;
+                if ((usesCapsule && collisionShapeExpected != EUnitCollisionShape.VerticalCapsule) ||
+                    (!usesCapsule && collisionShapeExpected.HasValue))
+                    throw new InvalidOperationException(shape.name + " 尚未导出: " + CollisionShapeFields[0]);
                 float[] actual = Values(shape, tables);
                 for (int i = 0; i < actual.Length; i++)
                     if (!expected[i].HasValue || Mathf.Abs(actual[i] - expected[i].Value) > 0.00051f)
-                        throw new InvalidOperationException(shape.name + " 尚未导出: " + Fields[i]);
+                        throw new InvalidOperationException(shape.name + " 尚未导出: " + MovementFields[i]);
+                float[] bodyActual = BodyValues(shape, tables);
+                if (!(bodyActual[0] > 0f))
+                {
+                    if (bodyExpected.Any(value => value.HasValue))
+                        throw new InvalidOperationException(shape.name + " 的资源目录受击范围不应写入配置。");
+                }
+                else
+                    for (int i = 0; i < bodyActual.Length; i++)
+                        if (!bodyExpected[i].HasValue || Mathf.Abs(bodyActual[i] - bodyExpected[i].Value) > 0.00051f)
+                            throw new InvalidOperationException(shape.name + " 尚未导出: " + BodyFields[i]);
+                float[] hitEffectActual = HitEffectValues(shape, tables);
+                if (hitEffectActual.Length == 0)
+                {
+                    if (hitEffectExpected.Any(value => value.HasValue))
+                        throw new InvalidOperationException(shape.name + " 缺少命中特效挂点。");
+                }
+                else
+                    for (int i = 0; i < hitEffectActual.Length; i++)
+                        if (!hitEffectExpected[i].HasValue || Mathf.Abs(hitEffectActual[i] - hitEffectExpected[i].Value) > 0.00051f)
+                            throw new InvalidOperationException(shape.name + " 尚未导出: " + HitEffectFields[i]);
             }
         }
     }

@@ -24,11 +24,13 @@ namespace Roguelike.Features.Combat.Rendering
             public CombatDirections Directions;
             public bool FlipX;
             public int MaterialIndex;
+            public int HitFlashMaterialIndex;
             public int[] MeshIndices;
         }
         private readonly Dictionary<(int, int), Clip> clips = new Dictionary<(int, int), Clip>();
         private readonly Dictionary<int, Texture2D> textures = new Dictionary<int, Texture2D>();
-        private readonly Dictionary<int, int> materialIndices = new Dictionary<int, int>();
+        private readonly Dictionary<(int, int), int> materialIndices = new Dictionary<(int, int), int>();
+        private readonly Dictionary<(int, int), int> hitFlashMaterialIndices = new Dictionary<(int, int), int>();
         private readonly List<Material> materials = new List<Material>();
         private readonly List<Mesh> meshes = new List<Mesh>();
         private bool disposed;
@@ -52,6 +54,16 @@ namespace Roguelike.Features.Combat.Rendering
             if (string.IsNullOrWhiteSpace(config.ShaderName)) throw new InvalidOperationException("TbCombatPresentation.shaderName is required.");
             Shader shader = Shader.Find(config.ShaderName);
             if (shader == null || !shader.isSupported) throw new InvalidOperationException("Unavailable configured shader: " + config.ShaderName);
+            if (string.IsNullOrWhiteSpace(config.HitFlashShaderName)) throw new InvalidOperationException("TbCombatPresentation.hitFlashShaderName is required.");
+            Shader hitFlashShader = Shader.Find(config.HitFlashShaderName);
+            if (hitFlashShader == null || !hitFlashShader.isSupported)
+                throw new InvalidOperationException("Unavailable configured hit flash shader: " + config.HitFlashShaderName);
+            CombatMath.Positive(config.HitFlashDurationSeconds);
+            if (config.HitFlashR < 0 || config.HitFlashR > 1 || config.HitFlashG < 0 || config.HitFlashG > 1 ||
+                config.HitFlashB < 0 || config.HitFlashB > 1 || config.HitFlashOpacity < 0 || config.HitFlashOpacity > 1)
+                throw new InvalidOperationException("TbCombatPresentation hit flash RGB and opacity must be within 0..1.");
+            ValidateRenderQueues(config);
+            Color hitFlashColor = new Color(config.HitFlashR, config.HitFlashG, config.HitFlashB, config.HitFlashOpacity);
             FilterMode filter;
             switch (config.TextureFilterMode)
             {
@@ -63,12 +75,15 @@ namespace Roguelike.Features.Combat.Rendering
             try
             {
                 await result.LoadVisualAsync(scenario.CharacterId_Ref.VisualSetId_Ref, false, scenario.CombatRulesId_Ref,
-                    scenario.PresentationId_Ref, resources, shader, filter, token);
+                    scenario.PresentationId_Ref, resources, shader, hitFlashShader, hitFlashColor, filter,
+                    config.UnitRenderQueue, token);
                 foreach (var monster in scenario.MonsterIds_Ref)
                     await result.LoadVisualAsync(monster.VisualSetId_Ref, true, scenario.CombatRulesId_Ref,
-                        scenario.PresentationId_Ref, resources, shader, filter, token);
+                        scenario.PresentationId_Ref, resources, shader, hitFlashShader, hitFlashColor, filter,
+                        config.UnitRenderQueue, token);
                 await result.LoadSkillAsync(scenario.CharacterId_Ref.DefaultSkillId_Ref, scenario.CombatRulesId_Ref,
-                    scenario.PresentationId_Ref, resources, shader, filter, token);
+                    scenario.PresentationId_Ref, resources, shader, hitFlashShader, hitFlashColor, filter,
+                    config.SkillRenderQueue, token);
                 token.ThrowIfCancellationRequested();
                 result.Materials = result.materials.ToArray(); result.Meshes = result.meshes.ToArray();
                 return result;
@@ -94,6 +109,18 @@ namespace Roguelike.Features.Combat.Rendering
             Shader shader = Shader.Find(presentation.ShaderName);
             if (shader == null || !shader.isSupported)
                 throw new InvalidOperationException("Unavailable configured shader: " + presentation.ShaderName);
+            if (string.IsNullOrWhiteSpace(presentation.HitFlashShaderName))
+                throw new InvalidOperationException("TbCombatPresentation.hitFlashShaderName is required.");
+            Shader hitFlashShader = Shader.Find(presentation.HitFlashShaderName);
+            if (hitFlashShader == null || !hitFlashShader.isSupported)
+                throw new InvalidOperationException("Unavailable configured hit flash shader: " + presentation.HitFlashShaderName);
+            CombatMath.Positive(presentation.HitFlashDurationSeconds);
+            if (presentation.HitFlashR < 0 || presentation.HitFlashR > 1 || presentation.HitFlashG < 0 || presentation.HitFlashG > 1 ||
+                presentation.HitFlashB < 0 || presentation.HitFlashB > 1 || presentation.HitFlashOpacity < 0 || presentation.HitFlashOpacity > 1)
+                throw new InvalidOperationException("TbCombatPresentation hit flash RGB and opacity must be within 0..1.");
+            ValidateRenderQueues(presentation);
+            Color hitFlashColor = new Color(presentation.HitFlashR, presentation.HitFlashG,
+                presentation.HitFlashB, presentation.HitFlashOpacity);
             FilterMode filter;
             switch (presentation.TextureFilterMode)
             {
@@ -106,12 +133,15 @@ namespace Roguelike.Features.Combat.Rendering
             try
             {
                 await result.LoadVisualAsync(definition.Character.VisualSetId_Ref, false, definition.CombatRules,
-                    presentation, resources, shader, filter, token);
+                    presentation, resources, shader, hitFlashShader, hitFlashColor, filter,
+                    presentation.UnitRenderQueue, token);
                 foreach (var monster in definition.Monsters.Concat(new[] { definition.Boss.MonsterId_Ref }).GroupBy(item => item.Id).Select(group => group.First()))
                     await result.LoadVisualAsync(monster.VisualSetId_Ref, true, definition.CombatRules,
-                        presentation, resources, shader, filter, token);
+                        presentation, resources, shader, hitFlashShader, hitFlashColor, filter,
+                        presentation.UnitRenderQueue, token);
                 foreach (var skill in definition.AvailableSkills)
-                    await result.LoadSkillAsync(skill, definition.CombatRules, presentation, resources, shader, filter, token);
+                    await result.LoadSkillAsync(skill, definition.CombatRules, presentation, resources, shader,
+                        hitFlashShader, hitFlashColor, filter, presentation.SkillRenderQueue, token);
                 token.ThrowIfCancellationRequested();
                 result.Materials = result.materials.ToArray();
                 result.Meshes = result.meshes.ToArray();
@@ -123,25 +153,32 @@ namespace Roguelike.Features.Combat.Rendering
         /// <summary>为角色集合加载必需待机/移动，怪物另加载显式攻击；复用同集合已准备的帧。</summary>
         /// <param name="visual">TbVisualSet 显式片段引用及缩放。</param>
         /// <param name="monster">是否必须加载攻击。</param>
-        /// <param name="rules">提供世界单位换算的 TbCombatRules。</param>
+        /// <param name="rules">提供像素到渲染坐标换算比例的 TbCombatRules。</param>
         /// <param name="presentation">提供方向及时钟的 TbCombatPresentation。</param>
         /// <param name="resources">统一资源入口。</param>
         /// <param name="shader">已验证的配置 Shader。</param>
+        /// <param name="hitFlashShader">TbCombatPresentation.hitFlashShaderName 指定的白闪 Shader。</param>
+        /// <param name="hitFlashColor">TbCombatPresentation 的 hitFlash RGB 与 opacity 字段还原的叠加色。</param>
         /// <param name="filter">配置解析的过滤方式。</param>
+        /// <param name="renderQueue">TbCombatPresentation.unitRenderQueue。</param>
         /// <param name="token">取消令牌。</param>
         /// <returns>全部必需片段准备任务。</returns>
         /// <remarks>创建共享 Unity 对象，所有权归本资源集合。</remarks>
         /// <exception cref="InvalidOperationException">缺少显式片段或缩放非法。</exception>
         private async Task LoadVisualAsync(VisualSetConfig visual, bool monster, CombatRulesConfig rules, CombatPresentationConfig presentation,
-            IResourceService resources, Shader shader, FilterMode filter, CancellationToken token)
+            IResourceService resources, Shader shader, Shader hitFlashShader, Color hitFlashColor, FilterMode filter,
+            int renderQueue, CancellationToken token)
         {
             if (visual?.StandClipId_Ref == null || visual.MoveClipId_Ref == null || (monster && visual.AttackClipId_Ref == null))
                 throw new InvalidOperationException("Visual requires explicit idle/move and monster attack clips.");
             float scale = rules.WorldUnitsPerPixel * visual.ScalePermille / 1000f;
             CombatMath.Positive(scale);
-            await LoadClipAsync(visual.Id, visual.StandClipId_Ref, scale, presentation, resources, shader, filter, token);
-            await LoadClipAsync(visual.Id, visual.MoveClipId_Ref, scale, presentation, resources, shader, filter, token);
-            if (monster) await LoadClipAsync(visual.Id, visual.AttackClipId_Ref, scale, presentation, resources, shader, filter, token);
+            await LoadClipAsync(visual.Id, visual.StandClipId_Ref, scale, presentation, resources, shader,
+                hitFlashShader, hitFlashColor, filter, renderQueue, token);
+            await LoadClipAsync(visual.Id, visual.MoveClipId_Ref, scale, presentation, resources, shader,
+                hitFlashShader, hitFlashColor, filter, renderQueue, token);
+            if (monster) await LoadClipAsync(visual.Id, visual.AttackClipId_Ref, scale, presentation, resources,
+                shader, hitFlashShader, hitFlashColor, filter, renderQueue, token);
         }
 
         /// <summary>按 TbSkill 的投递类型加载已确认的飞行、命中或目标位置片段。</summary>
@@ -150,12 +187,16 @@ namespace Roguelike.Features.Combat.Rendering
         /// <param name="presentation">提供 ANI 时间单位的 TbCombatPresentation。</param>
         /// <param name="resources">统一资源入口。</param>
         /// <param name="shader">已验证的配置 Shader。</param>
+        /// <param name="hitFlashShader">TbCombatPresentation.hitFlashShaderName 指定的白闪 Shader。</param>
+        /// <param name="hitFlashColor">TbCombatPresentation 的 hitFlash RGB 与 opacity 字段还原的叠加色。</param>
         /// <param name="filter">配置解析的纹理过滤方式。</param>
+        /// <param name="renderQueue">TbCombatPresentation.skillRenderQueue。</param>
         /// <param name="token">取消令牌。</param>
         /// <returns>该技能全部显式片段完成加载的任务。</returns>
         /// <exception cref="InvalidOperationException">技能投递类型或片段角色不符合协议。</exception>
         private async Task LoadSkillAsync(SkillConfig skill, CombatRulesConfig rules, CombatPresentationConfig presentation,
-            IResourceService resources, Shader shader, FilterMode filter, CancellationToken token)
+            IResourceService resources, Shader shader, Shader hitFlashShader, Color hitFlashColor, FilterMode filter,
+            int renderQueue, CancellationToken token)
         {
             if (skill?.CombatProfileId_Ref == null) throw new InvalidOperationException("TbSkill: missing combat profile.");
             // 与角色/怪物保持同一来源：TbVisualSet.scalePermille 同时缩放技能视觉与 TbSkill 判定半径，
@@ -167,16 +208,19 @@ namespace Roguelike.Features.Combat.Rendering
                 if (skill.ProjectileClipId_Ref?.Action != EAnimationAction.Projectile ||
                     (skill.ImpactClipId_Ref != null && skill.ImpactClipId_Ref.Action != EAnimationAction.Impact))
                     throw new InvalidOperationException($"TbSkill {skill.Id}: invalid projectile visual roles.");
-                await LoadClipAsync(skill.Id, skill.ProjectileClipId_Ref, scale, presentation, resources, shader, filter, token);
+                await LoadClipAsync(skill.Id, skill.ProjectileClipId_Ref, scale, presentation, resources, shader,
+                    hitFlashShader, hitFlashColor, filter, renderQueue, token);
                 if (skill.ImpactClipId_Ref != null)
-                    await LoadClipAsync(skill.Id, skill.ImpactClipId_Ref, scale, presentation, resources, shader, filter, token);
+                    await LoadClipAsync(skill.Id, skill.ImpactClipId_Ref, scale, presentation, resources, shader,
+                        hitFlashShader, hitFlashColor, filter, renderQueue, token);
                 return;
             }
             if (skill.CombatProfileId_Ref.DeliveryType != ESkillDeliveryType.TargetArea || skill.AreaClipIds_Ref == null ||
                 skill.AreaClipIds_Ref.Count == 0 || skill.AreaClipIds_Ref.Any(item => item?.Action != EAnimationAction.Area))
                 throw new InvalidOperationException($"TbSkill {skill.Id}: invalid target-area visual roles.");
             foreach (var clip in skill.AreaClipIds_Ref)
-                await LoadClipAsync(skill.Id, clip, scale, presentation, resources, shader, filter, token);
+                await LoadClipAsync(skill.Id, clip, scale, presentation, resources, shader, hitFlashShader,
+                    hitFlashColor, filter, renderQueue, token);
         }
 
         /// <summary>按 TbAnimationClip 的 ANI/PNG ID 加载，验证图集边界并预建普通与镜像网格。</summary>
@@ -186,12 +230,16 @@ namespace Roguelike.Features.Combat.Rendering
         /// <param name="presentation">方向及时钟配置。</param>
         /// <param name="resources">统一资源入口。</param>
         /// <param name="shader">配置 Shader。</param>
+        /// <param name="hitFlashShader">配置的白闪 Shader。</param>
+        /// <param name="hitFlashColor">配置的白闪 RGB 与叠加不透明度。</param>
         /// <param name="filter">配置过滤方式。</param>
+        /// <param name="renderQueue">该片段类别在 TbCombatPresentation 中配置的透明渲染队列。</param>
         /// <param name="token">取消令牌。</param>
         /// <returns>片段准备任务。</returns>
         /// <remarks>临时原始句柄离开作用域即释放；对象创建后立即登记，确保异常可回收。</remarks>
         private async Task LoadClipAsync(int visualId, AnimationClipConfig config, float scale, CombatPresentationConfig presentation,
-            IResourceService resources, Shader shader, FilterMode filter, CancellationToken token)
+            IResourceService resources, Shader shader, Shader hitFlashShader, Color hitFlashColor, FilterMode filter,
+            int renderQueue, CancellationToken token)
         {
             token.ThrowIfCancellationRequested();
             var key = (visualId, config.Id);
@@ -207,19 +255,31 @@ namespace Roguelike.Features.Combat.Rendering
                 texture = new Texture2D(2, 2, TextureFormat.RGBA32, false) { filterMode = filter, wrapMode = TextureWrapMode.Clamp };
                 textures.Add(config.TextureResourceId, texture);
                 if (!ImageConversion.LoadImage(texture, png.Data, true)) throw new InvalidOperationException("Cannot decode TbResource " + config.TextureResourceId);
-                var material = new Material(shader) { enableInstancing = true, renderQueue = (int)RenderQueue.Transparent };
-                materialIndices.Add(config.TextureResourceId, materials.Count); materials.Add(material);
+            }
+            var materialKey = (config.TextureResourceId, renderQueue);
+            if (!materialIndices.ContainsKey(materialKey))
+            {
+                var material = new Material(shader) { enableInstancing = true, renderQueue = renderQueue };
+                materialIndices.Add(materialKey, materials.Count); materials.Add(material);
                 if (!material.HasProperty("_BaseMap") || !material.HasProperty("_Surface")) throw new InvalidOperationException("Configured shader lacks URP Unlit material interface.");
                 material.SetTexture("_BaseMap", texture); material.SetColor("_BaseColor", Color.white);
                 material.SetFloat("_Surface", 1); material.SetFloat("_Blend", 0);
                 material.SetFloat("_SrcBlend", (float)BlendMode.SrcAlpha); material.SetFloat("_DstBlend", (float)BlendMode.OneMinusSrcAlpha);
                 material.SetFloat("_ZWrite", 0); material.SetFloat("_Cull", (float)CullMode.Off);
                 material.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+                var hitFlashMaterial = new Material(hitFlashShader) { enableInstancing = true, renderQueue = renderQueue };
+                hitFlashMaterialIndices.Add(materialKey, materials.Count); materials.Add(hitFlashMaterial);
+                if (!hitFlashMaterial.HasProperty("_BaseMap") || !hitFlashMaterial.HasProperty("_FlashColor"))
+                    throw new InvalidOperationException("Configured hit flash shader lacks _BaseMap or _FlashColor.");
+                hitFlashMaterial.SetTexture("_BaseMap", texture);
+                hitFlashMaterial.SetColor("_FlashColor", hitFlashColor);
             }
             AniFrameLayout.ValidateAtlas(data, texture.width, texture.height);
             var animation = new CombatAnimation(data, presentation, config.Loop);
             var clip = new Clip { Animation = animation, FlipX = config.FlipX,
-                MaterialIndex = materialIndices[config.TextureResourceId], MeshIndices = new int[data.frames.Length * 2] };
+                MaterialIndex = materialIndices[materialKey],
+                HitFlashMaterialIndex = hitFlashMaterialIndices[materialKey],
+                MeshIndices = new int[data.frames.Length * 2] };
             for (int i = 0; i < clip.MeshIndices.Length; i++) clip.MeshIndices[i] = -1;
             if (config.Action == EAnimationAction.Stand || config.Action == EAnimationAction.Move)
                 clip.Directions = new CombatDirections(presentation, animation);
@@ -235,6 +295,19 @@ namespace Roguelike.Features.Combat.Rendering
                     clip.MeshIndices[global * 2 + 1] = meshes.Count; meshes.Add(AniMeshFactory.CreateFrame(quads, scale));
                 }
             clips.Add(key, clip);
+        }
+
+        /// <summary>验证单位、技能与战斗反馈的透明绘制层级严格递增。</summary>
+        /// <param name="presentation">TbCombatPresentation 当前行。</param>
+        /// <exception cref="InvalidOperationException">任一队列不在 Unity 透明范围，或层级顺序错误。</exception>
+        private static void ValidateRenderQueues(CombatPresentationConfig presentation)
+        {
+            if (presentation.UnitRenderQueue < (int)RenderQueue.Transparent ||
+                presentation.FeedbackRenderQueue > 5000 ||
+                presentation.UnitRenderQueue >= presentation.SkillRenderQueue ||
+                presentation.SkillRenderQueue >= presentation.FeedbackRenderQueue)
+                throw new InvalidOperationException(
+                    "TbCombatPresentation render queues must satisfy Transparent <= unit < skill < feedback <= 5000.");
         }
 
         /// <summary>播放更新时读取预加载片段，不加载资源或创建对象。</summary>
@@ -256,7 +329,7 @@ namespace Roguelike.Features.Combat.Rendering
             foreach (var mesh in meshes) Release(mesh);
             foreach (var material in materials) Release(material);
             foreach (var texture in textures.Values) Release(texture);
-            meshes.Clear(); materials.Clear(); textures.Clear(); clips.Clear(); materialIndices.Clear();
+            meshes.Clear(); materials.Clear(); textures.Clear(); clips.Clear(); materialIndices.Clear(); hitFlashMaterialIndices.Clear();
         }
 
         /// <summary>按 Unity 生命周期销毁本模块拥有的运行时对象。</summary>

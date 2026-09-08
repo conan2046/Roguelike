@@ -19,6 +19,7 @@ namespace Roguelike.Features.Combat.Rendering
         public int GlobalFrame { get; private set; }
         public int MeshIndex { get; private set; }
         public int MaterialIndex { get; private set; }
+        public int HitFlashMaterialIndex { get; private set; }
         public bool FlipX { get; private set; }
         public bool Visible { get; private set; }
 
@@ -84,6 +85,7 @@ namespace Roguelike.Features.Combat.Rendering
             GlobalFrame = clip.Animation.Sample(ActionIndex, age);
             MeshIndex = clip.MeshIndices[GlobalFrame * 2 + (FlipX ? 1 : 0)];
             MaterialIndex = clip.MaterialIndex;
+            HitFlashMaterialIndex = clip.HitFlashMaterialIndex;
             previousClip = ClipId; sequence = attacking ? unit.PendingAttack.Sequence : 0;
         }
     }

@@ -148,7 +148,7 @@ VictorySettlement / DefeatSettlement
 | `projectileClipId` | 弹丸存活期间播放的飞行表现；Projectile 技能必填 |
 | `impactClipId` | 弹丸命中后播放一次的命中表现，可空 |
 | `areaClipIds` | `TargetArea` 技能在目标位置同时播放的表现片段列表 |
-| `areaRadiusMilli` | `TargetArea` 群体伤害半径，世界单位乘 1000 |
+| `areaRadiusPixelsMilli` | `TargetArea` 群体伤害半径，像素乘 1000；由技能预制体导出 |
 
 已确认的表现角色如下；未确认片段不进入运行时引用：
 

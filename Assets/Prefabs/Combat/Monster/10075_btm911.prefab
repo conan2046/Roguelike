@@ -10,8 +10,9 @@ GameObject:
   m_Component:
   - component: {fileID: 8092225401291002868}
   - component: {fileID: 5353678349478928474}
+  - component: {fileID: 458519316707291328}
   m_Layer: 0
-  m_Name: MovementCollision
+  m_Name: "\u78B0\u649E\u8303\u56F4"
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -26,7 +27,7 @@ Transform:
   m_GameObject: {fileID: 666720675888286656}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0.60999995, z: 0}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -42,13 +43,52 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: ce3ef1b4267b23d439caac8085833e24, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
+  m_Name:
+  m_EditorClassIdentifier:
   ConfigId: 10075
   IsHero: 0
   CombatRulesId: 1
-  Radius: 0.25
-  Height: 1.2199999
+  RadiusPixels: 25
+  HeightPixels: 122.00001
+  OffsetXPixels: 0
+  OffsetYPixels: 61.000004
+  ElevationPixels: 0
+  DataVersion: 1
+--- !u!70 &458519316707291328
+CapsuleCollider2D:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 666720675888286656}
+  m_Enabled: 1
+  m_Density: 1
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_ForceSendLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_ForceReceiveLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_ContactCaptureLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_CallbackLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_IsTrigger: 1
+  m_UsedByEffector: 0
+  m_UsedByComposite: 0
+  m_Offset: {x: 0, y: 0.61}
+  m_Size: {x: 0.5, y: 1.22}
+  m_Direction: 0
 --- !u!1 &1977703280680229292
 GameObject:
   m_ObjectHideFlags: 0
@@ -80,6 +120,50 @@ Transform:
   m_Children: []
   m_Father: {fileID: 2953362454148210851}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &4348209252333306696
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1710948410897848452}
+  - component: {fileID: 5173471114833504675}
+  m_Layer: 0
+  m_Name: "\u547D\u4E2D\u7279\u6548\u6302\u70B9"
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1710948410897848452
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4348209252333306696}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 2953362454148210851}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &5173471114833504675
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4348209252333306696}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 305e34899dbadfb4fa0e9579f9330b58, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
 --- !u!1 &6601315455547584573
 GameObject:
   m_ObjectHideFlags: 0
@@ -112,9 +196,9 @@ Transform:
   - {fileID: 556999211610430584}
   - {fileID: 8092225401291002868}
   - {fileID: 8092225401291002870}
+  - {fileID: 1710948410897848452}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-
 --- !u!1 &8092225401291002869
 GameObject:
   m_ObjectHideFlags: 0
@@ -131,7 +215,6 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
-
 --- !u!4 &8092225401291002870
 Transform:
   m_ObjectHideFlags: 0
@@ -147,4 +230,3 @@ Transform:
   m_Children: []
   m_Father: {fileID: 2953362454148210851}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-

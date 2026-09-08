@@ -24,9 +24,17 @@ namespace Roguelike.Features.Combat.Rendering
         private const int BarFillResourceId = 960007;
         private const int DigitAtlasResourceId = 960008;
 
-        private const int RenderQueueHpFrame = (int)RenderQueue.Transparent + 1;
-        private const int RenderQueueHpFill = (int)RenderQueue.Transparent + 2;
-        private const int RenderQueueDigits = (int)RenderQueue.Transparent + 3;
+        private const int FeedbackAtlasWidth = 348;
+        private const int FeedbackAtlasHeight = 44;
+        private const int BarTextureWidth = 60;
+        private const int BarTextureHeight = 7;
+        private const int DigitTextureHeight = 30;
+        private const int DigitCellWidth = 29;
+
+        private const float HpFrameDepth = -1f;
+        private const float HpFillDepth = -2f;
+        private const float DigitDepth = -3f;
+        private const float HiddenWorldCoordinate = 1000000f;
 
         private const float NumberRiseDuration = 0.6f;
         private const float NumberRiseHeight = 0.35f;
@@ -39,6 +47,8 @@ namespace Roguelike.Features.Combat.Rendering
         private readonly CombatSession session;
         private readonly IReadOnlyDictionary<int, float> damageFloatHeights;
         private readonly float worldUnitsPerPixel;
+        private readonly float healthBarWidthPixels;
+        private readonly float healthBarHeightPixels;
 
         private readonly Material[] materials;
         private readonly Mesh[] meshes;
@@ -49,10 +59,13 @@ namespace Roguelike.Features.Combat.Rendering
         private readonly int barFrameMaterialIndex;
         private readonly int barFillMaterialIndex;
         private readonly int digitMaterialIndex;
-        private readonly int unitQuadMeshIndex;
+        private readonly int barFrameMeshIndex;
+        private readonly int barFillMeshIndex;
+        private readonly int digitMeshStartIndex;
 
         private readonly List<HpBarSlot> hpBars = new List<HpBarSlot>();
-        private readonly long[] previousHealth = Array.Empty<long>();
+        private long[] previousHealth = Array.Empty<long>();
+        private ulong[] previousLifetimes = Array.Empty<ulong>();
         private readonly List<DamageNumber> damageNumbers = new List<DamageNumber>();
         private readonly List<Entity> digitPool = new List<Entity>();
 
@@ -84,7 +97,7 @@ namespace Roguelike.Features.Combat.Rendering
             var (materials, meshes, textures, meshArray) = await LoadResourcesAsync(scenario.PresentationId_Ref,
                 scenario.CombatRulesId_Ref, resources, token);
             return new CombatFeedbackVisuals(world, session, lookup, scenario.CombatRulesId_Ref,
-                materials, meshes, textures, meshArray);
+                scenario.PresentationId_Ref, materials, meshes, textures, meshArray);
         }
 
         /// <summary>从正式关卡定义加载血条/数字资源并绑定到世界。</summary>
@@ -97,7 +110,7 @@ namespace Roguelike.Features.Combat.Rendering
             var (materials, meshes, textures, meshArray) = await LoadResourcesAsync(definition.Presentation,
                 definition.CombatRules, resources, token);
             return new CombatFeedbackVisuals(world, session, lookup, definition.CombatRules,
-                materials, meshes, textures, meshArray);
+                definition.Presentation, materials, meshes, textures, meshArray);
         }
 
         private static Dictionary<int, float> BuildHeightLookup(PerformanceScenarioConfig scenario)
@@ -135,6 +148,8 @@ namespace Roguelike.Features.Combat.Rendering
             LoadResourcesAsync(CombatPresentationConfig presentation, CombatRulesConfig rules,
                 IResourceService resources, CancellationToken token)
         {
+            if (!(presentation.HealthBarWidthPixels > 0f) || !(presentation.HealthBarHeightPixels > 0f))
+                throw new InvalidOperationException("TbCombatPresentation health bar pixel size must be positive.");
             if (string.IsNullOrWhiteSpace(presentation.ShaderName))
                 throw new InvalidOperationException("TbCombatPresentation.shaderName is required for combat feedback.");
             Shader shader = Shader.Find(presentation.ShaderName);
@@ -148,8 +163,8 @@ namespace Roguelike.Features.Combat.Rendering
                 _ => throw new InvalidOperationException("TbCombatPresentation.textureFilterMode must be Point or Bilinear.")
             };
 
-            var textureList = new List<Texture2D>(3);
-            var materialList = new List<Material>(3);
+            var textureList = new List<Texture2D>(4);
+            var materialList = new List<Material>(1);
 
             Texture2D barFrame = await LoadTextureAsync(BarFrameResourceId, resources, filter, token);
             Texture2D barFill = await LoadTextureAsync(BarFillResourceId, resources, filter, token);
@@ -158,22 +173,28 @@ namespace Roguelike.Features.Combat.Rendering
             textureList.Add(barFrame);
             textureList.Add(barFill);
             textureList.Add(digitAtlas);
+            Texture2D feedbackAtlas = CreateFeedbackAtlas(barFrame, barFill, digitAtlas, filter);
+            textureList.Add(feedbackAtlas);
 
-            materialList.Add(CreateMaterial(shader, barFrame, RenderQueueHpFrame));
-            materialList.Add(CreateMaterial(shader, barFill, RenderQueueHpFill));
-            materialList.Add(CreateMaterial(shader, digitAtlas, RenderQueueDigits));
+            materialList.Add(CreateMaterial(shader, feedbackAtlas, presentation.FeedbackRenderQueue));
 
             var meshesList = new List<Mesh>();
-            meshesList.Add(QuadMeshBuilder.Create(0f, 1f, 0f, 1f));
+            meshesList.Add(QuadMeshBuilder.Create(
+                0.5f / FeedbackAtlasWidth, (BarTextureWidth - 0.5f) / FeedbackAtlasWidth,
+                0.5f / FeedbackAtlasHeight, (BarTextureHeight - 0.5f) / FeedbackAtlasHeight));
+            meshesList.Add(QuadMeshBuilder.Create(
+                0.5f / FeedbackAtlasWidth, (BarTextureWidth - 0.5f) / FeedbackAtlasWidth,
+                (BarTextureHeight + 0.5f) / FeedbackAtlasHeight,
+                (BarTextureHeight * 2f - 0.5f) / FeedbackAtlasHeight));
 
             const int digitCount = 12;
-            const float cellWidth = 29f / 348f;
-            const float cellHeight = 1f;
             for (int i = 0; i < digitCount; i++)
             {
-                float u0 = i * cellWidth;
-                float u1 = u0 + cellWidth;
-                meshesList.Add(QuadMeshBuilder.Create(u0, u1, 0f, cellHeight));
+                float u0 = (i * DigitCellWidth + 0.5f) / FeedbackAtlasWidth;
+                float u1 = (i * DigitCellWidth + DigitCellWidth - 0.5f) / FeedbackAtlasWidth;
+                float v0 = (BarTextureHeight * 2f + 0.5f) / FeedbackAtlasHeight;
+                float v1 = (BarTextureHeight * 2f + DigitTextureHeight - 0.5f) / FeedbackAtlasHeight;
+                meshesList.Add(QuadMeshBuilder.Create(u0, u1, v0, v1));
             }
 
             var materials = materialList.ToArray();
@@ -183,19 +204,88 @@ namespace Roguelike.Features.Combat.Rendering
             return (materials, meshes, textures, meshArray);
         }
 
+        /// <summary>按 TbResource 的 Texture 类型加载正式资源，并创建仅供运行时图集合成的可读副本。</summary>
+        /// <param name="resourceId">TbResource.id；其 path 必须指向 YooAsset 收集的 Texture2D。</param>
+        /// <param name="resources">统一资源服务。</param>
+        /// <param name="filter">TbCombatPresentation.textureFilterMode 指定的采样方式。</param>
+        /// <param name="token">战斗启动取消令牌。</param>
+        /// <returns>与资源像素尺寸一致、由当前战斗反馈实例拥有的 RGBA32 纹理。</returns>
+        /// <remarks>加载句柄在副本完成后立即释放；返回纹理由 CombatFeedbackVisuals.Dispose 销毁。</remarks>
         private static async Task<Texture2D> LoadTextureAsync(int resourceId, IResourceService resources,
             FilterMode filter, CancellationToken token)
         {
-            using var handle = await resources.LoadRawFileAsync(resourceId, token);
+            using var handle = await resources.LoadAssetAsync<Texture2D>(resourceId, token);
             token.ThrowIfCancellationRequested();
-            var texture = new Texture2D(2, 2, TextureFormat.RGBA32, false)
+            return CreateReadableCopy(handle.Asset, filter);
+        }
+
+        /// <summary>通过临时 RenderTexture 复制不可读的正式纹理，供 CPU 合并反馈图集。</summary>
+        /// <param name="source">YooAsset 加载的正式 Texture2D。</param>
+        /// <param name="filter">副本使用的采样方式。</param>
+        /// <returns>像素可读且不会依赖资源句柄生命周期的 RGBA32 副本。</returns>
+        /// <remarks>临时 RenderTexture 仅在调用期间存在，并恢复调用前的 RenderTexture.active。</remarks>
+        private static Texture2D CreateReadableCopy(Texture2D source, FilterMode filter)
+        {
+            if (source == null) throw new ArgumentNullException(nameof(source));
+            RenderTexture previous = RenderTexture.active;
+            RenderTexture temporary = RenderTexture.GetTemporary(source.width, source.height, 0,
+                RenderTextureFormat.ARGB32, RenderTextureReadWrite.Default);
+            Texture2D copy = null;
+            try
+            {
+                Graphics.Blit(source, temporary);
+                RenderTexture.active = temporary;
+                copy = new Texture2D(source.width, source.height, TextureFormat.RGBA32, false)
+                {
+                    filterMode = filter,
+                    wrapMode = TextureWrapMode.Clamp
+                };
+                copy.ReadPixels(new Rect(0, 0, source.width, source.height), 0, 0, false);
+                copy.Apply(false, false);
+                return copy;
+            }
+            catch
+            {
+                if (copy != null) Release(new[] { copy });
+                throw;
+            }
+            finally
+            {
+                RenderTexture.active = previous;
+                RenderTexture.ReleaseTemporary(temporary);
+            }
+        }
+
+        /// <summary>把正式蓝框、红色填充与数字纹理合并为仅驻留内存的单材质图集。</summary>
+        /// <param name="barFrame">TbResource 960006 加载的血条底框。</param>
+        /// <param name="barFill">TbResource 960007 加载的血量填充。</param>
+        /// <param name="digits">TbResource 960008 加载的伤害数字图集。</param>
+        /// <param name="filter">TbCombatPresentation.textureFilterMode 指定的采样方式。</param>
+        /// <returns>供本局 Entities Graphics 共享材质使用的运行时图集。</returns>
+        /// <remarks>图集不保存、不序列化，CombatFeedbackVisuals.Dispose 时与源纹理一并销毁。</remarks>
+        private static Texture2D CreateFeedbackAtlas(Texture2D barFrame, Texture2D barFill,
+            Texture2D digits, FilterMode filter)
+        {
+            if (barFrame.width != BarTextureWidth || barFrame.height != BarTextureHeight ||
+                barFill.width != BarTextureWidth || barFill.height != BarTextureHeight ||
+                digits.width != FeedbackAtlasWidth || digits.height != DigitTextureHeight)
+                throw new InvalidOperationException(
+                    $"Combat feedback textures do not match their configured atlas layout: " +
+                    $"frame={barFrame.width}x{barFrame.height}, fill={barFill.width}x{barFill.height}, " +
+                    $"digits={digits.width}x{digits.height}.");
+
+            var atlas = new Texture2D(FeedbackAtlasWidth, FeedbackAtlasHeight, TextureFormat.RGBA32, false)
             {
                 filterMode = filter,
                 wrapMode = TextureWrapMode.Clamp
             };
-            if (!ImageConversion.LoadImage(texture, handle.Data, true))
-                throw new InvalidOperationException("Cannot decode TbResource " + resourceId);
-            return texture;
+            atlas.SetPixels32(new Color32[FeedbackAtlasWidth * FeedbackAtlasHeight]);
+            atlas.SetPixels32(0, 0, BarTextureWidth, BarTextureHeight, barFrame.GetPixels32());
+            atlas.SetPixels32(0, BarTextureHeight, BarTextureWidth, BarTextureHeight, barFill.GetPixels32());
+            atlas.SetPixels32(0, BarTextureHeight * 2, FeedbackAtlasWidth, DigitTextureHeight,
+                digits.GetPixels32());
+            atlas.Apply(false, true);
+            return atlas;
         }
 
         private static Material CreateMaterial(Shader shader, Texture2D texture, int renderQueue)
@@ -220,8 +310,8 @@ namespace Roguelike.Features.Combat.Rendering
         }
 
         private CombatFeedbackVisuals(World world, CombatSession session, Dictionary<int, float> damageFloatHeights,
-            CombatRulesConfig rules, Material[] materials, Mesh[] meshes, Texture2D[] textures,
-            RenderMeshArray meshArray)
+            CombatRulesConfig rules, CombatPresentationConfig presentation, Material[] materials, Mesh[] meshes,
+            Texture2D[] textures, RenderMeshArray meshArray)
         {
             this.world = world ?? throw new ArgumentNullException(nameof(world));
             this.session = session ?? throw new ArgumentNullException(nameof(session));
@@ -232,12 +322,18 @@ namespace Roguelike.Features.Combat.Rendering
             this.textures = textures;
             this.meshArray = meshArray;
             worldUnitsPerPixel = rules.WorldUnitsPerPixel;
+            healthBarWidthPixels = presentation.HealthBarWidthPixels;
+            healthBarHeightPixels = presentation.HealthBarHeightPixels;
+            if (!(healthBarWidthPixels > 0f) || !(healthBarHeightPixels > 0f))
+                throw new InvalidOperationException("TbCombatPresentation health bar pixel size must be positive.");
 
             description = new RenderMeshDescription(ShadowCastingMode.Off, receiveShadows: false);
             barFrameMaterialIndex = 0;
-            barFillMaterialIndex = 1;
-            digitMaterialIndex = 2;
-            unitQuadMeshIndex = 0;
+            barFillMaterialIndex = 0;
+            digitMaterialIndex = 0;
+            barFrameMeshIndex = 0;
+            barFillMeshIndex = 1;
+            digitMeshStartIndex = 2;
 
             try
             {
@@ -263,7 +359,10 @@ namespace Roguelike.Features.Combat.Rendering
                     HideDamageNumber(damageNumbers[i]);
                 damageNumbers.Clear();
                 for (int i = 0; i < previousHealth.Length; i++)
+                {
                     previousHealth[i] = 0;
+                    previousLifetimes[i] = 0;
+                }
             }
             lastTick = tick;
 
@@ -275,17 +374,17 @@ namespace Roguelike.Features.Combat.Rendering
                 float3 unitPos = new float3(unit.Position, 0f);
                 float anchorY = unitPos.y + floatHeight;
 
+                long prev = previousHealth[slot];
+                if (previousLifetimes[slot] == unit.Target.Lifetime && prev > 0 && unit.Target.Health < prev)
+                {
+                    long damage = prev - unit.Target.Health;
+                    SpawnDamageNumber(damage, new float3(unitPos.x, anchorY, DigitDepth), tick);
+                }
+
                 if (unit.Target.Health > 0)
                 {
                     if (!slotState.Bound) BindHpBar(slot);
                     UpdateHpBar(slotState, unit, unitPos.x, anchorY);
-
-                    long prev = previousHealth[slot];
-                    if (prev > 0 && unit.Target.Health < prev)
-                    {
-                        long damage = prev - unit.Target.Health;
-                        SpawnDamageNumber(damage, new float3(unitPos.x, anchorY, 0f), tick);
-                    }
                 }
                 else if (slotState.Bound)
                 {
@@ -294,6 +393,7 @@ namespace Roguelike.Features.Combat.Rendering
                 }
 
                 previousHealth[slot] = unit.Target.Health;
+                previousLifetimes[slot] = unit.Target.Lifetime;
             }
 
             UpdateDamageNumbers(tick);
@@ -302,7 +402,7 @@ namespace Roguelike.Features.Combat.Rendering
         private void EnsureUnitCapacity()
         {
             int count = session.UnitCount;
-            if (hpBars.Count == count && previousHealth.Length == count) return;
+            if (hpBars.Count == count && previousHealth.Length == count && previousLifetimes.Length == count) return;
 
             int oldBars = hpBars.Count;
             for (int i = hpBars.Count; i < count; i++)
@@ -310,8 +410,12 @@ namespace Roguelike.Features.Combat.Rendering
 
             int oldHealth = previousHealth.Length;
             Array.Resize(ref previousHealth, count);
+            Array.Resize(ref previousLifetimes, count);
             for (int i = oldHealth; i < count; i++)
+            {
                 previousHealth[i] = 0;
+                previousLifetimes[i] = 0;
+            }
 
             // 容量缩小时：销毁不再需要的血条实体（正常不会缩小）。
             if (count < oldBars)
@@ -332,8 +436,8 @@ namespace Roguelike.Features.Combat.Rendering
         private void BindHpBar(int slot)
         {
             var state = hpBars[slot];
-            state.FrameEntity = CreateFeedbackEntity(barFrameMaterialIndex, unitQuadMeshIndex);
-            state.FillEntity = CreateFeedbackEntity(barFillMaterialIndex, unitQuadMeshIndex);
+            state.FrameEntity = CreateFeedbackEntity(barFrameMaterialIndex, barFrameMeshIndex);
+            state.FillEntity = CreateFeedbackEntity(barFillMaterialIndex, barFillMeshIndex);
             state.Bound = true;
         }
 
@@ -356,8 +460,8 @@ namespace Roguelike.Features.Combat.Rendering
             float ratio = unit.Target.MaxHealth > 0
                 ? math.clamp((float)unit.Target.Health / unit.Target.MaxHealth, 0f, 1f)
                 : 0f;
-            float barWidth = math.max(unit.Radius * 2.2f, worldUnitsPerPixel * 48f);
-            float barHeight = barWidth * (7f / 60f);
+            float barWidth = healthBarWidthPixels * worldUnitsPerPixel;
+            float barHeight = healthBarHeightPixels * worldUnitsPerPixel;
             float barCenterX = unitX;
             float barCenterY = anchorY - barHeight * 0.5f;
             float barLeftX = barCenterX - barWidth * 0.5f;
@@ -368,12 +472,12 @@ namespace Roguelike.Features.Combat.Rendering
             SetVisible(slot.FillEntity, true);
 
             manager.SetComponentData(slot.FrameEntity,
-                LocalTransform.FromPosition(new float3(barCenterX, barCenterY, 0f)));
+                LocalTransform.FromPosition(new float3(barCenterX, barCenterY, HpFrameDepth)));
             manager.SetComponentData(slot.FrameEntity,
                 new PostTransformMatrix { Value = float4x4.Scale(barWidth, barHeight, 1f) });
 
             manager.SetComponentData(slot.FillEntity,
-                LocalTransform.FromPosition(new float3(fillCenterX, barCenterY, 0f)));
+                LocalTransform.FromPosition(new float3(fillCenterX, barCenterY, HpFillDepth)));
             manager.SetComponentData(slot.FillEntity,
                 new PostTransformMatrix { Value = float4x4.Scale(fillWidth, barHeight, 1f) });
         }
@@ -401,12 +505,13 @@ namespace Roguelike.Features.Combat.Rendering
 
             for (int i = 0; i < text.Length; i++)
             {
-                int meshIndex = CharToMeshIndex(text[i]);
+                int meshIndex = digitMeshStartIndex + CharToMeshIndex(text[i]);
                 Entity digit = AcquireDigitEntity();
                 number.Digits[i] = digit;
-                manager.SetComponentData(digit, MaterialMeshInfo.FromRenderMeshArrayIndices(digitMaterialIndex, meshIndex));
+                manager.SetComponentData(digit,
+                    MaterialMeshInfo.FromRenderMeshArrayIndices(digitMaterialIndex, meshIndex));
                 float x = leftX + i * digitWorldWidth * DigitKerning + digitWorldWidth * 0.5f;
-                manager.SetComponentData(digit, LocalTransform.FromPosition(new float3(x, baseY, 0f)));
+                manager.SetComponentData(digit, LocalTransform.FromPosition(new float3(x, baseY, DigitDepth)));
                 manager.SetComponentData(digit, new PostTransformMatrix
                 {
                     Value = float4x4.Scale(digitWorldWidth, digitWorldHeight, 1f)
@@ -444,7 +549,7 @@ namespace Roguelike.Features.Combat.Rendering
                 digitPool.RemoveAt(digitPool.Count - 1);
                 if (manager.Exists(candidate)) return candidate;
             }
-            return CreateFeedbackEntity(digitMaterialIndex, 0);
+            return CreateFeedbackEntity(digitMaterialIndex, digitMeshStartIndex);
         }
 
         private void UpdateDamageNumbers(ulong tick)
@@ -477,7 +582,7 @@ namespace Roguelike.Features.Combat.Rendering
                     var digit = number.Digits[d];
                     if (!manager.Exists(digit)) continue;
                     float x = leftX + d * digitWorldWidth * DigitKerning + digitWorldWidth * 0.5f;
-                    manager.SetComponentData(digit, LocalTransform.FromPosition(new float3(x, baseY, 0f)));
+                    manager.SetComponentData(digit, LocalTransform.FromPosition(new float3(x, baseY, DigitDepth)));
                     manager.SetComponentData(digit, new PostTransformMatrix
                     {
                         Value = float4x4.Scale(digitWorldWidth, digitWorldHeight, 1f)
@@ -499,11 +604,17 @@ namespace Roguelike.Features.Combat.Rendering
             }
         }
 
+        /// <summary>切换反馈实体可见性，隐藏时移出相机视野，显示位置和尺寸由调用方紧接着写入。</summary>
+        /// <param name="entity">需要切换的血条或数字实体。</param>
+        /// <param name="visible">是否显示；显示分支不修改尺寸。</param>
+        /// <remarks>不增删 DisableRendering，也不使用退化零矩阵，避免 Entities Graphics 块索引失效或产生黑色退化面。</remarks>
         private void SetVisible(Entity entity, bool visible)
         {
-            bool hidden = manager.HasComponent<DisableRendering>(entity);
-            if (visible && hidden) manager.RemoveComponent<DisableRendering>(entity);
-            else if (!visible && !hidden) manager.AddComponent<DisableRendering>(entity);
+            if (visible) return;
+            manager.SetComponentData(entity,
+                LocalTransform.FromPosition(new float3(HiddenWorldCoordinate, HiddenWorldCoordinate, 0f)));
+            manager.SetComponentData(entity,
+                new PostTransformMatrix { Value = float4x4.Scale(1f, 1f, 1f) });
         }
 
         /// <summary>释放运行时创建的实体、材质、网格和纹理。</summary>

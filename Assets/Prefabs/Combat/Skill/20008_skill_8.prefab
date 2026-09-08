@@ -11,7 +11,7 @@ GameObject:
   - component: {fileID: 383326349084406459}
   - component: {fileID: 5491573366499069071}
   m_Layer: 0
-  m_Name: ProjectileCollision
+  m_Name: "\u5F39\u4E38\u547D\u4E2D\u8303\u56F4"
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -42,10 +42,14 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 7dc9c495508dfac4b9b33bd25661c6b1, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
+  m_Name:
+  m_EditorClassIdentifier:
   SkillId: 20008
-  Radius: 1.205
+  Kind: 0
+  RadiusPixels: 120.5
+  OffsetXPixels: 0
+  OffsetYPixels: 0
+  DataVersion: 1
 --- !u!1 &5772270691937426681
 GameObject:
   m_ObjectHideFlags: 0

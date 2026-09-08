@@ -22,6 +22,9 @@ namespace Roguelike.Features.Combat.Runtime
         private CombatVisualResources assets;
         private CombatEntityVisuals visuals;
         private CombatFeedbackVisuals feedback;
+#if ROGUELIKE_COMBAT_COLLISION_DEBUG
+        private CombatCollisionDebugVisuals collisionDebug;
+#endif
         private CombatTilemapBackground mapBackground;
         private CombatUiRuntime ui;
         private ICombatInput input;
@@ -75,6 +78,10 @@ namespace Roguelike.Features.Combat.Runtime
                 visuals = new CombatEntityVisuals(world, Session, scenario, assets);
                 feedback = await CombatFeedbackVisuals.CreateAsync(world, Session, scenario, resources, linked.Token);
                 CreateCamera();
+#if ROGUELIKE_COMBAT_COLLISION_DEBUG
+                collisionDebug = new CombatCollisionDebugVisuals(Session, scenario.CombatRulesId_Ref, transform);
+                collisionDebug.Synchronize();
+#endif
                 ApplyScenarioSettings();
                 RefreshStatus();
                 Ready = true;
@@ -118,6 +125,10 @@ namespace Roguelike.Features.Combat.Runtime
                 visuals = new CombatEntityVisuals(world, Session, definition, assets);
                 feedback = await CombatFeedbackVisuals.CreateAsync(world, Session, definition, resources, linked.Token);
                 CreateCamera();
+#if ROGUELIKE_COMBAT_COLLISION_DEBUG
+                collisionDebug = new CombatCollisionDebugVisuals(Session, definition.CombatRules, transform);
+                collisionDebug.Synchronize();
+#endif
                 ui = await CombatUiRuntime.CreateAsync(definition, resources, transform, ViewCamera,
                     ChooseUpgrade, Restart, linked.Token);
                 linked.Token.ThrowIfCancellationRequested();
@@ -252,6 +263,9 @@ namespace Roguelike.Features.Combat.Runtime
             else Session.Advance(elapsedSeconds, frame.Movement);
             visuals.Synchronize();
             feedback?.Synchronize();
+#if ROGUELIKE_COMBAT_COLLISION_DEBUG
+            collisionDebug?.Synchronize();
+#endif
             RefreshStatus();
         }
 
@@ -334,6 +348,9 @@ namespace Roguelike.Features.Combat.Runtime
             }
             visuals.Synchronize();
             feedback?.Synchronize();
+#if ROGUELIKE_COMBAT_COLLISION_DEBUG
+            collisionDebug?.Synchronize();
+#endif
             RefreshStatus();
             return true;
         }
@@ -347,6 +364,9 @@ namespace Roguelike.Features.Combat.Runtime
             if (!Ready || Coordinator == null || !Coordinator.ChooseUpgrade(panelGeneration, optionId)) return false;
             visuals.Synchronize();
             feedback?.Synchronize();
+#if ROGUELIKE_COMBAT_COLLISION_DEBUG
+            collisionDebug?.Synchronize();
+#endif
             RefreshStatus();
             return true;
         }
@@ -370,6 +390,9 @@ namespace Roguelike.Features.Combat.Runtime
         /// <remarks>正式 TbStage 完全使用可编辑 Prefab，OnGUI 不参与正式入口。</remarks>
         private void OnGUI()
         {
+#if ROGUELIKE_COMBAT_COLLISION_DEBUG
+            if (Ready) collisionDebug?.DrawLegend();
+#endif
             if (!Ready || Coordinator != null) return;
             if (labelStyle == null)
             {
@@ -408,6 +431,10 @@ namespace Roguelike.Features.Combat.Runtime
             Ready = false;
             ui?.Dispose();
             ui = null;
+#if ROGUELIKE_COMBAT_COLLISION_DEBUG
+            collisionDebug?.Dispose();
+            collisionDebug = null;
+#endif
             if (ViewCamera != null)
             {
                 ViewCamera.enabled = false;

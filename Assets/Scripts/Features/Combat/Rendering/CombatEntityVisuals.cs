@@ -20,6 +20,11 @@ namespace Roguelike.Features.Combat.Rendering
         private readonly CombatSession session;
         private readonly CombatVisualResources resources;
         private CombatVisualPlayer[] players;
+        private long[] previousHealth;
+        private ulong[] previousLifetimes;
+        private ulong[] hitFlashUntilTicks;
+        private readonly ulong hitFlashDurationTicks;
+        private readonly float worldUnitsPerPixel;
         private readonly IReadOnlyDictionary<int, VisualSetConfig> visualSets;
         private readonly IReadOnlyDictionary<int, SkillConfig> skills;
         private readonly RenderMeshArray meshArray;
@@ -60,6 +65,8 @@ namespace Roguelike.Features.Combat.Rendering
         /// <remarks>修改会话单位渲染组件；自有世界退出顺序为本绑定、会话、世界、共享资源，先清理 GPU 注册。不修改 Scene/Prefab。</remarks>
         public CombatEntityVisuals(World world, CombatSession session, PerformanceScenarioConfig scenario, CombatVisualResources resources)
             : this(world, session, resources,
+                scenario.PresentationId_Ref,
+                scenario.CombatRulesId_Ref.WorldUnitsPerPixel,
                 new[] { scenario.CharacterId_Ref.VisualSetId_Ref }.Concat(scenario.MonsterIds_Ref.Select(item => item.VisualSetId_Ref)),
                 new[] { scenario.CharacterId_Ref.DefaultSkillId_Ref })
         {
@@ -73,6 +80,8 @@ namespace Roguelike.Features.Combat.Rendering
         /// <remarks>槽位根据 CombatUnit.VisualSetId 选择表现，动态扩容不会依赖生成顺序。</remarks>
         public CombatEntityVisuals(World world, CombatSession session, CombatRunDefinition definition, CombatVisualResources resources)
             : this(world, session, resources,
+                definition.Presentation,
+                definition.CombatRules.WorldUnitsPerPixel,
                 new[] { definition.Character.VisualSetId_Ref }
                     .Concat(definition.Monsters.Select(item => item.VisualSetId_Ref))
                     .Concat(new[] { definition.Boss.MonsterId_Ref.VisualSetId_Ref }),
@@ -84,19 +93,28 @@ namespace Roguelike.Features.Combat.Rendering
         /// <param name="world">会话所属世界。</param>
         /// <param name="session">实体与事件读取入口。</param>
         /// <param name="resources">已经完成共享加载的 ANI 资源。</param>
+        /// <param name="presentation">提供 TbCombatPresentation.hitFlashDurationSecondsMilli。</param>
+        /// <param name="worldUnitsPerPixel">TbCombatRules.worldUnitsPerPixel，用于表现节点像素偏移换算。</param>
         /// <param name="visualCatalog">本会话允许出现的 TbVisualSet。</param>
         /// <param name="skillCatalog">本会话允许发射的 TbSkill。</param>
         /// <remarks>只保存配置引用与 GPU 注册；不加载资源、不保存资产。</remarks>
         private CombatEntityVisuals(World world, CombatSession session, CombatVisualResources resources,
+            CombatPresentationConfig presentation, float worldUnitsPerPixel,
             IEnumerable<VisualSetConfig> visualCatalog, IEnumerable<SkillConfig> skillCatalog)
         {
             this.world = world;
             manager = world.EntityManager; this.session = session; this.resources = resources;
+            if (!(worldUnitsPerPixel > 0f)) throw new InvalidOperationException("Combat visual pixel scale must be positive.");
+            this.worldUnitsPerPixel = worldUnitsPerPixel;
             visualSets = visualCatalog.Where(item => item != null).GroupBy(item => item.Id)
                 .ToDictionary(group => group.Key, group => group.First());
             skills = skillCatalog.Where(item => item != null).GroupBy(item => item.Id)
                 .ToDictionary(group => group.Key, group => group.First());
             players = Array.Empty<CombatVisualPlayer>();
+            previousHealth = Array.Empty<long>();
+            previousLifetimes = Array.Empty<ulong>();
+            hitFlashUntilTicks = Array.Empty<ulong>();
+            hitFlashDurationTicks = Math.Max(1UL, (ulong)Math.Ceiling(presentation.HitFlashDurationSeconds / session.StepSeconds));
             meshArray = new RenderMeshArray(resources.Materials, resources.Meshes);
             description = new RenderMeshDescription(ShadowCastingMode.Off, receiveShadows: false);
             try
@@ -117,6 +135,7 @@ namespace Roguelike.Features.Combat.Rendering
             ulong tick = session.Statistics.Tick;
             if (tick < lastTick)
             {
+                Array.Clear(hitFlashUntilTicks, 0, hitFlashUntilTicks.Length);
                 seenImpacts.Clear();
                 seenAreas.Clear();
                 foreach (var impact in impacts) HideImpact(impact);
@@ -125,14 +144,17 @@ namespace Roguelike.Features.Combat.Rendering
             lastTick = tick;
             for (int slot = 0; slot < players.Length; slot++)
             {
+                CombatUnit unit = session.ReadUnit(slot);
+                UpdateHitFlash(slot, unit, tick);
                 var player = players[slot];
-                player.Sample(session.ReadUnit(slot), tick, session.StepSeconds);
+                player.Sample(unit, tick, session.StepSeconds);
                 var entity = session.UnitEntity(slot);
                 bool hidden = manager.HasComponent<DisableRendering>(entity);
                 if (player.Visible && hidden) manager.RemoveComponent<DisableRendering>(entity);
                 else if (!player.Visible && !hidden) manager.AddComponent<DisableRendering>(entity);
                 if (!player.Visible) continue;
-                manager.SetComponentData(entity, MaterialMeshInfo.FromRenderMeshArrayIndices(player.MaterialIndex, player.MeshIndex));
+                int materialIndex = IsHitFlashing(slot) ? player.HitFlashMaterialIndex : player.MaterialIndex;
+                manager.SetComponentData(entity, MaterialMeshInfo.FromRenderMeshArrayIndices(materialIndex, player.MeshIndex));
                 var bounds = resources.Meshes[player.MeshIndex].bounds;
                 manager.SetComponentData(entity, new RenderBounds { Value = new AABB { Center = bounds.center, Extents = bounds.extents } });
             }
@@ -146,6 +168,27 @@ namespace Roguelike.Features.Combat.Rendering
         /// <returns>当前播放器。</returns>
         public CombatVisualPlayer Read(int slot) => players[slot];
 
+        /// <summary>诊断和验收读取指定单位是否正处于实际扣血触发的白闪窗口。</summary>
+        /// <param name="slot">会话单位槽。</param>
+        /// <returns>当前生命周期仍存活且模拟 tick 尚未越过白闪截止 tick 时为真。</returns>
+        public bool IsHitFlashing(int slot) => session.ReadUnit(slot).Target.Health > 0 &&
+            session.Statistics.Tick < hitFlashUntilTicks[slot];
+
+        /// <summary>比较同一生命周期前后生命值，只在发生正数扣血时刷新白闪截止 tick。</summary>
+        /// <param name="slot">会话单位槽。</param>
+        /// <param name="unit">当前 CombatUnit 快照。</param>
+        /// <param name="tick">CombatSession 已完成的模拟 tick。</param>
+        /// <remarks>持续时间来自 TbCombatPresentation.hitFlashDurationSecondsMilli；生命周期切换、治疗、闪避、免疫和无敌均不会触发。</remarks>
+        private void UpdateHitFlash(int slot, in CombatUnit unit, ulong tick)
+        {
+            if (previousLifetimes[slot] != unit.Target.Lifetime)
+                hitFlashUntilTicks[slot] = 0;
+            else if (unit.Target.Health > 0 && previousHealth[slot] > unit.Target.Health)
+                hitFlashUntilTicks[slot] = tick + hitFlashDurationTicks;
+            previousHealth[slot] = unit.Target.Health;
+            previousLifetimes[slot] = unit.Target.Lifetime;
+        }
+
         /// <summary>会话按批扩容后，为新增槽位建立播放器并绑定已加载的共享美术。</summary>
         /// <remarks>单位类型读取 CombatUnit.VisualSetId；只在容量增长时分配播放器数组，不重复加载纹理、材质或网格。旧槽复用由生命周期变化重置动画。</remarks>
         private void BindNewUnits()
@@ -153,12 +196,18 @@ namespace Roguelike.Features.Combat.Rendering
             if (players.Length == session.UnitCount) return;
             int previous = players.Length;
             Array.Resize(ref players, session.UnitCount);
+            Array.Resize(ref previousHealth, session.UnitCount);
+            Array.Resize(ref previousLifetimes, session.UnitCount);
+            Array.Resize(ref hitFlashUntilTicks, session.UnitCount);
             for (int slot = previous; slot < players.Length; slot++)
             {
-                int visualId = session.ReadUnit(slot).VisualSetId;
+                CombatUnit unit = session.ReadUnit(slot);
+                int visualId = unit.VisualSetId;
                 if (!visualSets.TryGetValue(visualId, out var visual))
                     throw new InvalidOperationException("Combat unit references a visual that was not preloaded: " + visualId);
                 players[slot] = new CombatVisualPlayer(visual, resources);
+                previousHealth[slot] = unit.Target.Health;
+                previousLifetimes[slot] = unit.Target.Lifetime;
                 RenderMeshUtility.AddComponents(session.UnitEntity(slot), manager, description, meshArray,
                     MaterialMeshInfo.FromRenderMeshArrayIndices(0, 0));
             }
@@ -191,11 +240,21 @@ namespace Roguelike.Features.Combat.Rendering
                 if (!skills.TryGetValue(projectile.SkillId, out var projectileSkill) || projectileSkill.ProjectileClipId_Ref == null)
                     throw new InvalidOperationException("Combat projectile references a skill visual that was not preloaded.");
                 var clip = resources.Read(projectile.SkillId, projectileSkill.ProjectileClipId.Value);
+                if (!projectileSkill.ProjectileVisualOffsetXPixels.HasValue ||
+                    !projectileSkill.ProjectileVisualOffsetYPixels.HasValue ||
+                    !projectileSkill.ProjectileVisualScale.HasValue || !(projectileSkill.ProjectileVisualScale.Value > 0f))
+                    throw new InvalidOperationException("Combat projectile visual placement is incomplete: " + projectile.SkillId);
                 int frame = clip.Animation.Sample(0, projectile.Age);
                 ApplyFrame(entity, clip, frame, clip.FlipX);
                 float angle = math.atan2(projectile.Velocity.y, projectile.Velocity.x);
+                float2 localOffset = new float2(projectileSkill.ProjectileVisualOffsetXPixels.Value,
+                    projectileSkill.ProjectileVisualOffsetYPixels.Value) * worldUnitsPerPixel;
+                math.sincos(angle, out float sin, out float cos);
+                float2 visualOffset = new float2(cos * localOffset.x - sin * localOffset.y,
+                    sin * localOffset.x + cos * localOffset.y);
                 manager.SetComponentData(entity, LocalTransform.FromPositionRotationScale(
-                    new float3(projectile.Position, 0), quaternion.RotateZ(angle), 1));
+                    new float3(projectile.Position + visualOffset, 0), quaternion.RotateZ(angle),
+                    projectileSkill.ProjectileVisualScale.Value));
                 VisibleProjectileCount++;
             }
         }
@@ -210,12 +269,20 @@ namespace Roguelike.Features.Combat.Rendering
                 var impactEvent = session.ReadImpact(index);
                 if (!seenImpacts.Add(impactEvent.AttackSequence)) continue;
                 if (!skills.TryGetValue(impactEvent.SkillId, out var projectileSkill) || projectileSkill.ImpactClipId_Ref == null) continue;
+                if (!projectileSkill.ImpactVisualOffsetXPixels.HasValue ||
+                    !projectileSkill.ImpactVisualOffsetYPixels.HasValue ||
+                    !projectileSkill.ImpactVisualScale.HasValue || !(projectileSkill.ImpactVisualScale.Value > 0f))
+                    throw new InvalidOperationException("Combat impact visual placement is incomplete: " + impactEvent.SkillId);
                 var visual = AcquireImpact();
                 visual.Active = true;
                 visual.SkillId = impactEvent.SkillId;
                 visual.ClipId = projectileSkill.ImpactClipId.Value;
                 visual.StartTick = impactEvent.Tick;
-                manager.SetComponentData(visual.Entity, LocalTransform.FromPosition(new float3(impactEvent.Position, 0)));
+                float2 offset = new float2(projectileSkill.ImpactVisualOffsetXPixels.Value,
+                    projectileSkill.ImpactVisualOffsetYPixels.Value) * worldUnitsPerPixel;
+                manager.SetComponentData(visual.Entity, LocalTransform.FromPositionRotationScale(
+                    new float3(impactEvent.Position + offset, 0), quaternion.identity,
+                    projectileSkill.ImpactVisualScale.Value));
                 SetVisible(visual.Entity, true);
             }
 
@@ -262,6 +329,11 @@ namespace Roguelike.Features.Combat.Rendering
                 if (!skills.TryGetValue(areaEvent.SkillId, out SkillConfig skill) ||
                     skill.AreaClipIds_Ref == null || skill.AreaClipIds_Ref.Count == 0)
                     throw new InvalidOperationException("Combat area event references a skill visual that was not preloaded.");
+                if (!skill.AreaVisualOffsetXPixels.HasValue || !skill.AreaVisualOffsetYPixels.HasValue ||
+                    !skill.AreaVisualScale.HasValue || !(skill.AreaVisualScale.Value > 0f))
+                    throw new InvalidOperationException("Combat area visual placement is incomplete: " + areaEvent.SkillId);
+                float2 offset = new float2(skill.AreaVisualOffsetXPixels.Value,
+                    skill.AreaVisualOffsetYPixels.Value) * worldUnitsPerPixel;
                 foreach (AnimationClipConfig clipConfig in skill.AreaClipIds_Ref)
                 {
                     AreaVisual visual = AcquireArea();
@@ -270,7 +342,8 @@ namespace Roguelike.Features.Combat.Rendering
                     visual.ClipId = clipConfig.Id;
                     visual.StartTick = areaEvent.Tick;
                     manager.SetComponentData(visual.Entity,
-                        LocalTransform.FromPosition(new float3(areaEvent.Position, 0)));
+                        LocalTransform.FromPositionRotationScale(new float3(areaEvent.Position + offset, 0),
+                            quaternion.identity, skill.AreaVisualScale.Value));
                     SetVisible(visual.Entity, true);
                 }
             }

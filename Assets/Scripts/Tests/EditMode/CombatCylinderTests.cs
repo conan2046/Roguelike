@@ -24,6 +24,35 @@ namespace Roguelike.Tests
             Assert.That(CombatCylinder.Sweep(new float2(-1, 0), new float2(0, 1), 1, out _), Is.False);
         }
 
+        /// <summary>纵向胶囊扫掠必须分别找到侧边和端帽的首次接触，并输出稳定外法线。</summary>
+        [Test]
+        public void VerticalCapsuleSweepFindsSideAndCapContacts()
+        {
+            Assert.That(CombatCylinder.Sweep(new float2(-3f, 0f), new float2(4f, 0f), 1f, 2f,
+                out float sideFraction, out float2 sideNormal), Is.True);
+            Assert.That(sideFraction, Is.EqualTo(0.5f).Within(1e-6f));
+            Assert.That(math.distance(sideNormal, new float2(-1f, 0f)), Is.LessThan(1e-6f));
+
+            Assert.That(CombatCylinder.Sweep(new float2(0f, 4f), new float2(0f, -4f), 1f, 2f,
+                out float capFraction, out float2 capNormal), Is.True);
+            Assert.That(capFraction, Is.EqualTo(0.25f).Within(1e-6f));
+            Assert.That(math.distance(capNormal, new float2(0f, 1f)), Is.LessThan(1e-6f));
+        }
+
+        /// <summary>胶囊中轴覆盖区内的距离只取横向间隔，超过端点后再计入纵向间隔。</summary>
+        [Test]
+        public void VerticalCapsuleReachUsesSegmentDistance()
+        {
+            Assert.That(CombatGeometry.WithinCapsuleReach(new float2(0.5f, 1.5f), 2f, 0.5f), Is.True);
+            Assert.That(CombatGeometry.WithinCapsuleReach(new float2(0f, 2.5f), 2f, 0.5f), Is.True);
+            Assert.That(CombatGeometry.WithinCapsuleReach(new float2(0f, 2.51f), 2f, 0.5f), Is.False);
+
+            CombatCylinder capsule = CombatCylinder.FromConfig(30f, 140f, 0f, 0f, 0f, 0.01f)
+                .AsVerticalCapsule2D();
+            Assert.That(capsule.UsesCapsule2D, Is.True);
+            Assert.That(capsule.HalfSegment2D, Is.EqualTo(0.4f).Within(1e-6f));
+        }
+
         /// <summary>圆柱高度区间决定阻挡，水平相同但竖直分离时不碰撞；配置缺失必须拒绝。</summary>
         [Test]
         public void CylinderHeightAndPixelConversionAreIndependent()

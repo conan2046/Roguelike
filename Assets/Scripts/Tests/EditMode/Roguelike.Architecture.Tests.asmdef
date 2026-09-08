@@ -11,6 +11,8 @@
     "Roguelike.Features.Combat.Ecs",
     "Roguelike.Features.Combat.Runtime",
     "Roguelike.Features.Combat.Rendering",
+    "Roguelike.Features.Combat.Authoring",
+    "Roguelike.Features.Combat.Authoring.Editor",
     "Unity.Entities.Graphics",
     "Unity.Entities",
     "Unity.Collections",

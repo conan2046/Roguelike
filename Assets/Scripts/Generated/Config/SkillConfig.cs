@@ -25,15 +25,24 @@ public sealed partial class SkillConfig : Luban.BeanBase
         VisualSetId_Ref = null;
         if(_buf.ReadBool()){ CombatProfileId = _buf.ReadInt(); } else { CombatProfileId = null; }
         CombatProfileId_Ref = null;
-        if(_buf.ReadBool()){ ProjectileRadiusMilli = _buf.ReadInt(); } else { ProjectileRadiusMilli = null; }
-        if(_buf.ReadBool()){ ProjectileOffsetXMilli = _buf.ReadInt(); } else { ProjectileOffsetXMilli = null; }
-        if(_buf.ReadBool()){ ProjectileOffsetYMilli = _buf.ReadInt(); } else { ProjectileOffsetYMilli = null; }
+        if(_buf.ReadBool()){ ProjectileRadiusPixelsMilli = _buf.ReadInt(); } else { ProjectileRadiusPixelsMilli = null; }
+        if(_buf.ReadBool()){ ProjectileOffsetXPixelsMilli = _buf.ReadInt(); } else { ProjectileOffsetXPixelsMilli = null; }
+        if(_buf.ReadBool()){ ProjectileOffsetYPixelsMilli = _buf.ReadInt(); } else { ProjectileOffsetYPixelsMilli = null; }
         if(_buf.ReadBool()){ ProjectileClipId = _buf.ReadInt(); } else { ProjectileClipId = null; }
         ProjectileClipId_Ref = null;
         if(_buf.ReadBool()){ ImpactClipId = _buf.ReadInt(); } else { ImpactClipId = null; }
         ImpactClipId_Ref = null;
         {int n0 = _buf.ReadSize(); AreaClipIds = new System.Collections.Generic.List<int>(n0);for(var i0 = 0 ; i0 < n0 ; i0++) { int _e0;  _e0 = _buf.ReadInt(); AreaClipIds.Add(_e0);}}
-        if(_buf.ReadBool()){ AreaRadiusMilli = _buf.ReadInt(); } else { AreaRadiusMilli = null; }
+        if(_buf.ReadBool()){ AreaRadiusPixelsMilli = _buf.ReadInt(); } else { AreaRadiusPixelsMilli = null; }
+        if(_buf.ReadBool()){ ProjectileVisualOffsetXPixelsMilli = _buf.ReadInt(); } else { ProjectileVisualOffsetXPixelsMilli = null; }
+        if(_buf.ReadBool()){ ProjectileVisualOffsetYPixelsMilli = _buf.ReadInt(); } else { ProjectileVisualOffsetYPixelsMilli = null; }
+        if(_buf.ReadBool()){ ProjectileVisualScalePermille = _buf.ReadInt(); } else { ProjectileVisualScalePermille = null; }
+        if(_buf.ReadBool()){ ImpactVisualOffsetXPixelsMilli = _buf.ReadInt(); } else { ImpactVisualOffsetXPixelsMilli = null; }
+        if(_buf.ReadBool()){ ImpactVisualOffsetYPixelsMilli = _buf.ReadInt(); } else { ImpactVisualOffsetYPixelsMilli = null; }
+        if(_buf.ReadBool()){ ImpactVisualScalePermille = _buf.ReadInt(); } else { ImpactVisualScalePermille = null; }
+        if(_buf.ReadBool()){ AreaVisualOffsetXPixelsMilli = _buf.ReadInt(); } else { AreaVisualOffsetXPixelsMilli = null; }
+        if(_buf.ReadBool()){ AreaVisualOffsetYPixelsMilli = _buf.ReadInt(); } else { AreaVisualOffsetYPixelsMilli = null; }
+        if(_buf.ReadBool()){ AreaVisualScalePermille = _buf.ReadInt(); } else { AreaVisualScalePermille = null; }
     }
 
     public static SkillConfig DeserializeSkillConfig(ByteBuf _buf)
@@ -60,17 +69,17 @@ public sealed partial class SkillConfig : Luban.BeanBase
     public readonly int? CombatProfileId;
     public SkillCombatConfig CombatProfileId_Ref;
     /// <summary>
-    /// 弹丸半径；世界单位&#215;1000；实际值=表值/1000；最多3位小数；非弹丸留空
+    /// 弹丸命中半径（像素）；由技能预制体“弹丸命中范围”节点导出；非弹丸留空。
     /// </summary>
-    public readonly int? ProjectileRadiusMilli;
+    public readonly int? ProjectileRadiusPixelsMilli;
     /// <summary>
-    /// 碰撞中心横向偏移；技能局部右向；世界单位&#215;1000；实际值=表值/1000；最多3位小数
+    /// 弹丸命中中心横向偏移（像素）；技能局部右向；由技能预制体导出。
     /// </summary>
-    public readonly int? ProjectileOffsetXMilli;
+    public readonly int? ProjectileOffsetXPixelsMilli;
     /// <summary>
-    /// 碰撞中心纵向偏移；技能局部前向；世界单位&#215;1000；实际值=表值/1000；最多3位小数
+    /// 弹丸命中中心前向偏移（像素）；由技能预制体导出。
     /// </summary>
-    public readonly int? ProjectileOffsetYMilli;
+    public readonly int? ProjectileOffsetYPixelsMilli;
     /// <summary>
     /// 弹丸飞行表现；Projectile必填
     /// </summary>
@@ -87,9 +96,45 @@ public sealed partial class SkillConfig : Luban.BeanBase
     public readonly System.Collections.Generic.List<int> AreaClipIds;
     public System.Collections.Generic.List<AnimationClipConfig> AreaClipIds_Ref;
     /// <summary>
-    /// TargetArea群体半径，世界单位乘1000
+    /// 范围技能命中半径（像素）；由技能预制体“范围技能命中范围”节点导出；非范围技能留空。
     /// </summary>
-    public readonly int? AreaRadiusMilli;
+    public readonly int? AreaRadiusPixelsMilli;
+    /// <summary>
+    /// 弹丸表现横向偏移（逻辑像素）；由技能预制体“弹丸表现”节点导出。
+    /// </summary>
+    public readonly int? ProjectileVisualOffsetXPixelsMilli;
+    /// <summary>
+    /// 弹丸表现纵向偏移（逻辑像素）；由技能预制体“弹丸表现”节点导出。
+    /// </summary>
+    public readonly int? ProjectileVisualOffsetYPixelsMilli;
+    /// <summary>
+    /// 弹丸表现相对缩放（千分比）；由技能预制体“弹丸表现”节点统一 Scale 导出。
+    /// </summary>
+    public readonly int? ProjectileVisualScalePermille;
+    /// <summary>
+    /// 命中特效表现横向偏移（逻辑像素）；由技能预制体“命中特效表现”节点导出。
+    /// </summary>
+    public readonly int? ImpactVisualOffsetXPixelsMilli;
+    /// <summary>
+    /// 命中特效表现纵向偏移（逻辑像素）；由技能预制体“命中特效表现”节点导出。
+    /// </summary>
+    public readonly int? ImpactVisualOffsetYPixelsMilli;
+    /// <summary>
+    /// 命中特效表现相对缩放（千分比）；由技能预制体“命中特效表现”节点统一 Scale 导出。
+    /// </summary>
+    public readonly int? ImpactVisualScalePermille;
+    /// <summary>
+    /// 范围特效表现横向偏移（逻辑像素）；由技能预制体“范围特效表现”节点导出。
+    /// </summary>
+    public readonly int? AreaVisualOffsetXPixelsMilli;
+    /// <summary>
+    /// 范围特效表现纵向偏移（逻辑像素）；由技能预制体“范围特效表现”节点导出。
+    /// </summary>
+    public readonly int? AreaVisualOffsetYPixelsMilli;
+    /// <summary>
+    /// 范围特效表现相对缩放（千分比）；由技能预制体“范围特效表现”节点统一 Scale 导出。
+    /// </summary>
+    public readonly int? AreaVisualScalePermille;
    
     public const int __ID__ = -844226349;
     public override int GetTypeId() => __ID__;
@@ -112,13 +157,22 @@ public sealed partial class SkillConfig : Luban.BeanBase
         + "name:" + Name + ","
         + "visualSetId:" + VisualSetId + ","
         + "combatProfileId:" + CombatProfileId + ","
-        + "projectileRadiusMilli:" + ProjectileRadiusMilli + ","
-        + "projectileOffsetXMilli:" + ProjectileOffsetXMilli + ","
-        + "projectileOffsetYMilli:" + ProjectileOffsetYMilli + ","
+        + "projectileRadiusPixelsMilli:" + ProjectileRadiusPixelsMilli + ","
+        + "projectileOffsetXPixelsMilli:" + ProjectileOffsetXPixelsMilli + ","
+        + "projectileOffsetYPixelsMilli:" + ProjectileOffsetYPixelsMilli + ","
         + "projectileClipId:" + ProjectileClipId + ","
         + "impactClipId:" + ImpactClipId + ","
         + "areaClipIds:" + Luban.StringUtil.CollectionToString(AreaClipIds) + ","
-        + "areaRadiusMilli:" + AreaRadiusMilli + ","
+        + "areaRadiusPixelsMilli:" + AreaRadiusPixelsMilli + ","
+        + "projectileVisualOffsetXPixelsMilli:" + ProjectileVisualOffsetXPixelsMilli + ","
+        + "projectileVisualOffsetYPixelsMilli:" + ProjectileVisualOffsetYPixelsMilli + ","
+        + "projectileVisualScalePermille:" + ProjectileVisualScalePermille + ","
+        + "impactVisualOffsetXPixelsMilli:" + ImpactVisualOffsetXPixelsMilli + ","
+        + "impactVisualOffsetYPixelsMilli:" + ImpactVisualOffsetYPixelsMilli + ","
+        + "impactVisualScalePermille:" + ImpactVisualScalePermille + ","
+        + "areaVisualOffsetXPixelsMilli:" + AreaVisualOffsetXPixelsMilli + ","
+        + "areaVisualOffsetYPixelsMilli:" + AreaVisualOffsetYPixelsMilli + ","
+        + "areaVisualScalePermille:" + AreaVisualScalePermille + ","
         + "}";
     }
 }

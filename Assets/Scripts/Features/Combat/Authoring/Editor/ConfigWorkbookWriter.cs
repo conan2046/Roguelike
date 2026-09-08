@@ -15,8 +15,20 @@ namespace Roguelike.Features.Combat.Authoring.Editor
         /// <param name="fields">源表内已有的千分整数列。</param>
         /// <param name="updates">按 ID 索引的整数数组，与 fields 顺序一致。</param>
         /// <remarks>直接写文件；调用方必须备份源表并在失败时恢复。文件占用时抛出 IO 异常，不绕过 Excel 锁。</remarks>
-        /// <exception cref="InvalidOperationException">字段数错误或某个 ID 不存在。</exception>
+        /// <exception cref="InvalidOperationException">源表缺少字段、字段数错误或某个 ID 不存在。</exception>
         public static void Patch(string path, string[] fields, Dictionary<int, int[]> updates)
+        {
+            PatchOptional(path, fields, updates.ToDictionary(pair => pair.Key,
+                pair => pair.Value.Select(value => (int?)value).ToArray()));
+        }
+
+        /// <summary>按 ID 更新可空整数列；空值会删除单元格内容，保持资源目录行没有伪造的零配置。</summary>
+        /// <param name="path">待更新业务 Excel。</param>
+        /// <param name="fields">源表内已有的可空整数列。</param>
+        /// <param name="updates">按 ID 索引的可空整数数组，与 fields 顺序一致。</param>
+        /// <remarks>直接写文件；调用方必须备份源表并在失败时恢复。</remarks>
+        /// <exception cref="InvalidOperationException">源表缺少字段、字段数错误或某个 ID 不存在。</exception>
+        public static void PatchOptional(string path, string[] fields, Dictionary<int, int?[]> updates)
         {
             XNamespace ns = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
             using var zip = ZipFile.Open(path, ZipArchiveMode.Update);
@@ -26,7 +38,14 @@ namespace Roguelike.Features.Combat.Authoring.Editor
             var entry = zip.GetEntry("xl/worksheets/sheet1.xml"); XDocument xml;
             using (var input = entry.Open()) xml = XDocument.Load(input);
             var rows = xml.Descendants(ns + "row").ToArray();
-            var headers = rows.Single(r => (string)r.Attribute("r") == "1").Elements(ns + "c").ToDictionary(c => Read(c, strings, ns), Column);
+            var headers = rows.Single(r => (string)r.Attribute("r") == "1")
+                .Elements(ns + "c")
+                .Select(c => new { Name = NormalizeHeader(Read(c, strings, ns)), Column = Column(c) })
+                .Where(header => header.Name.Length > 0)
+                .ToDictionary(header => header.Name, header => header.Column, StringComparer.Ordinal);
+            string[] missingFields = fields.Prepend("id").Where(field => !headers.ContainsKey(field)).Distinct().ToArray();
+            if (missingFields.Length > 0)
+                throw new InvalidOperationException($"源表缺少导出字段：{string.Join(", ", missingFields)}。");
             var found = new HashSet<int>();
             foreach (var row in rows)
             {
@@ -38,9 +57,14 @@ namespace Roguelike.Features.Combat.Authoring.Editor
                 {
                     string address = headers[fields[i]] + (string)row.Attribute("r");
                     var cell = cells.FirstOrDefault(c => (string)c.Attribute("r") == address);
+                    if (!values[i].HasValue)
+                    {
+                        cell?.Remove();
+                        continue;
+                    }
                     if (cell == null) { cell = new XElement(ns + "c", new XAttribute("r", address)); row.Add(cell); }
                     cell.Attribute("t")?.Remove(); cell.Elements().Remove();
-                    cell.Add(new XElement(ns + "v", values[i].ToString(CultureInfo.InvariantCulture)));
+                    cell.Add(new XElement(ns + "v", values[i].Value.ToString(CultureInfo.InvariantCulture)));
                 }
             }
             if (found.Count != updates.Count) throw new InvalidOperationException("预制体 ID 不存在于源表。");
@@ -53,6 +77,11 @@ namespace Roguelike.Features.Combat.Authoring.Editor
         private static string Read(XElement cell, string[] strings, XNamespace ns) => cell == null ? "" :
             (string)cell.Attribute("t") == "s" ? strings[int.Parse(cell.Element(ns + "v").Value)] :
             (string)cell.Attribute("t") == "inlineStr" ? string.Concat(cell.Descendants(ns + "t").Select(t => t.Value)) : cell.Element(ns + "v")?.Value ?? "";
+
+        /// <summary>移除 Excel 表头单元格意外携带的首尾换行和缩进，保持字段名匹配稳定。</summary>
+        /// <param name="header">从共享字符串或内联文本读取的原始表头。</param>
+        /// <returns>用于精确查找的规范字段名。</returns>
+        private static string NormalizeHeader(string header) => (header ?? string.Empty).Trim();
 
         /// <summary>提取单元格地址中的列字母，导出时按列匹配字段。</summary>
         /// <param name="cell">包含 r 地址属性的单元格。</param><returns>列字母。</returns>

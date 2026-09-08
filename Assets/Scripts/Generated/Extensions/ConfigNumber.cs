@@ -35,11 +35,29 @@ namespace cfg
         public float Y => ConfigNumber.Decode(YMilli);
     }
 
+    /// <summary>CombatPresentationConfig 的像素表现参数换算入口；Prefab 只负责编辑，运行时只读 Luban。</summary>
+    public sealed partial class CombatPresentationConfig
+    {
+        /// <summary>战斗血条最终显示宽度，逻辑像素；由 CombatHealthBar Prefab 导出。</summary>
+        public float HealthBarWidthPixels => ConfigNumber.Decode(HealthBarWidthPixelsMilli);
+
+        /// <summary>战斗血条最终显示高度，逻辑像素；由 CombatHealthBar Prefab 导出。</summary>
+        public float HealthBarHeightPixels => ConfigNumber.Decode(HealthBarHeightPixelsMilli);
+    }
+
     /// <summary>MonsterConfig 的统一单位换算入口；原始整数保留在 Luban 生成字段中，不维护第二套默认配置。</summary>
     public sealed partial class MonsterConfig
     {
-        /// <summary>伤害判定身体半径，世界单位；独立于移动圆柱 读取 MonsterConfig.bodyRadiusMilli，除以 ConfigNumber.Scale 还原原单位。</summary>
-        public float? BodyRadius => BodyRadiusMilli.HasValue ? ConfigNumber.Decode(BodyRadiusMilli.Value) : (float?)null;
+        /// <summary>受击判定半径，逻辑像素；由怪物预制体导出。</summary>
+        public float? BodyRadiusPixels => BodyRadiusPixelsMilli.HasValue ? ConfigNumber.Decode(BodyRadiusPixelsMilli.Value) : (float?)null;
+        /// <summary>受击判定中心横向偏移，逻辑像素；由怪物预制体导出。</summary>
+        public float? BodyOffsetXPixels => BodyOffsetXPixelsMilli.HasValue ? ConfigNumber.Decode(BodyOffsetXPixelsMilli.Value) : (float?)null;
+        /// <summary>受击判定中心前向偏移，逻辑像素；由怪物预制体导出。</summary>
+        public float? BodyOffsetYPixels => BodyOffsetYPixelsMilli.HasValue ? ConfigNumber.Decode(BodyOffsetYPixelsMilli.Value) : (float?)null;
+        /// <summary>命中特效挂点横向偏移，逻辑像素；由怪物预制体导出。</summary>
+        public float? HitEffectOffsetXPixels => HitEffectOffsetXPixelsMilli.HasValue ? ConfigNumber.Decode(HitEffectOffsetXPixelsMilli.Value) : (float?)null;
+        /// <summary>命中特效挂点纵向偏移，逻辑像素；由怪物预制体导出。</summary>
+        public float? HitEffectOffsetYPixels => HitEffectOffsetYPixelsMilli.HasValue ? ConfigNumber.Decode(HitEffectOffsetYPixelsMilli.Value) : (float?)null;
         /// <summary>移动圆柱半径，逻辑像素；由预制体导出 读取 MonsterConfig.moveRadiusPixelsMilli，除以 ConfigNumber.Scale 还原原单位。</summary>
         public float? MoveRadiusPixels => MoveRadiusPixelsMilli.HasValue ? ConfigNumber.Decode(MoveRadiusPixelsMilli.Value) : (float?)null;
         /// <summary>移动圆柱高度，逻辑像素；由预制体导出 读取 MonsterConfig.moveHeightPixelsMilli，除以 ConfigNumber.Scale 还原原单位。</summary>
@@ -55,12 +73,32 @@ namespace cfg
     /// <summary>SkillConfig 的统一单位换算入口；原始整数保留在 Luban 生成字段中，不维护第二套默认配置。</summary>
     public sealed partial class SkillConfig
     {
-        /// <summary>TbSkill 技能局部圆形碰撞配置，世界单位。 读取 SkillConfig.projectileRadiusMilli，除以 ConfigNumber.Scale 还原原单位。</summary>
-        public float? ProjectileRadius => ProjectileRadiusMilli.HasValue ? ConfigNumber.Decode(ProjectileRadiusMilli.Value) : (float?)null;
-        /// <summary>TbSkill 技能局部圆形碰撞配置，世界单位。 读取 SkillConfig.projectileOffsetXMilli，除以 ConfigNumber.Scale 还原原单位。</summary>
-        public float? ProjectileOffsetX => ProjectileOffsetXMilli.HasValue ? ConfigNumber.Decode(ProjectileOffsetXMilli.Value) : (float?)null;
-        /// <summary>TbSkill 技能局部圆形碰撞配置，世界单位。 读取 SkillConfig.projectileOffsetYMilli，除以 ConfigNumber.Scale 还原原单位。</summary>
-        public float? ProjectileOffsetY => ProjectileOffsetYMilli.HasValue ? ConfigNumber.Decode(ProjectileOffsetYMilli.Value) : (float?)null;
+        /// <summary>弹丸命中半径，逻辑像素；由技能预制体导出。</summary>
+        public float? ProjectileRadiusPixels => ProjectileRadiusPixelsMilli.HasValue ? ConfigNumber.Decode(ProjectileRadiusPixelsMilli.Value) : (float?)null;
+        /// <summary>弹丸命中中心横向偏移，逻辑像素；由技能预制体导出。</summary>
+        public float? ProjectileOffsetXPixels => ProjectileOffsetXPixelsMilli.HasValue ? ConfigNumber.Decode(ProjectileOffsetXPixelsMilli.Value) : (float?)null;
+        /// <summary>弹丸命中中心前向偏移，逻辑像素；由技能预制体导出。</summary>
+        public float? ProjectileOffsetYPixels => ProjectileOffsetYPixelsMilli.HasValue ? ConfigNumber.Decode(ProjectileOffsetYPixelsMilli.Value) : (float?)null;
+        /// <summary>范围技能命中半径，逻辑像素；由技能预制体导出。</summary>
+        public float? AreaRadiusPixels => AreaRadiusPixelsMilli.HasValue ? ConfigNumber.Decode(AreaRadiusPixelsMilli.Value) : (float?)null;
+        /// <summary>弹丸表现横向偏移，逻辑像素；由“弹丸表现”节点导出。</summary>
+        public float? ProjectileVisualOffsetXPixels => ProjectileVisualOffsetXPixelsMilli.HasValue ? ConfigNumber.Decode(ProjectileVisualOffsetXPixelsMilli.Value) : (float?)null;
+        /// <summary>弹丸表现纵向偏移，逻辑像素；由“弹丸表现”节点导出。</summary>
+        public float? ProjectileVisualOffsetYPixels => ProjectileVisualOffsetYPixelsMilli.HasValue ? ConfigNumber.Decode(ProjectileVisualOffsetYPixelsMilli.Value) : (float?)null;
+        /// <summary>弹丸表现相对缩放；由千分比还原。</summary>
+        public float? ProjectileVisualScale => ProjectileVisualScalePermille.HasValue ? ConfigNumber.Decode(ProjectileVisualScalePermille.Value) : (float?)null;
+        /// <summary>命中特效表现横向偏移，逻辑像素；由“命中特效表现”节点导出。</summary>
+        public float? ImpactVisualOffsetXPixels => ImpactVisualOffsetXPixelsMilli.HasValue ? ConfigNumber.Decode(ImpactVisualOffsetXPixelsMilli.Value) : (float?)null;
+        /// <summary>命中特效表现纵向偏移，逻辑像素；由“命中特效表现”节点导出。</summary>
+        public float? ImpactVisualOffsetYPixels => ImpactVisualOffsetYPixelsMilli.HasValue ? ConfigNumber.Decode(ImpactVisualOffsetYPixelsMilli.Value) : (float?)null;
+        /// <summary>命中特效表现相对缩放；由千分比还原。</summary>
+        public float? ImpactVisualScale => ImpactVisualScalePermille.HasValue ? ConfigNumber.Decode(ImpactVisualScalePermille.Value) : (float?)null;
+        /// <summary>范围特效表现横向偏移，逻辑像素；由“范围特效表现”节点导出。</summary>
+        public float? AreaVisualOffsetXPixels => AreaVisualOffsetXPixelsMilli.HasValue ? ConfigNumber.Decode(AreaVisualOffsetXPixelsMilli.Value) : (float?)null;
+        /// <summary>范围特效表现纵向偏移，逻辑像素；由“范围特效表现”节点导出。</summary>
+        public float? AreaVisualOffsetYPixels => AreaVisualOffsetYPixelsMilli.HasValue ? ConfigNumber.Decode(AreaVisualOffsetYPixelsMilli.Value) : (float?)null;
+        /// <summary>范围特效表现相对缩放；由千分比还原。</summary>
+        public float? AreaVisualScale => AreaVisualScalePermille.HasValue ? ConfigNumber.Decode(AreaVisualScalePermille.Value) : (float?)null;
     }
 
     /// <summary>SkillCombatConfig 的统一单位换算入口；原始整数保留在 Luban 生成字段中，不维护第二套默认配置。</summary>
@@ -81,8 +119,16 @@ namespace cfg
     /// <summary>CharacterConfig 的统一单位换算入口；原始整数保留在 Luban 生成字段中，不维护第二套默认配置。</summary>
     public sealed partial class CharacterConfig
     {
-        /// <summary>伤害判定身体半径，世界单位；独立于移动圆柱 读取 CharacterConfig.bodyRadiusMilli，除以 ConfigNumber.Scale 还原原单位。</summary>
-        public float? BodyRadius => BodyRadiusMilli.HasValue ? ConfigNumber.Decode(BodyRadiusMilli.Value) : (float?)null;
+        /// <summary>受击判定半径，逻辑像素；由角色预制体导出。</summary>
+        public float? BodyRadiusPixels => BodyRadiusPixelsMilli.HasValue ? ConfigNumber.Decode(BodyRadiusPixelsMilli.Value) : (float?)null;
+        /// <summary>受击判定中心横向偏移，逻辑像素；由角色预制体导出。</summary>
+        public float? BodyOffsetXPixels => BodyOffsetXPixelsMilli.HasValue ? ConfigNumber.Decode(BodyOffsetXPixelsMilli.Value) : (float?)null;
+        /// <summary>受击判定中心前向偏移，逻辑像素；由角色预制体导出。</summary>
+        public float? BodyOffsetYPixels => BodyOffsetYPixelsMilli.HasValue ? ConfigNumber.Decode(BodyOffsetYPixelsMilli.Value) : (float?)null;
+        /// <summary>命中特效挂点横向偏移，逻辑像素；由角色预制体导出。</summary>
+        public float? HitEffectOffsetXPixels => HitEffectOffsetXPixelsMilli.HasValue ? ConfigNumber.Decode(HitEffectOffsetXPixelsMilli.Value) : (float?)null;
+        /// <summary>命中特效挂点纵向偏移，逻辑像素；由角色预制体导出。</summary>
+        public float? HitEffectOffsetYPixels => HitEffectOffsetYPixelsMilli.HasValue ? ConfigNumber.Decode(HitEffectOffsetYPixelsMilli.Value) : (float?)null;
         /// <summary>移动圆柱半径，逻辑像素；由预制体导出 读取 CharacterConfig.moveRadiusPixelsMilli，除以 ConfigNumber.Scale 还原原单位。</summary>
         public float? MoveRadiusPixels => MoveRadiusPixelsMilli.HasValue ? ConfigNumber.Decode(MoveRadiusPixelsMilli.Value) : (float?)null;
         /// <summary>移动圆柱高度，逻辑像素；由预制体导出 读取 CharacterConfig.moveHeightPixelsMilli，除以 ConfigNumber.Scale 还原原单位。</summary>
@@ -170,6 +216,16 @@ namespace cfg
         public float ProjectileG => ConfigNumber.Decode(ProjectileGMilli);
         /// <summary>调试弹丸蓝 读取 CombatPresentationConfig.projectileBMilli，除以 ConfigNumber.Scale 还原原单位。</summary>
         public float ProjectileB => ConfigNumber.Decode(ProjectileBMilli);
+        /// <summary>实际扣血后的白闪持续秒数 读取 CombatPresentationConfig.hitFlashDurationSecondsMilli，除以 ConfigNumber.Scale 还原原单位。</summary>
+        public float HitFlashDurationSeconds => ConfigNumber.Decode(HitFlashDurationSecondsMilli);
+        /// <summary>白闪颜色红色通道 读取 CombatPresentationConfig.hitFlashRMilli，除以 ConfigNumber.Scale 还原原单位。</summary>
+        public float HitFlashR => ConfigNumber.Decode(HitFlashRMilli);
+        /// <summary>白闪颜色绿色通道 读取 CombatPresentationConfig.hitFlashGMilli，除以 ConfigNumber.Scale 还原原单位。</summary>
+        public float HitFlashG => ConfigNumber.Decode(HitFlashGMilli);
+        /// <summary>白闪颜色蓝色通道 读取 CombatPresentationConfig.hitFlashBMilli，除以 ConfigNumber.Scale 还原原单位。</summary>
+        public float HitFlashB => ConfigNumber.Decode(HitFlashBMilli);
+        /// <summary>白闪叠加不透明度 读取 CombatPresentationConfig.hitFlashOpacityMilli，除以 ConfigNumber.Scale 还原原单位。</summary>
+        public float HitFlashOpacity => ConfigNumber.Decode(HitFlashOpacityMilli);
     }
 
     /// <summary>CombatRulesConfig 的统一单位换算入口；原始整数保留在 Luban 生成字段中，不维护第二套默认配置。</summary>

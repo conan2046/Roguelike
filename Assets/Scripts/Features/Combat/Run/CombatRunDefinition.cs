@@ -149,7 +149,9 @@ namespace Roguelike.Features.Combat.Run
             Require(Map.ArenaHalfWidthMilli > 0 && Map.ArenaHalfHeightMilli > 0 && Map.SpawnRadiusPixelsMilli > 0 &&
                     Map.CameraPaddingMilli >= 0 && Math.Abs(Map.PlayerStartXMilli) < Map.ArenaHalfWidthMilli &&
                     Math.Abs(Map.PlayerStartYMilli) < Map.ArenaHalfHeightMilli, $"TbMap {Map.Id}: invalid arena or player start.");
-            Require(Character.AttributeProfileId_Ref != null && Character.VisualSetId_Ref != null && Character.BodyRadiusMilli > 0 &&
+            Require(Character.AttributeProfileId_Ref != null && Character.VisualSetId_Ref != null && Character.BodyRadiusPixelsMilli > 0 &&
+                    Character.BodyOffsetXPixelsMilli.HasValue && Character.BodyOffsetYPixelsMilli.HasValue &&
+                    Character.HitEffectOffsetXPixelsMilli.HasValue && Character.HitEffectOffsetYPixelsMilli.HasValue &&
                     Character.MoveRadiusPixelsMilli > 0 && Character.MoveHeightPixelsMilli > 0,
                 $"TbCharacter {Character.Id}: formal combat data is incomplete.");
             Require(Drop != null && Drop.ExperienceItemId_Ref != null && Drop.ExperienceValue > 0 &&
@@ -245,13 +247,19 @@ namespace Roguelike.Features.Combat.Run
                 $"TbSkillCombat {combat.Id}: invalid common fields.");
             if (combat.DeliveryType == ESkillDeliveryType.Projectile)
             {
-                Require(combat.ProjectileSpeedMilli > 0 && combat.ProjectileLifetimeMilli > 0 && skill.ProjectileRadiusMilli > 0 &&
-                        skill.ProjectileOffsetXMilli.HasValue && skill.ProjectileOffsetYMilli.HasValue &&
+                Require(combat.ProjectileSpeedMilli > 0 && combat.ProjectileLifetimeMilli > 0 && skill.ProjectileRadiusPixelsMilli > 0 &&
+                        skill.ProjectileOffsetXPixelsMilli.HasValue && skill.ProjectileOffsetYPixelsMilli.HasValue &&
+                        skill.ProjectileVisualOffsetXPixelsMilli.HasValue && skill.ProjectileVisualOffsetYPixelsMilli.HasValue &&
+                        skill.ProjectileVisualScalePermille > 0 &&
+                        (!skill.ImpactClipId.HasValue || (skill.ImpactVisualOffsetXPixelsMilli.HasValue &&
+                            skill.ImpactVisualOffsetYPixelsMilli.HasValue && skill.ImpactVisualScalePermille > 0)) &&
                         skill.ProjectileClipId_Ref != null && (!skill.ImpactClipId.HasValue || skill.ImpactClipId_Ref != null),
                     $"TbSkill {skill.Id}: incomplete projectile fields.");
                 return;
             }
-            Require(combat.DeliveryType == ESkillDeliveryType.TargetArea && skill.AreaRadiusMilli > 0 &&
+            Require(combat.DeliveryType == ESkillDeliveryType.TargetArea && skill.AreaRadiusPixelsMilli > 0 &&
+                    skill.AreaVisualOffsetXPixelsMilli.HasValue && skill.AreaVisualOffsetYPixelsMilli.HasValue &&
+                    skill.AreaVisualScalePermille > 0 &&
                     skill.AreaClipIds_Ref != null && skill.AreaClipIds_Ref.Count > 0 && skill.AreaClipIds_Ref.All(item => item != null),
                 $"TbSkill {skill.Id}: incomplete target-area fields.");
         }
@@ -264,7 +272,9 @@ namespace Roguelike.Features.Combat.Run
         {
             Require(monster?.AttributeProfileId_Ref != null && monster.DefaultSkillId_Ref?.CombatProfileId_Ref != null &&
                     monster.VisualSetId_Ref?.StandClipId_Ref != null && monster.VisualSetId_Ref.MoveClipId_Ref != null &&
-                    monster.VisualSetId_Ref.AttackClipId_Ref != null && monster.BodyRadiusMilli > 0 &&
+                    monster.VisualSetId_Ref.AttackClipId_Ref != null && monster.BodyRadiusPixelsMilli > 0 &&
+                    monster.BodyOffsetXPixelsMilli.HasValue && monster.BodyOffsetYPixelsMilli.HasValue &&
+                    monster.HitEffectOffsetXPixelsMilli.HasValue && monster.HitEffectOffsetYPixelsMilli.HasValue &&
                     monster.MoveRadiusPixelsMilli > 0 && monster.MoveHeightPixelsMilli > 0 && monster.MovementType.HasValue &&
                     Enum.IsDefined(typeof(EMovementType), monster.MovementType.Value) &&
                     monster.DefaultSkillId_Ref.CombatProfileId_Ref.DeliveryType == ESkillDeliveryType.Melee,

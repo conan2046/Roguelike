@@ -54,6 +54,17 @@ public sealed partial class CombatPresentationConfig : Luban.BeanBase
         {int n0 = _buf.ReadSize(); AttackDirectionIds = new System.Collections.Generic.List<int>(n0);for(var i0 = 0 ; i0 < n0 ; i0++) { int _e0;  _e0 = _buf.ReadInt(); AttackDirectionIds.Add(_e0);}}
         ShaderName = _buf.ReadString();
         TextureFilterMode = _buf.ReadString();
+        HitFlashShaderName = _buf.ReadString();
+        HitFlashDurationSecondsMilli = _buf.ReadInt();
+        HitFlashRMilli = _buf.ReadInt();
+        HitFlashGMilli = _buf.ReadInt();
+        HitFlashBMilli = _buf.ReadInt();
+        HitFlashOpacityMilli = _buf.ReadInt();
+        UnitRenderQueue = _buf.ReadInt();
+        SkillRenderQueue = _buf.ReadInt();
+        FeedbackRenderQueue = _buf.ReadInt();
+        HealthBarWidthPixelsMilli = _buf.ReadInt();
+        HealthBarHeightPixelsMilli = _buf.ReadInt();
     }
 
     public static CombatPresentationConfig DeserializeCombatPresentationConfig(ByteBuf _buf)
@@ -200,6 +211,50 @@ public sealed partial class CombatPresentationConfig : Luban.BeanBase
     /// 纹理采样：Point 或 Bilinear
     /// </summary>
     public readonly string TextureFilterMode;
+    /// <summary>
+    /// 单位实际扣血时使用的白闪 Shader 标识
+    /// </summary>
+    public readonly string HitFlashShaderName;
+    /// <summary>
+    /// 单位实际扣血后的白闪持续秒数；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
+    /// </summary>
+    public readonly int HitFlashDurationSecondsMilli;
+    /// <summary>
+    /// 白闪颜色红色通道；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
+    /// </summary>
+    public readonly int HitFlashRMilli;
+    /// <summary>
+    /// 白闪颜色绿色通道；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
+    /// </summary>
+    public readonly int HitFlashGMilli;
+    /// <summary>
+    /// 白闪颜色蓝色通道；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
+    /// </summary>
+    public readonly int HitFlashBMilli;
+    /// <summary>
+    /// 白闪叠加不透明度；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
+    /// </summary>
+    public readonly int HitFlashOpacityMilli;
+    /// <summary>
+    /// 角色和怪物的透明渲染队列；技能与反馈必须使用更高队列。
+    /// </summary>
+    public readonly int UnitRenderQueue;
+    /// <summary>
+    /// 弹丸、命中和范围技能的透明渲染队列；必须高于单位。
+    /// </summary>
+    public readonly int SkillRenderQueue;
+    /// <summary>
+    /// 血条和伤害数字的透明渲染队列；必须高于技能。
+    /// </summary>
+    public readonly int FeedbackRenderQueue;
+    /// <summary>
+    /// 战斗血条最终显示宽度；逻辑像素&#215;1000，由 CombatHealthBar Prefab 导出。
+    /// </summary>
+    public readonly int HealthBarWidthPixelsMilli;
+    /// <summary>
+    /// 战斗血条最终显示高度；逻辑像素&#215;1000，由 CombatHealthBar Prefab 导出。
+    /// </summary>
+    public readonly int HealthBarHeightPixelsMilli;
    
     public const int __ID__ = 600358192;
     public override int GetTypeId() => __ID__;
@@ -252,6 +307,17 @@ public sealed partial class CombatPresentationConfig : Luban.BeanBase
         + "attackDirectionIds:" + Luban.StringUtil.CollectionToString(AttackDirectionIds) + ","
         + "shaderName:" + ShaderName + ","
         + "textureFilterMode:" + TextureFilterMode + ","
+        + "hitFlashShaderName:" + HitFlashShaderName + ","
+        + "hitFlashDurationSecondsMilli:" + HitFlashDurationSecondsMilli + ","
+        + "hitFlashRMilli:" + HitFlashRMilli + ","
+        + "hitFlashGMilli:" + HitFlashGMilli + ","
+        + "hitFlashBMilli:" + HitFlashBMilli + ","
+        + "hitFlashOpacityMilli:" + HitFlashOpacityMilli + ","
+        + "unitRenderQueue:" + UnitRenderQueue + ","
+        + "skillRenderQueue:" + SkillRenderQueue + ","
+        + "feedbackRenderQueue:" + FeedbackRenderQueue + ","
+        + "healthBarWidthPixelsMilli:" + HealthBarWidthPixelsMilli + ","
+        + "healthBarHeightPixelsMilli:" + HealthBarHeightPixelsMilli + ","
         + "}";
     }
 }

@@ -69,6 +69,131 @@ namespace Roguelike.Tests
                 Assert.That(world.EntityManager.HasComponent<DisableRendering>(session.UnitEntity(slot)), Is.True);
         }
 
+        /// <summary>仅实际生命下降的单位切换共享白闪材质，连续受击刷新持续时间并在配置时长后恢复。</summary>
+        [Test]
+        public void ActualHealthLossFlashesOnlyDamagedSlotAndRestores()
+        {
+            var tables = LoadTables();
+            PerformanceScenarioConfig scenario = tables.TbPerformanceScenario.Get(4);
+            var source = new Files(tables);
+            using var world = new World("Actual health loss hit flash");
+            using var assets = CombatVisualResources.LoadAsync(scenario, source, CancellationToken.None)
+                .GetAwaiter().GetResult();
+            using var session = CombatSessionFactory.CreateAsync(world, scenario, source, CancellationToken.None)
+                .GetAwaiter().GetResult();
+            using var visuals = new CombatEntityVisuals(world, session, scenario, assets);
+            Assert.That(session.UnitCount, Is.GreaterThan(1));
+            for (int slot = 0; slot < session.UnitCount; slot++)
+            {
+                CombatUnit unit = session.ReadUnit(slot);
+                unit.MoveSpeed = 0;
+                unit.Cooldown = 1000;
+                world.EntityManager.SetComponentData(session.UnitEntity(slot), unit);
+            }
+
+            CombatVisualPlayer damagedPlayer = visuals.Read(1);
+            Assert.That(damagedPlayer.HitFlashMaterialIndex, Is.Not.EqualTo(damagedPlayer.MaterialIndex));
+            Color flashColor = assets.Materials[damagedPlayer.HitFlashMaterialIndex].GetColor("_FlashColor");
+            Assert.That(flashColor.r, Is.EqualTo(scenario.PresentationId_Ref.HitFlashR).Within(0.001f));
+            Assert.That(flashColor.g, Is.EqualTo(scenario.PresentationId_Ref.HitFlashG).Within(0.001f));
+            Assert.That(flashColor.b, Is.EqualTo(scenario.PresentationId_Ref.HitFlashB).Within(0.001f));
+            Assert.That(flashColor.a, Is.EqualTo(0.5f).Within(0.001f));
+            CombatUnit damaged = session.ReadUnit(1);
+            damaged.Target.Health--;
+            world.EntityManager.SetComponentData(session.UnitEntity(1), damaged);
+            visuals.Synchronize();
+            Assert.That(visuals.IsHitFlashing(1), Is.True);
+            Assert.That(visuals.IsHitFlashing(0), Is.False);
+            MaterialMeshInfo flashInfo = world.EntityManager.GetComponentData<MaterialMeshInfo>(session.UnitEntity(1));
+            Assert.That(MaterialMeshInfo.StaticIndexToArrayIndex(flashInfo.Material), Is.EqualTo(damagedPlayer.HitFlashMaterialIndex));
+
+            int durationTicks = (int)Math.Ceiling(scenario.PresentationId_Ref.HitFlashDurationSeconds / session.StepSeconds);
+            int firstPart = durationTicks / 2;
+            for (int tick = 0; tick < firstPart; tick++)
+            {
+                session.Advance(session.StepSeconds, float2.zero);
+                visuals.Synchronize();
+            }
+            damaged = session.ReadUnit(1);
+            damaged.Target.Health--;
+            world.EntityManager.SetComponentData(session.UnitEntity(1), damaged);
+            visuals.Synchronize();
+            for (int tick = 0; tick < durationTicks - firstPart; tick++)
+            {
+                session.Advance(session.StepSeconds, float2.zero);
+                visuals.Synchronize();
+            }
+            Assert.That(visuals.IsHitFlashing(1), Is.True, "The second hit must refresh the configured flash window.");
+            for (int tick = durationTicks - firstPart; tick < durationTicks; tick++)
+            {
+                session.Advance(session.StepSeconds, float2.zero);
+                visuals.Synchronize();
+            }
+            Assert.That(visuals.IsHitFlashing(1), Is.False);
+            MaterialMeshInfo restoredInfo = world.EntityManager.GetComponentData<MaterialMeshInfo>(session.UnitEntity(1));
+            Assert.That(MaterialMeshInfo.StaticIndexToArrayIndex(restoredInfo.Material), Is.EqualTo(damagedPlayer.MaterialIndex));
+
+            damaged = session.ReadUnit(1);
+            damaged.Target.Health++;
+            world.EntityManager.SetComponentData(session.UnitEntity(1), damaged);
+            visuals.Synchronize();
+            Assert.That(visuals.IsHitFlashing(1), Is.False, "Healing must not trigger the hit flash.");
+        }
+
+        /// <summary>用真实弹丸结算驱动怪物扣血，确认伤害链路在同次表现同步中启动白闪。</summary>
+        /// <remarks>仅修改隔离测试 World 内的单位状态；不绕过 CombatSession 直接改目标生命。</remarks>
+        [Test]
+        public void ActualProjectileDamageStartsMonsterHitFlash()
+        {
+            Tables tables = LoadTables();
+            PerformanceScenarioConfig scenario = tables.TbPerformanceScenario.Get(4);
+            var source = new Files(tables);
+            using var world = new World("Actual projectile hit flash");
+            using var assets = CombatVisualResources.LoadAsync(scenario, source, CancellationToken.None)
+                .GetAwaiter().GetResult();
+            using var session = CombatSessionFactory.CreateAsync(world, scenario, source, CancellationToken.None)
+                .GetAwaiter().GetResult();
+            using var visuals = new CombatEntityVisuals(world, session, scenario, assets);
+
+            CombatUnit player = session.ReadUnit(0);
+            player.Cooldown = 0;
+            player.Attack.Hit = 1;
+            world.EntityManager.SetComponentData(session.UnitEntity(0), player);
+            for (int slot = 1; slot < session.UnitCount; slot++)
+            {
+                CombatUnit monster = session.ReadUnit(slot);
+                monster.Position = player.Position + new float2(slot == 1 ? 2f : 8f, 0f);
+                monster.PreviousPosition = monster.Position;
+                monster.MoveSpeed = 0;
+                monster.Cooldown = 1000;
+                monster.Target.Evasion = 0;
+                if (slot > 1) monster.Target.Health = 0;
+                world.EntityManager.SetComponentData(session.UnitEntity(slot), monster);
+            }
+
+            long originalHealth = session.ReadUnit(1).Target.Health;
+            session.Advance(session.StepSeconds, float2.zero);
+            visuals.Synchronize();
+            bool damaged = session.ReadUnit(1).Target.Health < originalHealth;
+            if (!damaged)
+            {
+                int projectileSlot = Enumerable.Range(0, session.ProjectileCapacity)
+                    .First(index => session.ReadProjectile(index).Active);
+                CombatProjectile projectile = session.ReadProjectile(projectileSlot);
+                projectile.Position = session.ReadUnit(1).Position - projectile.CollisionOffset;
+                projectile.Velocity = float2.zero;
+                projectile.BornThisTick = false;
+                world.EntityManager.SetComponentData(session.ProjectileEntity(projectileSlot), projectile);
+                session.Advance(session.StepSeconds, float2.zero);
+                visuals.Synchronize();
+                damaged = session.ReadUnit(1).Target.Health < originalHealth;
+            }
+            Assert.That(damaged, Is.True, "Configured projectile did not damage the stationary target.");
+            Assert.That(visuals.IsHitFlashing(1), Is.True,
+                "Actual projectile damage must trigger the target hit flash immediately.");
+            Assert.That(visuals.IsHitFlashing(0), Is.False);
+        }
+
         /// <summary>核对共享加载数量、全帧预建和显式释放，不因怪物数量重复加载。</summary>
         [Test]
         public void SharedResourcesLoadOnceAndDispose()
@@ -79,7 +204,7 @@ namespace Roguelike.Tests
             Assert.That(source.ActiveHandles, Is.Zero);
             Assert.That(assets.ClipCount, Is.EqualTo(7));
             Assert.That(assets.TextureCount, Is.EqualTo(7));
-            Assert.That(assets.Materials.Length, Is.EqualTo(7));
+            Assert.That(assets.Materials.Length, Is.EqualTo(assets.TextureCount * 2));
             Assert.That(assets.Meshes.Length, Is.GreaterThan(100));
             var mesh = assets.Meshes[0]; var material = assets.Materials[0]; var texture = material.mainTexture;
             assets.Dispose(); assets.Dispose();
@@ -95,15 +220,35 @@ namespace Roguelike.Tests
             var definition = CombatRunDefinition.Create(tables, 1);
             var source = new Files(tables);
             using var assets = CombatVisualResources.LoadAsync(definition, source, CancellationToken.None).GetAwaiter().GetResult();
+            CombatVisualResources.Clip unitClip = assets.Read(definition.Character.VisualSetId,
+                definition.Character.VisualSetId_Ref.StandClipId.Value);
+            Assert.That(assets.Materials[unitClip.MaterialIndex].renderQueue,
+                Is.EqualTo(definition.Presentation.UnitRenderQueue));
             foreach (var skill in definition.AvailableSkills)
             {
                 if (skill.ProjectileClipId.HasValue)
+                {
                     Assert.That(assets.Read(skill.Id, skill.ProjectileClipId.Value).Animation.ActionCount, Is.GreaterThan(0));
+                    Assert.That(assets.Materials[assets.Read(skill.Id, skill.ProjectileClipId.Value).MaterialIndex].renderQueue,
+                        Is.EqualTo(definition.Presentation.SkillRenderQueue));
+                }
                 if (skill.ImpactClipId.HasValue)
+                {
                     Assert.That(assets.Read(skill.Id, skill.ImpactClipId.Value).Animation.ActionCount, Is.GreaterThan(0));
+                    Assert.That(assets.Materials[assets.Read(skill.Id, skill.ImpactClipId.Value).MaterialIndex].renderQueue,
+                        Is.EqualTo(definition.Presentation.SkillRenderQueue));
+                }
                 foreach (var clipId in skill.AreaClipIds)
+                {
                     Assert.That(assets.Read(skill.Id, clipId).Animation.ActionCount, Is.GreaterThan(0));
+                    Assert.That(assets.Materials[assets.Read(skill.Id, clipId).MaterialIndex].renderQueue,
+                        Is.EqualTo(definition.Presentation.SkillRenderQueue));
+                }
             }
+            Assert.That(definition.Presentation.SkillRenderQueue,
+                Is.GreaterThan(definition.Presentation.UnitRenderQueue));
+            Assert.That(definition.Presentation.FeedbackRenderQueue,
+                Is.GreaterThan(definition.Presentation.SkillRenderQueue));
             Assert.That(source.ActiveHandles, Is.Zero);
         }
 

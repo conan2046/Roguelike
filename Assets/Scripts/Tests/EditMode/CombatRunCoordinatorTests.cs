@@ -125,7 +125,8 @@ namespace Roguelike.Tests
             CombatUnit player = fixture.Session.ReadUnit(0);
             Assert.That(player.Attack.Attack, Is.EqualTo(expected.Attack).Within(1e-9));
             Assert.That(player.Target.MaxHealth, Is.EqualTo((long)expected.MaxHealth));
-            Assert.That(player.MoveSpeed, Is.EqualTo((float)expected.MoveSpeed).Within(1e-6));
+            Assert.That(player.MoveSpeed,
+                Is.EqualTo((float)expected.MoveSpeed * fixture.Definition.CombatRules.WorldUnitsPerPixel).Within(1e-6));
             Assert.That(player.Interval, Is.EqualTo(CombatMath.AttackInterval(
                 fixture.Definition.InitialSkills[0].CombatProfileId_Ref.BaseInterval,
                 expected.AttackSpeedMultiplier, fixture.Definition.CombatRules.MinAttackInterval)).Within(1e-9));

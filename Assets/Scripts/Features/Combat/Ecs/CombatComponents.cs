@@ -16,10 +16,10 @@ namespace Roguelike.Features.Combat.Ecs
         public DamageTarget Target;
         public CombatCylinder Movement;
         public AttackSnapshot Attack;
-        public float2 Position, PreviousPosition, SpawnPosition;
+        public float2 Position, PreviousPosition, SpawnPosition, BodyOffset, HitEffectOffset;
         public float2 ProjectileOffset;
         public int SkillId;
-        public float Radius, MoveSpeed, Range, ProjectileSpeed, ProjectileLifetime, ProjectileRadius;
+        public float Radius, BodyHalfSegment, MoveSpeed, Range, ProjectileSpeed, ProjectileLifetime, ProjectileRadius;
         public double Interval, Cooldown, NextTargetRefresh;
         public int TargetSlot;
         public ulong TargetLifetime;
@@ -118,11 +118,13 @@ namespace Roguelike.Features.Combat.Ecs
         /// <summary>攻击边缘按浮点可表示精度比较，避免移动停在边缘后因单个 ULP 舍入永远无法攻击。</summary>
         /// <param name="offset">两圆中心差。</param>
         /// <param name="reach">表内技能范围与双方身体半径之和。</param>
-        /// <returns>是否处于接触范围；仅容忍平方边界的一个 float ULP。</returns>
+        /// <returns>是否处于接触范围；仅容忍平方边界的四个 float ULP。</returns>
         public static bool WithinReach(float2 offset, float reach)
         {
             float squared = reach * reach;
-            float boundary = math.asfloat(math.asint(squared) + 1);
+            // 移动扫掠会在接触比例前退一个 ULP；斜向乘加累计误差略大于单次平方误差，
+            // 四个 ULP 只覆盖浮点运算噪声，不形成可感知的额外攻击距离。
+            float boundary = math.asfloat(math.asint(squared) + 4);
             return math.lengthsq(offset) <= boundary;
         }
 
@@ -145,6 +147,84 @@ namespace Roguelike.Features.Combat.Ecs
             if (discriminant < 0) return false;
             fraction = (-b - math.sqrt(discriminant)) / a;
             return fraction >= 0 && fraction <= 1;
+        }
+
+        /// <summary>计算点到以原点为中心的纵向线段的平方距离。</summary>
+        /// <param name="relative">点相对胶囊中心的偏移。</param>
+        /// <param name="halfSegment">中轴线段半长。</param>
+        /// <returns>与胶囊中轴线最近点的平方距离。</returns>
+        public static float VerticalSegmentDistanceSquared(float2 relative, float halfSegment)
+        {
+            float outsideY = math.max(0f, math.abs(relative.y) - halfSegment);
+            return relative.x * relative.x + outsideY * outsideY;
+        }
+
+        /// <summary>按两个纵向胶囊的中轴间距判断边缘是否进入配置范围。</summary>
+        /// <param name="relative">两个胶囊中心差。</param>
+        /// <param name="halfSegment">两个胶囊中轴半长之和。</param>
+        /// <param name="reach">两半径与额外配置距离之和。</param>
+        /// <returns>是否进入可命中距离。</returns>
+        public static bool WithinCapsuleReach(float2 relative, float halfSegment, float reach)
+        {
+            float squared = reach * reach;
+            float boundary = math.asfloat(math.asint(squared) + 4);
+            return VerticalSegmentDistanceSquared(relative, halfSegment) <= boundary;
+        }
+
+        /// <summary>计算纵向胶囊中轴最近点指向查询点的法线。</summary>
+        /// <param name="relative">查询点相对胶囊中心的偏移。</param>
+        /// <param name="halfSegment">胶囊中轴半长。</param>
+        /// <param name="fallback">查询点恰好在中轴上时的确定方向。</param>
+        /// <returns>单位法线。</returns>
+        public static float2 VerticalCapsuleNormal(float2 relative, float halfSegment, float2 fallback)
+        {
+            float2 closest = new float2(0f, math.clamp(relative.y, -halfSegment, halfSegment));
+            return math.normalizesafe(relative - closest, math.normalizesafe(fallback, new float2(1f, 0f)));
+        }
+
+        /// <summary>计算移动点与纵向胶囊的最早连续接触。</summary>
+        /// <param name="relative">移动点起点相对胶囊中心的位置。</param>
+        /// <param name="motion">本 tick 相对位移。</param>
+        /// <param name="radius">移动圆与目标胶囊半径之和。</param>
+        /// <param name="halfSegment">目标胶囊与移动胶囊中轴半长之和。</param>
+        /// <param name="fraction">首次接触在 motion 上的归一化比例。</param>
+        /// <param name="normal">接触时从目标指向移动点的法线。</param>
+        /// <returns>本段是否与胶囊接触。</returns>
+        public static bool SweepVerticalCapsule(float2 relative, float2 motion, float radius,
+            float halfSegment, out float fraction, out float2 normal)
+        {
+            fraction = 0f;
+            normal = VerticalCapsuleNormal(relative, halfSegment, -motion);
+            if (VerticalSegmentDistanceSquared(relative, halfSegment) <= radius * radius) return true;
+            float best = float.PositiveInfinity;
+            if (math.abs(motion.x) > 0.0000001f)
+            {
+                for (int side = -1; side <= 1; side += 2)
+                {
+                    float candidate = (side * radius - relative.x) / motion.x;
+                    float y = relative.y + motion.y * candidate;
+                    if (candidate >= 0f && candidate <= 1f && math.abs(y) <= halfSegment)
+                        best = math.min(best, candidate);
+                }
+            }
+            for (int cap = -1; cap <= 1; cap += 2)
+            {
+                float2 start = relative - new float2(0f, cap * halfSegment);
+                float a = math.lengthsq(motion);
+                float b = math.dot(start, motion);
+                float c = math.lengthsq(start) - radius * radius;
+                float discriminant = b * b - a * c;
+                if (a > 0f && discriminant >= 0f)
+                {
+                    float candidate = (-b - math.sqrt(discriminant)) / a;
+                    if (candidate >= 0f && candidate <= 1f) best = math.min(best, candidate);
+                }
+            }
+            if (!math.isfinite(best)) return false;
+            fraction = best;
+            float2 contact = relative + motion * best;
+            normal = VerticalCapsuleNormal(contact, halfSegment, -motion);
+            return true;
         }
     }
 }

@@ -18,14 +18,21 @@ namespace Roguelike.Features.Combat.Authoring.Editor
     public static class SkillCollisionPipeline
     {
         public const string Root = "Assets/Prefabs/Combat/Skill";
-        private static readonly string[] Fields = { "projectileRadiusMilli", "projectileOffsetXMilli", "projectileOffsetYMilli" };
+        internal static readonly string[] ProjectileFields = { "projectileRadiusPixelsMilli", "projectileOffsetXPixelsMilli", "projectileOffsetYPixelsMilli" };
+        internal static readonly string[] AreaFields = { "areaRadiusPixelsMilli" };
+        internal static readonly string[] VisualPlacementFields =
+        {
+            "projectileVisualOffsetXPixelsMilli", "projectileVisualOffsetYPixelsMilli", "projectileVisualScalePermille",
+            "impactVisualOffsetXPixelsMilli", "impactVisualOffsetYPixelsMilli", "impactVisualScalePermille",
+            "areaVisualOffsetXPixelsMilli", "areaVisualOffsetYPixelsMilli", "areaVisualScalePermille"
+        };
         /// <summary>缩放写入 TbVisualSet 而非 TbSkill；与半径字段分表导出，避免相互覆盖或重复烘焙。</summary>
         public static readonly string[] VisualFields = { "scalePermille" };
 
         /// <summary>菜单批量创建 TbSkill 目录内缺失的预制体，按保存组件的 ID 识别用户重命名资产。</summary>
         /// <remarks>只创建技能预制体；首帧预览在打开 Prefab Stage 时临时生成；已有资产不覆盖，临时对象在 finally 清理，不保存 Scene。</remarks>
         /// <exception cref="InvalidOperationException">编辑器运行中、规则不唯一或资源无效。</exception>
-        [MenuItem("Roguelike/Combat/技能碰撞配置/生成缺失技能预制体")]
+        [MenuItem("Roguelike/战斗/碰撞配置/生成缺失技能预制体")]
         public static void Generate()
         {
             EnsureEditable();
@@ -56,16 +63,20 @@ namespace Roguelike.Features.Combat.Authoring.Editor
                 throw new InvalidOperationException("技能纹理解码失败: " + skill.Id);
             var mesh = AniMeshFactory.CreateFrame(AniFrameLayout.Build(data, 0, 0, texture.width, texture.height), rules.WorldUnitsPerPixel * skill.VisualSetId_Ref.ScalePermille / 1000f);
             mesh.name = skill.Name + " first frame";
-            float previewRadius = ConfigNumber.Decode(ConfigNumber.Encode(mesh.bounds.size.x / 2));
+            float previewRadiusPixels = ConfigNumber.Decode(ConfigNumber.Encode(mesh.bounds.size.x / (2 * rules.WorldUnitsPerPixel)));
             UnityEngine.Object.DestroyImmediate(texture);
             UnityEngine.Object.DestroyImmediate(mesh);
             var root = new GameObject(skill.Name);
             try
             {
-                var node = new GameObject("ProjectileCollision"); node.transform.SetParent(root.transform, false);
-                node.transform.localPosition = new Vector3(skill.ProjectileOffsetX ?? 0, 0, skill.ProjectileOffsetY ?? 0);
+                bool area = skill.CombatProfileId_Ref?.DeliveryType == ESkillDeliveryType.TargetArea;
+                var node = new GameObject(area ? "范围技能命中范围" : "弹丸命中范围"); node.transform.SetParent(root.transform, false);
                 var shape = node.AddComponent<SkillCollisionAuthoring>(); shape.SkillId = skill.Id;
-                shape.Radius = skill.ProjectileRadius ?? previewRadius;
+                shape.Kind = area ? SkillCollisionAuthoring.CollisionKind.TargetArea : SkillCollisionAuthoring.CollisionKind.Projectile;
+                shape.RadiusPixels = area ? skill.AreaRadiusPixels ?? previewRadiusPixels : skill.ProjectileRadiusPixels ?? previewRadiusPixels;
+                shape.OffsetXPixels = skill.ProjectileOffsetXPixels ?? 0f;
+                shape.OffsetYPixels = skill.ProjectileOffsetYPixels ?? 0f;
+                shape.DataVersion = CombatCollisionPipeline.CurrentDataVersion;
                 PrefabUtility.SaveAsPrefabAsset(root, Root + "/" + skill.Id + "_" + skill.Name + ".prefab");
             }
             finally { UnityEngine.Object.DestroyImmediate(root); }
@@ -88,23 +99,51 @@ namespace Roguelike.Features.Combat.Authoring.Editor
             return result;
         }
 
-        /// <summary>导出或校验时将世界空间编辑尺寸量化为 TbSkill 的半径与局部偏移千分整数。</summary>
-        /// <param name="shape">根节点直接子级的碰撞组件，局部 X/Z 分别为右/前。</param>
-        /// <returns>半径、X 偏移、Y 偏移，与 Fields 列顺序一致。</returns>
+        /// <summary>导出或校验时将像素编辑尺寸量化为 TbSkill 的弹丸半径与偏移千分整数。</summary>
+        /// <param name="shape">根节点直接子级的弹丸命中组件。</param>
+        /// <returns>半径、横向偏移、前向偏移，与 ProjectileFields 顺序一致。</returns>
         /// <exception cref="InvalidOperationException">旋转、缩放、高度、根位置或半径不符合圆形协议。</exception>
         /// <exception cref="OverflowException">数值非有限或超过千分整数范围。</exception>
         public static int[] Values(SkillCollisionAuthoring shape)
         {
             var node = shape.transform; var root = node.parent;
             if (root == null || root.parent != null || root.localPosition != Vector3.zero ||
-                node.localScale != Vector3.one || node.localPosition.y != 0 ||
+                node.localScale != Vector3.one ||
                 Quaternion.Angle(root.localRotation, Quaternion.identity) != 0 || Quaternion.Angle(node.localRotation, Quaternion.identity) != 0)
-                throw new InvalidOperationException("技能碰撞节点必须为根直接子节点；根位置、旋转归零，碰撞节点缩放为一、Y 为零。");
-            // 根节点允许等比缩放，但只作为 TbVisualSet.scalePermille 单独导出；半径仍按未缩放的编辑值量化，
-            // 这样重复导出不会把缩放重复烘焙进半径导致累积放大。
-            int radius = ConfigNumber.Encode(shape.Radius);
+                throw new InvalidOperationException("技能命中范围必须为根节点直接子节点；根位置、旋转归零，范围节点缩放为一。");
+            if (shape.Kind != SkillCollisionAuthoring.CollisionKind.Projectile)
+                throw new InvalidOperationException("该节点不是弹丸命中范围。");
+            CircleCollider2D circle = shape.GetComponent<CircleCollider2D>();
+            float scale = SkillCollisionEditor.PixelScale();
+            float rootScale = UniformRootScale(root);
+            float radiusPixels = circle == null ? shape.RadiusPixels : circle.radius * rootScale / scale;
+            Vector2 offsetPixels = circle == null
+                ? new Vector2(shape.OffsetXPixels, shape.OffsetYPixels)
+                : ((Vector2)node.localPosition + circle.offset) * rootScale / scale;
+            if (circle != null && !circle.isTrigger)
+                throw new InvalidOperationException("技能 CircleCollider2D 必须启用 Is Trigger。");
+            int radius = ConfigNumber.Encode(radiusPixels);
             if (radius <= 0) throw new InvalidOperationException("技能半径量化后必须大于零。");
-            return new[] { radius, ConfigNumber.Encode(node.localPosition.x), ConfigNumber.Encode(node.localPosition.z) };
+            return new[] { radius, ConfigNumber.Encode(offsetPixels.x), ConfigNumber.Encode(offsetPixels.y) };
+        }
+
+        /// <summary>将范围技能像素半径量化为配置千分整数。</summary>
+        /// <param name="shape">范围技能命中组件。</param>
+        /// <returns>仅包含范围半径的整数数组。</returns>
+        /// <exception cref="InvalidOperationException">节点用途错误或半径非法。</exception>
+        public static int[] AreaValues(SkillCollisionAuthoring shape)
+        {
+            if (shape.Kind != SkillCollisionAuthoring.CollisionKind.TargetArea)
+                throw new InvalidOperationException("该节点不是范围技能命中范围。");
+            CircleCollider2D circle = shape.GetComponent<CircleCollider2D>();
+            if (circle != null && !circle.isTrigger)
+                throw new InvalidOperationException("技能 CircleCollider2D 必须启用 Is Trigger。");
+            float radiusPixels = circle == null
+                ? shape.RadiusPixels
+                : circle.radius * UniformRootScale(shape.transform.parent) / SkillCollisionEditor.PixelScale();
+            int radius = ConfigNumber.Encode(radiusPixels);
+            if (radius <= 0) throw new InvalidOperationException("范围技能半径量化后必须大于零。");
+            return new[] { radius };
         }
 
         /// <summary>读取预制体根节点的等比缩放，量化为 TbVisualSet.scalePermille 千分整数。</summary>
@@ -116,72 +155,99 @@ namespace Roguelike.Features.Combat.Authoring.Editor
         {
             var root = shape.transform.parent;
             if (root == null) throw new InvalidOperationException("技能碰撞节点缺少根节点。");
-            Vector3 rootScale = root.localScale;
-            if (Mathf.Abs(rootScale.x - rootScale.y) > 0.0001f || Mathf.Abs(rootScale.x - rootScale.z) > 0.0001f)
-                throw new InvalidOperationException("技能预制体根节点缩放必须等比（X=Y=Z）。");
-            int permille = ConfigNumber.Encode(rootScale.x);
-            if (permille <= 0) throw new InvalidOperationException("技能缩放量化后必须大于零。");
-            return permille;
+            return ConfigNumber.Encode(UniformRootScale(root));
+        }
+
+        /// <summary>读取技能 Prefab 根节点的正数等比缩放，供 Collider2D 局部几何换算为最终世界像素。</summary>
+        /// <param name="root">技能 Prefab 根变换。</param>
+        /// <returns>根节点统一缩放值。</returns>
+        /// <exception cref="InvalidOperationException">根节点为空、缩放非正或 XYZ 不等比。</exception>
+        internal static float UniformRootScale(Transform root)
+        {
+            if (root == null) throw new InvalidOperationException("技能碰撞节点缺少根节点。");
+            Vector3 scale = root.localScale;
+            if (!(scale.x > 0f) || Mathf.Abs(scale.x - scale.y) > 0.0001f || Mathf.Abs(scale.x - scale.z) > 0.0001f)
+                throw new InvalidOperationException("技能预制体根节点缩放必须为正数且 X/Y/Z 相同。");
+            return scale.x;
+        }
+
+        /// <summary>读取技能根节点下三类表现节点，换算为 TbSkill 的偏移像素与相对缩放。</summary>
+        /// <param name="shape">同一技能 Prefab 的碰撞组件。</param>
+        /// <returns>与 VisualPlacementFields 顺序一致的九个可空整数。</returns>
+        /// <exception cref="InvalidOperationException">节点重复、层级、旋转、Z 偏移或非等比缩放不符合协议。</exception>
+        public static int?[] VisualPlacementValues(SkillCollisionAuthoring shape)
+        {
+            Transform root = shape.transform.parent;
+            if (root == null) throw new InvalidOperationException("技能碰撞节点缺少根节点。");
+            var result = new int?[VisualPlacementFields.Length];
+            var seen = new HashSet<SkillVisualPlacementAuthoring.VisualKind>();
+            float pixelScale = SkillCollisionEditor.PixelScale();
+            float rootScale = root.localScale.x;
+            foreach (SkillVisualPlacementAuthoring placement in root.GetComponentsInChildren<SkillVisualPlacementAuthoring>(true))
+            {
+                if (!seen.Add(placement.Kind)) throw new InvalidOperationException(root.name + " 的技能表现节点用途重复。");
+                Transform node = placement.transform;
+                Vector3 scale = node.localScale;
+                if (node.parent != root || Mathf.Abs(node.localPosition.z) > 0.0001f ||
+                    Quaternion.Angle(node.localRotation, Quaternion.identity) > 0.0001f ||
+                    !(scale.x > 0f) || Mathf.Abs(scale.x - scale.y) > 0.0001f || Mathf.Abs(scale.x - scale.z) > 0.0001f)
+                    throw new InvalidOperationException(root.name + " 的技能表现节点必须是根节点直接子级，Z/旋转归零且 Scale 等比为正数。");
+                int index = (int)placement.Kind * 3;
+                Vector2 authoredOffset = (Vector2)node.localPosition * rootScale / pixelScale;
+                // Prefab 中弹丸朝上：运行时 ANI 以局部 X 为前向、局部 Y 为左向，因此只在导出边界换轴；编辑者看到的位置保持不变。
+                Vector2 runtimeOffset = placement.Kind == SkillVisualPlacementAuthoring.VisualKind.Projectile
+                    ? new Vector2(authoredOffset.y, -authoredOffset.x)
+                    : authoredOffset;
+                result[index] = ConfigNumber.Encode(runtimeOffset.x);
+                result[index + 1] = ConfigNumber.Encode(runtimeOffset.y);
+                result[index + 2] = ConfigNumber.Encode(scale.x);
+            }
+            return result;
         }
 
         /// <summary>菜单将已保存的弹丸技能节点写入源表并生成 Luban，非弹丸与目录条目保持空碰撞配置。</summary>
         /// <remarks>只写 TbSkill 和生成物；生成失败恢复源表；不修改角色、怪物或当前场景。退出重入战斗后使用新快照。</remarks>
-        [MenuItem("Roguelike/Combat/技能碰撞配置/导出已保存技能并生成 Luban")]
-        public static void Export()
-        {
-            EnsureEditable();
-            var tables = CombatCylinderPipeline.ReadTables();
-            var updates = new Dictionary<int, int[]>();
-            var visualUpdates = new Dictionary<int, int[]>();
-            foreach (var shape in Shapes())
-            {
-                var skill = tables.TbSkill.Get(shape.SkillId);
-                // 缩放按技能所属表现集合导出，与角色/怪物共用 TbVisualSet.scalePermille 同一来源。
-                visualUpdates[skill.VisualSetId] = new[] { ScalePermille(shape) };
-                if (skill.CombatProfileId_Ref?.DeliveryType == ESkillDeliveryType.Projectile) updates.Add(skill.Id, Values(shape));
-            }
-            foreach (var skill in tables.TbSkill.DataList.Where(s => s.CombatProfileId_Ref?.DeliveryType == ESkillDeliveryType.Projectile))
-                if (!updates.ContainsKey(skill.Id)) throw new InvalidOperationException("缺少弹丸技能预制体: " + skill.Id);
-            string path = Directory.GetFiles("Config/Datas/Tables", "*_SkillConfig.xlsx").Single();
-            string visualPath = Directory.GetFiles("Config/Datas/Tables", "*_VisualSetConfig.xlsx").Single();
-            var backups = new Dictionary<string, byte[]> { [path] = File.ReadAllBytes(path), [visualPath] = File.ReadAllBytes(visualPath) };
-            try
-            {
-                ConfigWorkbookWriter.Patch(path, Fields, updates);
-                ConfigWorkbookWriter.Patch(visualPath, VisualFields, visualUpdates);
-                var info = new ProcessStartInfo("pwsh", "-NoProfile -File Tools/Config/generate.ps1")
-                { WorkingDirectory = Directory.GetCurrentDirectory(), UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
-                using var process = Process.Start(info);
-                var stdout = process.StandardOutput.ReadToEndAsync(); var stderr = process.StandardError.ReadToEndAsync();
-                process.WaitForExit(); File.WriteAllText("Library/SkillCollisionExport.log", stdout.Result + stderr.Result);
-                if (process.ExitCode != 0) throw new InvalidOperationException("Luban 生成失败，查看 Library/SkillCollisionExport.log。");
-            }
-            catch { foreach (var pair in backups) File.WriteAllBytes(pair.Key, pair.Value); throw; }
-            AssetDatabase.Refresh(); ValidateSaved();
-            Debug.Log("技能碰撞已按三位小数导出为千分整数，根节点缩放已写入 TbVisualSet.scalePermille。重新进入战斗生效。");
-        }
+        public static void Export() => CombatCollisionPipeline.ExportAll();
 
         /// <summary>菜单或测试对比保存节点与当前 bytes 的量化值；不修改表或资产。</summary>
         /// <exception cref="InvalidOperationException">技能不存在、节点无效或配置未导出。</exception>
-        [MenuItem("Roguelike/Combat/技能碰撞配置/校验保存节点与配置")]
+        [MenuItem("Roguelike/战斗/碰撞配置/校验技能预制体与配置")]
         public static void ValidateSaved()
         {
             var tables = CombatCylinderPipeline.ReadTables(); var found = new HashSet<int>();
             foreach (var shape in Shapes())
             {
                 var skill = tables.TbSkill.Get(shape.SkillId); found.Add(skill.Id);
-                if (skill.CombatProfileId_Ref?.DeliveryType != ESkillDeliveryType.Projectile) continue;
-                var expected = new[] { skill.ProjectileRadiusMilli, skill.ProjectileOffsetXMilli, skill.ProjectileOffsetYMilli };
-                var actual = Values(shape);
-                for (int i = 0; i < actual.Length; i++)
-                    if (!expected[i].HasValue || actual[i] != expected[i].Value) throw new InvalidOperationException("技能尚未导出: " + skill.Id + "/" + Fields[i]);
+                if (skill.CombatProfileId_Ref?.DeliveryType == ESkillDeliveryType.Projectile)
+                {
+                    var expected = new[] { skill.ProjectileRadiusPixelsMilli, skill.ProjectileOffsetXPixelsMilli, skill.ProjectileOffsetYPixelsMilli };
+                    var actual = Values(shape);
+                    for (int i = 0; i < actual.Length; i++)
+                        if (!expected[i].HasValue || actual[i] != expected[i].Value) throw new InvalidOperationException("技能尚未导出: " + skill.Id + "/" + ProjectileFields[i]);
+                }
+                else if (skill.CombatProfileId_Ref?.DeliveryType == ESkillDeliveryType.TargetArea)
+                {
+                    int[] actual = AreaValues(shape);
+                    if (!skill.AreaRadiusPixelsMilli.HasValue || actual[0] != skill.AreaRadiusPixelsMilli.Value)
+                        throw new InvalidOperationException("技能尚未导出: " + skill.Id + "/" + AreaFields[0]);
+                }
+                int?[] placementActual = VisualPlacementValues(shape);
+                int?[] placementExpected =
+                {
+                    skill.ProjectileVisualOffsetXPixelsMilli, skill.ProjectileVisualOffsetYPixelsMilli, skill.ProjectileVisualScalePermille,
+                    skill.ImpactVisualOffsetXPixelsMilli, skill.ImpactVisualOffsetYPixelsMilli, skill.ImpactVisualScalePermille,
+                    skill.AreaVisualOffsetXPixelsMilli, skill.AreaVisualOffsetYPixelsMilli, skill.AreaVisualScalePermille
+                };
+                for (int i = 0; i < placementActual.Length; i++)
+                    if (placementActual[i] != placementExpected[i])
+                        throw new InvalidOperationException("技能尚未导出: " + skill.Id + "/" + VisualPlacementFields[i]);
             }
             if (tables.TbSkill.DataList.Any(s => !found.Contains(s.Id))) throw new InvalidOperationException("部分技能尚未生成预制体。");
         }
 
         /// <summary>生成或导出前检查编辑状态；拒绝运行模式及未保存的 Prefab Stage，避免读取旧值。</summary>
         /// <exception cref="InvalidOperationException">编辑器正在运行或预制体尚未保存。</exception>
-        private static void EnsureEditable()
+        internal static void EnsureEditable()
         {
             if (EditorApplication.isPlayingOrWillChangePlaymode) throw new InvalidOperationException("请先退出 Play Mode。");
             var stage = UnityEditor.SceneManagement.PrefabStageUtility.GetCurrentPrefabStage();

@@ -141,7 +141,8 @@ namespace Roguelike.Features.Combat.Ecs
         private static void ValidateScenario(PerformanceScenarioConfig value)
         {
             if (value == null || value.Kind != EPerformanceKind.Combat || value.CombatRulesId_Ref == null || value.PresentationId_Ref?.InitialDirectionId_Ref == null ||
-                value.CharacterId_Ref?.DefaultSkillId_Ref?.CombatProfileId_Ref == null || !value.CharacterId_Ref.BodyRadius.HasValue ||
+                value.CharacterId_Ref?.DefaultSkillId_Ref?.CombatProfileId_Ref == null || !value.CharacterId_Ref.BodyRadiusPixels.HasValue ||
+                !value.CharacterId_Ref.BodyOffsetXPixels.HasValue || !value.CharacterId_Ref.BodyOffsetYPixels.HasValue ||
                 value.CharacterProfileOverrideId_Ref == null || value.MonsterProfileOverrideId_Ref == null ||
                 value.MonsterIds_Ref == null || value.MonsterIds_Ref.Count == 0 || value.EntityCount <= 0 || value.SpawnColumns <= 0 ||
                 !value.ArenaHalfWidth.HasValue || !value.ArenaHalfHeight.HasValue || !value.PlayerStartX.HasValue || !value.PlayerStartY.HasValue ||
@@ -162,7 +163,8 @@ namespace Roguelike.Features.Combat.Ecs
             if (!Enum.IsDefined(typeof(ETestHealthPolicy), value.PlayerHealthPolicy.Value) || !Enum.IsDefined(typeof(ETestInputPolicy), value.PlayerInputPolicy.Value))
                 throw new InvalidOperationException($"TbPerformanceScenario {value.Id}: unknown policy.");
             foreach (var monster in value.MonsterIds_Ref)
-                if (monster?.DefaultSkillId_Ref?.CombatProfileId_Ref == null || !monster.BodyRadius.HasValue)
+                if (monster?.DefaultSkillId_Ref?.CombatProfileId_Ref == null || !monster.BodyRadiusPixels.HasValue ||
+                    !monster.BodyOffsetXPixels.HasValue || !monster.BodyOffsetYPixels.HasValue)
                     throw new InvalidOperationException($"TbPerformanceScenario {value.Id}: monster is not combat-ready.");
             ValidateRules(value.CombatRulesId_Ref);
         }

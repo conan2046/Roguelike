@@ -1,21 +1,22 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEditor;
 using UnityEngine;
 
 namespace Roguelike.Features.Combat.Authoring.Editor
 {
-    /// <summary>全部 Hero/Monster 圆柱预制体的唯一编辑管理入口，汇总待导出差异。</summary>
+    /// <summary>角色、怪物和技能碰撞预制体的统一中文管理入口。</summary>
     public sealed class CombatCylinderWindow : EditorWindow
     {
         private readonly List<string> pending = new List<string>();
-        private int heroCount, monsterCount;
+        private int heroCount, monsterCount, skillCount;
         private string error;
         private Vector2 scroll;
 
         /// <summary>菜单打开集中窗口，不修改任何资产或配置。</summary>
-        [MenuItem("Roguelike/Combat/圆柱碰撞配置")]
-        public static void Open() => GetWindow<CombatCylinderWindow>("圆柱碰撞配置");
+        [MenuItem("Roguelike/战斗/碰撞配置/打开配置窗口")]
+        public static void Open() => GetWindow<CombatCylinderWindow>("战斗碰撞配置");
 
         /// <summary>窗口获得焦点时重新读取保存资产和生成表，显示其他窗口刚保存的调整。</summary>
         private void OnFocus() => RefreshStatus();
@@ -24,15 +25,16 @@ namespace Roguelike.Features.Combat.Authoring.Editor
         /// <remarks>按钮操作由用户显式触发；运行时禁用导出与生成，保护会话配置快照。</remarks>
         private void OnGUI()
         {
-            EditorGUILayout.LabelField("全部角色与怪物", EditorStyles.boldLabel);
-            EditorGUILayout.LabelField("Hero: " + heroCount + "    Monster: " + monsterCount);
-            EditorGUILayout.HelpBox("先保存微调后的 Prefab，再在这里一次导出全部。重新进入战斗生效。", MessageType.Info);
+            EditorGUILayout.LabelField("角色、怪物与技能碰撞", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField("主角: " + heroCount + "    怪物: " + monsterCount + "    技能: " + skillCount);
+            EditorGUILayout.HelpBox("在中文碰撞节点中按像素调整。保存 Prefab 后点一次导出，角色表、怪物表、技能表和 Luban 会一起更新。", MessageType.Info);
             if (!string.IsNullOrEmpty(error)) EditorGUILayout.HelpBox(error, MessageType.Error);
             else EditorGUILayout.HelpBox(pending.Count == 0 ? "已保存预制体与配置一致。" : "待导出修改：" + pending.Count + " 项", pending.Count == 0 ? MessageType.Info : MessageType.Warning);
             using (new EditorGUI.DisabledScope(EditorApplication.isPlayingOrWillChangePlaymode))
             {
-                if (GUILayout.Button("导出全部已保存圆柱并生成 Luban", GUILayout.Height(32))) Run(CombatCylinderPipeline.Export);
-                if (GUILayout.Button("批量生成缺失预制体（保留已有微调）")) Run(CombatCylinderPipeline.Generate);
+                if (GUILayout.Button("导出全部预制体并生成配置", GUILayout.Height(32))) Run(CombatCollisionPipeline.ExportAll);
+                if (GUILayout.Button("生成缺失的角色/怪物碰撞预制体")) Run(CombatCylinderPipeline.Generate);
+                if (GUILayout.Button("生成缺失的技能碰撞预制体")) Run(SkillCollisionPipeline.Generate);
             }
             if (GUILayout.Button("刷新修改状态")) RefreshStatus();
             scroll = EditorGUILayout.BeginScrollView(scroll);
@@ -53,7 +55,7 @@ namespace Roguelike.Features.Combat.Authoring.Editor
         /// <remarks>只读资产，允许新生成但尚未导出的形状显示为待导出。</remarks>
         private void RefreshStatus()
         {
-            pending.Clear(); heroCount = monsterCount = 0; error = null;
+            pending.Clear(); heroCount = monsterCount = skillCount = 0; error = null;
             try
             {
                 var tables = CombatCylinderPipeline.ReadTables();
@@ -64,12 +66,38 @@ namespace Roguelike.Features.Combat.Authoring.Editor
                     var shape = asset.GetComponentInChildren<CombatCylinderAuthoring>(true);
                     if (shape == null) { pending.Add(path); continue; }
                     if (shape.IsHero) heroCount++; else monsterCount++;
-                    float[] actual = CombatCylinderPipeline.Values(shape, tables); float?[] expected;
-                    if (shape.IsHero) { var c=tables.TbCharacter.Get(shape.ConfigId); expected=new[]{c.MoveRadiusPixels,c.MoveHeightPixels,c.MoveOffsetXPixels,c.MoveOffsetYPixels,c.MoveElevationPixels}; }
-                    else { var c=tables.TbMonster.Get(shape.ConfigId); expected=new[]{c.MoveRadiusPixels,c.MoveHeightPixels,c.MoveOffsetXPixels,c.MoveOffsetYPixels,c.MoveElevationPixels}; }
+                    float[] actual = CombatCylinderPipeline.Values(shape, tables); float?[] expected; float?[] bodyExpected;
+                    if (shape.IsHero) { var c=tables.TbCharacter.Get(shape.ConfigId); expected=new[]{c.MoveRadiusPixels,c.MoveHeightPixels,c.MoveOffsetXPixels,c.MoveOffsetYPixels,c.MoveElevationPixels}; bodyExpected=new[]{c.BodyRadiusPixels,c.BodyOffsetXPixels,c.BodyOffsetYPixels}; }
+                    else { var c=tables.TbMonster.Get(shape.ConfigId); expected=new[]{c.MoveRadiusPixels,c.MoveHeightPixels,c.MoveOffsetXPixels,c.MoveOffsetYPixels,c.MoveElevationPixels}; bodyExpected=new[]{c.BodyRadiusPixels,c.BodyOffsetXPixels,c.BodyOffsetYPixels}; }
+                    bool dirty = false;
                     for (int i=0;i<actual.Length;i++)
                         if (!expected[i].HasValue || Mathf.Abs(actual[i]-expected[i].Value)>0.00051f)
-                        { pending.Add(path); break; }
+                        { dirty = true; break; }
+                    float[] bodyActual = CombatCylinderPipeline.BodyValues(shape, tables);
+                    if (!dirty)
+                        for (int i=0;i<bodyActual.Length;i++)
+                            if ((bodyActual[0] > 0f && (!bodyExpected[i].HasValue || Mathf.Abs(bodyActual[i]-bodyExpected[i].Value)>0.00051f)) ||
+                                (bodyActual[0] <= 0f && bodyExpected[i].HasValue)) { dirty = true; break; }
+                    if (dirty) pending.Add(path);
+                }
+                foreach (string guid in AssetDatabase.FindAssets("t:Prefab", new[] {SkillCollisionPipeline.Root}))
+                {
+                    string path = AssetDatabase.GUIDToAssetPath(guid);
+                    var asset = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+                    var shape = asset.GetComponentInChildren<SkillCollisionAuthoring>(true);
+                    if (shape == null) { pending.Add(path); continue; }
+                    skillCount++;
+                    var skill = tables.TbSkill.Get(shape.SkillId);
+                    bool dirty = false;
+                    if (skill.CombatProfileId_Ref?.DeliveryType == cfg.ESkillDeliveryType.Projectile)
+                    {
+                        int[] actual = SkillCollisionPipeline.Values(shape);
+                        int?[] expected = { skill.ProjectileRadiusPixelsMilli, skill.ProjectileOffsetXPixelsMilli, skill.ProjectileOffsetYPixelsMilli };
+                        dirty = actual.Where((value, index) => !expected[index].HasValue || value != expected[index].Value).Any();
+                    }
+                    else if (skill.CombatProfileId_Ref?.DeliveryType == cfg.ESkillDeliveryType.TargetArea)
+                        dirty = !skill.AreaRadiusPixelsMilli.HasValue || SkillCollisionPipeline.AreaValues(shape)[0] != skill.AreaRadiusPixelsMilli.Value;
+                    if (dirty) pending.Add(path);
                 }
             }
             catch (Exception exception) { error = exception.Message; }

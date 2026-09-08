@@ -45,6 +45,9 @@ namespace Roguelike.Tests
                 Assert.That(unit.IsBoss, Is.False);
                 Assert.That(unit.Target.MaxHealth,
                     Is.EqualTo((long)new CombatAttributes(monster.AttributeProfileId_Ref).Get(EAttributeType.MaxHealth)));
+                Assert.That(unit.MoveSpeed,
+                    Is.EqualTo((float)new CombatAttributes(monster.AttributeProfileId_Ref)
+                        .Get(EAttributeType.MoveSpeed) * definition.CombatRules.WorldUnitsPerPixel).Within(1e-6));
                 Assert.That(math.distance(unit.Position, session.ReadUnit(0).Position),
                     Is.EqualTo(ConfigNumber.Decode(definition.Map.SpawnRadiusPixelsMilli) * definition.CombatRules.WorldUnitsPerPixel).Within(1e-5));
             }
@@ -54,26 +57,32 @@ namespace Roguelike.Tests
             var boss = session.ReadUnit(bossSlot);
             Assert.That(boss.ConfigId, Is.EqualTo(definition.Boss.MonsterId));
             Assert.That(boss.IsBoss, Is.True);
+            Assert.That(boss.MoveSpeed,
+                Is.EqualTo((float)new CombatAttributes(definition.Boss.MonsterId_Ref.AttributeProfileId_Ref)
+                    .Get(EAttributeType.MoveSpeed) * definition.CombatRules.WorldUnitsPerPixel).Within(1e-6));
             Assert.Throws<InvalidOperationException>(() => session.TrySpawnMonster(definition.Boss.MonsterId_Ref,
                 ConfigNumber.Decode(definition.Boss.SpawnRadiusPixelsMilli), sequence + 1, true, out _));
         }
 
         /// <summary>两种技能共享同一机制时，表内各自半径必须传到正式 ECS 扫掠并改变擦边命中结果。</summary>
-        /// <param name="radiusMilli">TbSkill 半径千分整数。</param><param name="hit">横向间距为 0.4 的目标是否应命中。</param>
-        [TestCase(80, false)]
-        [TestCase(400, true)]
-        public void SkillRadiusControlsIndependentProjectileCollision(int radiusMilli, bool hit)
+        /// <param name="radiusPixelsMilli">TbSkill 像素半径千分整数。</param><param name="hit">横向间距为 0.4 的目标是否应命中。</param>
+        [TestCase(8000, false)]
+        [TestCase(40000, true)]
+        public void SkillRadiusControlsIndependentProjectileCollision(int radiusPixelsMilli, bool hit)
         {
             var tables = LoadTables(); var scenario = tables.TbPerformanceScenario.Get(4);
             var source = scenario.CharacterId_Ref.DefaultSkillId_Ref;
-            var skill = SkillWithCollision(source, radiusMilli, 0, 0);
+            var skill = SkillWithCollision(source, radiusPixelsMilli, 0, 0);
             scenario.CharacterId_Ref.DefaultSkillId_Ref = skill;
             Assert.That(skill.CombatProfileId_Ref, Is.SameAs(source.CombatProfileId_Ref));
             using var world = new World("Independent skill radius"); using var session = CreateSession(world, scenario);
-            Assert.That(session.ReadUnit(0).ProjectileRadius, Is.EqualTo(radiusMilli / 1000f));
+            Assert.That(session.ReadUnit(0).ProjectileRadius,
+                Is.EqualTo(radiusPixelsMilli / 1000f * scenario.CombatRulesId_Ref.WorldUnitsPerPixel).Within(1e-6f));
             for (int slot = 1; slot < session.UnitCount; slot++)
             {
                 var unit = session.ReadUnit(slot); unit.Position = new float2(2, 0); unit.MoveSpeed = 0; unit.Cooldown = 1000;
+                unit.Radius = 0.1f; unit.BodyHalfSegment = 0f; unit.BodyOffset = float2.zero;
+                unit.Movement.Radius = 0.05f; unit.Movement.HalfSegment2D = 0f; unit.Movement.Offset = float2.zero;
                 unit.Target.Health = slot == 1 ? unit.Target.MaxHealth : 0; unit.Target.Evasion = 0;
                 world.EntityManager.SetComponentData(session.UnitEntity(slot), unit);
             }
@@ -92,11 +101,13 @@ namespace Roguelike.Tests
         public void SkillOffsetRotatesAndParticipatesInSweep()
         {
             var tables = LoadTables(); var scenario = tables.TbPerformanceScenario.Get(4);
-            scenario.CharacterId_Ref.DefaultSkillId_Ref = SkillWithCollision(scenario.CharacterId_Ref.DefaultSkillId_Ref, 80, 500, 1000);
+            scenario.CharacterId_Ref.DefaultSkillId_Ref = SkillWithCollision(scenario.CharacterId_Ref.DefaultSkillId_Ref, 8000, 50000, 100000);
             using var world = new World("Skill local offset"); using var session = CreateSession(world, scenario);
             for (int slot = 1; slot < session.UnitCount; slot++)
             {
                 var unit = session.ReadUnit(slot); unit.Position = new float2(2, 0); unit.MoveSpeed = 0; unit.Cooldown = 1000;
+                unit.Radius = 0.1f; unit.BodyHalfSegment = 0f; unit.BodyOffset = float2.zero;
+                unit.Movement.Radius = 0.05f; unit.Movement.HalfSegment2D = 0f; unit.Movement.Offset = float2.zero;
                 unit.Target.Health = slot == 1 ? unit.Target.MaxHealth : 0; unit.Target.Evasion = 0;
                 world.EntityManager.SetComponentData(session.UnitEntity(slot), unit);
             }
@@ -111,9 +122,44 @@ namespace Roguelike.Tests
             Assert.That(session.ReadUnit(1).Target.Health, Is.LessThan(health));
         }
 
+        /// <summary>受击中心偏移参与扫掠，而命中特效事件必须独立落在目标挂点。</summary>
+        [Test]
+        public void BodyOffsetParticipatesInProjectileSweep()
+        {
+            var tables = LoadTables();
+            var scenario = tables.TbPerformanceScenario.Get(4);
+            scenario.CharacterId_Ref.DefaultSkillId_Ref = SkillWithCollision(
+                scenario.CharacterId_Ref.DefaultSkillId_Ref, 35000, 0, 0);
+            using var world = new World("Body offset projectile sweep");
+            using var session = CreateSession(world, scenario);
+            for (int slot = 1; slot < session.UnitCount; slot++)
+            {
+                var unit = session.ReadUnit(slot);
+                unit.Position = new float2(2f, 0.6f);
+                unit.BodyOffset = new float2(0f, -0.6f);
+                unit.HitEffectOffset = new float2(0.25f, 0.75f);
+                unit.MoveSpeed = 0f;
+                unit.Cooldown = 1000d;
+                unit.Target.Health = slot == 1 ? unit.Target.MaxHealth : 0;
+                unit.Target.Evasion = 0d;
+                world.EntityManager.SetComponentData(session.UnitEntity(slot), unit);
+            }
+            session.Advance(session.StepSeconds, float2.zero);
+            CombatProjectile projectile = session.ReadProjectile(0);
+            Assert.That(projectile.Active, Is.True);
+            projectile.Position = float2.zero;
+            projectile.Velocity = new float2(600f, 0f);
+            world.EntityManager.SetComponentData(session.ProjectileEntity(0), projectile);
+            long health = session.ReadUnit(1).Target.Health;
+            session.Advance(session.StepSeconds, float2.zero);
+            Assert.That(session.ReadUnit(1).Target.Health, Is.LessThan(health));
+            Assert.That(session.ImpactCount, Is.EqualTo(1));
+            Assert.That(math.distance(session.ReadImpact(0).Position, new float2(2.25f, 1.35f)), Is.LessThan(1e-5f));
+        }
+
         /// <summary>隔离配置测试通过生成的二进制协议创建技能变体，保留相同机制和视觉引用，不写源表。</summary>
-        /// <param name="source">实际 TbSkill 行。</param><param name="radius">半径千分整数。</param>
-        /// <param name="x">局部右向偏移千分整数。</param><param name="y">局部前向偏移千分整数。</param>
+        /// <param name="source">实际 TbSkill 行。</param><param name="radius">像素半径千分整数。</param>
+        /// <param name="x">局部右向像素偏移千分整数。</param><param name="y">局部前向像素偏移千分整数。</param>
         /// <returns>仅当前测试持有的技能配置。</returns>
         private static SkillConfig SkillWithCollision(SkillConfig source, int radius, int x, int y)
         {
@@ -123,7 +169,16 @@ namespace Roguelike.Tests
             b.WriteBool(source.ProjectileClipId.HasValue); if (source.ProjectileClipId.HasValue) b.WriteInt(source.ProjectileClipId.Value);
             b.WriteBool(source.ImpactClipId.HasValue); if (source.ImpactClipId.HasValue) b.WriteInt(source.ImpactClipId.Value);
             b.WriteSize(source.AreaClipIds.Count); foreach (int clipId in source.AreaClipIds) b.WriteInt(clipId);
-            b.WriteBool(source.AreaRadiusMilli.HasValue); if (source.AreaRadiusMilli.HasValue) b.WriteInt(source.AreaRadiusMilli.Value);
+            b.WriteBool(source.AreaRadiusPixelsMilli.HasValue); if (source.AreaRadiusPixelsMilli.HasValue) b.WriteInt(source.AreaRadiusPixelsMilli.Value);
+            b.WriteBool(source.ProjectileVisualOffsetXPixelsMilli.HasValue); if (source.ProjectileVisualOffsetXPixelsMilli.HasValue) b.WriteInt(source.ProjectileVisualOffsetXPixelsMilli.Value);
+            b.WriteBool(source.ProjectileVisualOffsetYPixelsMilli.HasValue); if (source.ProjectileVisualOffsetYPixelsMilli.HasValue) b.WriteInt(source.ProjectileVisualOffsetYPixelsMilli.Value);
+            b.WriteBool(source.ProjectileVisualScalePermille.HasValue); if (source.ProjectileVisualScalePermille.HasValue) b.WriteInt(source.ProjectileVisualScalePermille.Value);
+            b.WriteBool(source.ImpactVisualOffsetXPixelsMilli.HasValue); if (source.ImpactVisualOffsetXPixelsMilli.HasValue) b.WriteInt(source.ImpactVisualOffsetXPixelsMilli.Value);
+            b.WriteBool(source.ImpactVisualOffsetYPixelsMilli.HasValue); if (source.ImpactVisualOffsetYPixelsMilli.HasValue) b.WriteInt(source.ImpactVisualOffsetYPixelsMilli.Value);
+            b.WriteBool(source.ImpactVisualScalePermille.HasValue); if (source.ImpactVisualScalePermille.HasValue) b.WriteInt(source.ImpactVisualScalePermille.Value);
+            b.WriteBool(source.AreaVisualOffsetXPixelsMilli.HasValue); if (source.AreaVisualOffsetXPixelsMilli.HasValue) b.WriteInt(source.AreaVisualOffsetXPixelsMilli.Value);
+            b.WriteBool(source.AreaVisualOffsetYPixelsMilli.HasValue); if (source.AreaVisualOffsetYPixelsMilli.HasValue) b.WriteInt(source.AreaVisualOffsetYPixelsMilli.Value);
+            b.WriteBool(source.AreaVisualScalePermille.HasValue); if (source.AreaVisualScalePermille.HasValue) b.WriteInt(source.AreaVisualScalePermille.Value);
             return new SkillConfig(b)
             {
                 CombatProfileId_Ref = source.CombatProfileId_Ref,
@@ -403,16 +458,25 @@ namespace Roguelike.Tests
             Assert.That(session.ReadUnit(0).Cooldown, Is.Zero);
             Assert.That(session.Statistics.Attacks, Is.Zero);
             session.Restart();
+            var player = session.ReadUnit(0);
+            player.Position = float2.zero;
+            player.BodyOffset = float2.zero;
+            player.BodyHalfSegment = 0f;
+            world.EntityManager.SetComponentData(session.UnitEntity(0), player);
             for (int slot = 1; slot < session.UnitCount; slot++)
             {
                 var unit = session.ReadUnit(slot);
                 unit.Position = new float2(slot == 1 ? -2 : 2, 0);
+                unit.BodyOffset = float2.zero;
+                unit.BodyHalfSegment = 0f;
+                unit.Radius = 0.2f;
                 unit.MoveSpeed = 0;
                 if (slot > 2) unit.Target.Health = 0;
                 world.EntityManager.SetComponentData(session.UnitEntity(slot), unit);
             }
             session.Advance(session.StepSeconds, float2.zero);
-            Assert.That(session.ReadUnit(0).TargetSlot, Is.EqualTo(1));
+            int expectedSlot = session.ReadUnit(1).Target.Lifetime < session.ReadUnit(2).Target.Lifetime ? 1 : 2;
+            Assert.That(session.ReadUnit(0).TargetSlot, Is.EqualTo(expectedSlot));
             Assert.That(session.Statistics.ProjectileSpawns, Is.EqualTo(1));
         }
 
@@ -462,8 +526,11 @@ namespace Roguelike.Tests
         public void EcsProjectileSweepsAndStopsAtFirstContact(bool evade)
         {
             var tables = LoadTables();
+            var scenario = tables.TbPerformanceScenario.Get(4);
+            scenario.CharacterId_Ref.DefaultSkillId_Ref = SkillWithCollision(
+                scenario.CharacterId_Ref.DefaultSkillId_Ref, 35000, 0, 0);
             using var world = new World("Combat projectile sweep test");
-            using var session = CreateSession(world, tables.TbPerformanceScenario.Get(4));
+            using var session = CreateSession(world, scenario);
             for (int slot = 1; slot < session.UnitCount; slot++)
             {
                 var unit = session.ReadUnit(slot);
@@ -540,6 +607,8 @@ namespace Roguelike.Tests
         public void EcsAllowsMutualKillsInOneTick()
         {
             var scenario = LoadTables().TbPerformanceScenario.Get(4);
+            scenario.CharacterId_Ref.DefaultSkillId_Ref = SkillWithCollision(
+                scenario.CharacterId_Ref.DefaultSkillId_Ref, 35000, 0, 0);
             using var world = new World("Combat simultaneous death test");
             using var session = CreateSession(world, scenario);
             var player = session.ReadUnit(0);
@@ -595,6 +664,8 @@ namespace Roguelike.Tests
         {
             var tables = LoadTables();
             var scenario = tables.TbPerformanceScenario.Get(5);
+            scenario.CharacterId_Ref.DefaultSkillId_Ref = SkillWithCollision(
+                scenario.CharacterId_Ref.DefaultSkillId_Ref, 35000, 0, 0);
             using var world = new World("Combat recycling test");
             using var session = CreateSession(world, scenario);
             var player = session.ReadUnit(0);

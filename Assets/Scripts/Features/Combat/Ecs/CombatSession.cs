@@ -122,9 +122,13 @@ namespace Roguelike.Features.Combat.Ecs
                     }
                 }
                 var player = settings.Character;
-                // TbVisualSet.scalePermille 同比缩放战斗判定半径，与视觉缩放保持同一来源，避免脱节。
                 templates[0] = BuildUnit(settings.CharacterProfile, settings.PlayerSkill,
-                    player.BodyRadius.Value * player.VisualSetId_Ref.ScalePermille / 1000f, CombatCylinder.FromConfig(player.MoveRadiusPixels, player.MoveHeightPixels, player.MoveOffsetXPixels, player.MoveOffsetYPixels, player.MoveElevationPixels, rules.WorldUnitsPerPixel), settings.PlayerStart, true);
+                    player.BodyRadiusPixels.Value * rules.WorldUnitsPerPixel,
+                    new float2(player.BodyOffsetXPixels.Value, player.BodyOffsetYPixels.Value) * rules.WorldUnitsPerPixel,
+                    BuildHitEffectOffset(player.HitEffectOffsetXPixels, player.HitEffectOffsetYPixels,
+                        player.BodyOffsetXPixels.Value, player.BodyOffsetYPixels.Value),
+                    BuildMovement(player.MoveRadiusPixels, player.MoveHeightPixels, player.MoveOffsetXPixels,
+                        player.MoveOffsetYPixels, player.MoveElevationPixels, player.CollisionShape), settings.PlayerStart, true);
                 var playerTemplate = templates[0];
                 playerTemplate.ConfigId = player.Id;
                 playerTemplate.VisualSetId = player.VisualSetId;
@@ -147,7 +151,12 @@ namespace Roguelike.Features.Combat.Ecs
                     var position = new float2(((slot - 1) % settings.SpawnColumns - (settings.SpawnColumns - 1) * 0.5f) * settings.HorizontalSpacing,
                         ((slot - 1) / settings.SpawnColumns - (rows - 1) * 0.5f) * settings.VerticalSpacing);
                     templates[slot] = BuildUnit(settings.GetMonsterProfile(monster), monster.DefaultSkillId_Ref,
-                        monster.BodyRadius.Value * monster.VisualSetId_Ref.ScalePermille / 1000f, CombatCylinder.FromConfig(monster.MoveRadiusPixels, monster.MoveHeightPixels, monster.MoveOffsetXPixels, monster.MoveOffsetYPixels, monster.MoveElevationPixels, rules.WorldUnitsPerPixel), position, false);
+                        monster.BodyRadiusPixels.Value * rules.WorldUnitsPerPixel,
+                        new float2(monster.BodyOffsetXPixels.Value, monster.BodyOffsetYPixels.Value) * rules.WorldUnitsPerPixel,
+                        BuildHitEffectOffset(monster.HitEffectOffsetXPixels, monster.HitEffectOffsetYPixels,
+                            monster.BodyOffsetXPixels.Value, monster.BodyOffsetYPixels.Value),
+                        BuildMovement(monster.MoveRadiusPixels, monster.MoveHeightPixels, monster.MoveOffsetXPixels,
+                            monster.MoveOffsetYPixels, monster.MoveElevationPixels, monster.CollisionShape), position, false);
                     var template = templates[slot];
                     template.ConfigId = monster.Id;
                     template.VisualSetId = monster.VisualSetId;
@@ -158,7 +167,8 @@ namespace Roguelike.Features.Combat.Ecs
                 for (int slot = 0; slot < count; slot++)
                 {
                     var template = templates[slot];
-                    maximumRadius = math.max(maximumRadius, template.Radius);
+                    maximumRadius = math.max(maximumRadius,
+                        template.Radius + template.BodyHalfSegment + math.length(template.BodyOffset));
                     maximumMotion = math.max(maximumMotion, template.MoveSpeed * (float)StepSeconds);
                     units[slot] = manager.CreateEntity(typeof(CombatUnit), typeof(LocalTransform), typeof(LocalToWorld));
                 }
@@ -399,13 +409,11 @@ namespace Roguelike.Features.Combat.Ecs
                     var other = ReadUnit(slot);
                     if (other.Target.Health <= 0 || !shape.HeightOverlaps(other.Movement)) continue;
                     float sum = shape.Radius + other.Movement.Radius;
+                    float halfSegment = shape.HalfSegment2D + other.Movement.HalfSegment2D;
                     float2 offset = other.Position + other.Movement.Offset - shape.Offset - center;
-                    if (math.lengthsq(position + shape.Offset - other.Position - other.Movement.Offset) >= sum * sum) continue;
-                    double distance = math.length(offset);
-                    if (distance == 0 || sum >= radius + distance) return false;
-                    double half = Math.Acos(Math.Max(-1, Math.Min(1, (radius * radius + distance * distance - sum * sum) / (2 * radius * distance))));
-                    double end = Math.Atan2(offset.y, offset.x) + half;
-                    while (end < angle) end += 2 * Math.PI;
+                    float2 relative = position + shape.Offset - other.Position - other.Movement.Offset;
+                    if (CombatGeometry.VerticalSegmentDistanceSquared(relative, halfSegment) >= sum * sum) continue;
+                    if (!TryFindSpawnCapsuleExit(radius, offset, sum, halfSegment, angle, out double end)) return false;
                     // 单精度角度前进一步，避免圆周投影舍入再次落入刚越过的接触弧。
                     float positive = (float)(end + 2 * Math.PI);
                     angle = math.asfloat(math.asint(positive) + 1) - 2 * Math.PI;
@@ -414,6 +422,94 @@ namespace Roguelike.Features.Combat.Ecs
                 if (!blocked) return true;
             }
             return false;
+        }
+
+        /// <summary>求固定出生圆与一个纵向胶囊重叠弧在正角度方向上的首个出口。</summary>
+        /// <param name="spawnRadius">出生圆半径。</param>
+        /// <param name="capsuleCenter">胶囊中心相对出生圆心的位置。</param>
+        /// <param name="clearance">两个胶囊端帽半径之和。</param>
+        /// <param name="halfSegment">两个胶囊中轴半长之和。</param>
+        /// <param name="angle">当前已确认位于重叠弧内的角度。</param>
+        /// <param name="exitAngle">沿正方向离开胶囊的最早边界角。</param>
+        /// <returns>是否存在不超过一整圈的出口。</returns>
+        private static bool TryFindSpawnCapsuleExit(float spawnRadius, float2 capsuleCenter, float clearance,
+            float halfSegment, double angle, out double exitAngle)
+        {
+            exitAngle = double.PositiveInfinity;
+            ConsiderSpawnCircleBoundary(spawnRadius, capsuleCenter + new float2(0f, halfSegment),
+                clearance, capsuleCenter, halfSegment, angle, ref exitAngle);
+            ConsiderSpawnCircleBoundary(spawnRadius, capsuleCenter - new float2(0f, halfSegment),
+                clearance, capsuleCenter, halfSegment, angle, ref exitAngle);
+            if (spawnRadius > 0f)
+            {
+                ConsiderSpawnVerticalBoundary(spawnRadius, capsuleCenter.x - clearance, capsuleCenter,
+                    clearance, halfSegment, angle, ref exitAngle);
+                ConsiderSpawnVerticalBoundary(spawnRadius, capsuleCenter.x + clearance, capsuleCenter,
+                    clearance, halfSegment, angle, ref exitAngle);
+            }
+            return double.IsFinite(exitAngle) && exitAngle <= angle + Math.PI * 2d;
+        }
+
+        /// <summary>把胶囊端帽圆与出生圆的交点中、交点后位于胶囊外的候选加入最早出口。</summary>
+        /// <param name="spawnRadius">出生圆半径。</param>
+        /// <param name="circleCenter">端帽圆心相对出生圆心的位置。</param>
+        /// <param name="circleRadius">端帽圆半径。</param>
+        /// <param name="capsuleCenter">完整胶囊中心。</param>
+        /// <param name="halfSegment">完整胶囊中轴半长。</param>
+        /// <param name="angle">当前重叠角。</param>
+        /// <param name="best">当前最早出口；找到更早候选时修改。</param>
+        private static void ConsiderSpawnCircleBoundary(float spawnRadius, float2 circleCenter, float circleRadius,
+            float2 capsuleCenter, float halfSegment, double angle, ref double best)
+        {
+            double distance = math.length(circleCenter);
+            if (!(spawnRadius > 0f) || distance <= 0d ||
+                distance > spawnRadius + circleRadius || distance < Math.Abs(spawnRadius - circleRadius)) return;
+            double cosine = (spawnRadius * spawnRadius + distance * distance - circleRadius * circleRadius) /
+                (2d * spawnRadius * distance);
+            double centerAngle = Math.Atan2(circleCenter.y, circleCenter.x);
+            double half = Math.Acos(Math.Max(-1d, Math.Min(1d, cosine)));
+            ConsiderSpawnExit(centerAngle - half, spawnRadius, capsuleCenter, circleRadius, halfSegment, angle, ref best);
+            ConsiderSpawnExit(centerAngle + half, spawnRadius, capsuleCenter, circleRadius, halfSegment, angle, ref best);
+        }
+
+        /// <summary>把胶囊直边与出生圆的交点中、交点后位于胶囊外的候选加入最早出口。</summary>
+        /// <param name="spawnRadius">出生圆半径。</param>
+        /// <param name="x">胶囊一条竖直边相对出生圆心的横坐标。</param>
+        /// <param name="capsuleCenter">完整胶囊中心。</param>
+        /// <param name="clearance">胶囊半径。</param>
+        /// <param name="halfSegment">胶囊中轴半长。</param>
+        /// <param name="angle">当前重叠角。</param>
+        /// <param name="best">当前最早出口；找到更早候选时修改。</param>
+        private static void ConsiderSpawnVerticalBoundary(float spawnRadius, float x, float2 capsuleCenter,
+            float clearance, float halfSegment, double angle, ref double best)
+        {
+            double ratio = x / spawnRadius;
+            if (ratio < -1d || ratio > 1d) return;
+            double first = Math.Acos(ratio);
+            double second = Math.PI * 2d - first;
+            if (Math.Abs(spawnRadius * Math.Sin(first) - capsuleCenter.y) <= halfSegment)
+                ConsiderSpawnExit(first, spawnRadius, capsuleCenter, clearance, halfSegment, angle, ref best);
+            if (Math.Abs(spawnRadius * Math.Sin(second) - capsuleCenter.y) <= halfSegment)
+                ConsiderSpawnExit(second, spawnRadius, capsuleCenter, clearance, halfSegment, angle, ref best);
+        }
+
+        /// <summary>规范化边界角，并用边界后的单精度可区分位置确认它确实是胶囊出口。</summary>
+        /// <param name="candidate">未规范化的边界角。</param>
+        /// <param name="spawnRadius">出生圆半径。</param>
+        /// <param name="capsuleCenter">胶囊中心相对出生圆心的位置。</param>
+        /// <param name="clearance">胶囊半径。</param>
+        /// <param name="halfSegment">胶囊中轴半长。</param>
+        /// <param name="angle">当前重叠角。</param>
+        /// <param name="best">当前最早出口；候选有效且更早时修改。</param>
+        private static void ConsiderSpawnExit(double candidate, float spawnRadius, float2 capsuleCenter,
+            float clearance, float halfSegment, double angle, ref double best)
+        {
+            while (candidate <= angle) candidate += Math.PI * 2d;
+            if (candidate > angle + Math.PI * 2d || candidate >= best) return;
+            float probe = math.asfloat(math.asint((float)candidate) + 1);
+            float2 point = spawnRadius * new float2(math.cos(probe), math.sin(probe)) - capsuleCenter;
+            if (CombatGeometry.VerticalSegmentDistanceSquared(point, halfSegment) >= clearance * clearance)
+                best = candidate;
         }
 
         /// <summary>将表内秒数向上量化为模拟 tick；先还原 float 的十进制精度，避免 0.2 秒被浮点误差抬至多一帧。</summary>
@@ -446,8 +542,12 @@ namespace Roguelike.Features.Combat.Ecs
         private int AddMonsterSlot(MonsterConfig monster)
         {
             var template = BuildUnit(settings.GetMonsterProfile(monster), monster.DefaultSkillId_Ref,
-                monster.BodyRadius.Value * monster.VisualSetId_Ref.ScalePermille / 1000f, CombatCylinder.FromConfig(monster.MoveRadiusPixels, monster.MoveHeightPixels,
-                    monster.MoveOffsetXPixels, monster.MoveOffsetYPixels, monster.MoveElevationPixels, rules.WorldUnitsPerPixel),
+                monster.BodyRadiusPixels.Value * rules.WorldUnitsPerPixel,
+                new float2(monster.BodyOffsetXPixels.Value, monster.BodyOffsetYPixels.Value) * rules.WorldUnitsPerPixel,
+                BuildHitEffectOffset(monster.HitEffectOffsetXPixels, monster.HitEffectOffsetYPixels,
+                    monster.BodyOffsetXPixels.Value, monster.BodyOffsetYPixels.Value),
+                BuildMovement(monster.MoveRadiusPixels, monster.MoveHeightPixels,
+                    monster.MoveOffsetXPixels, monster.MoveOffsetYPixels, monster.MoveElevationPixels, monster.CollisionShape),
                 float2.zero, false);
             template.ConfigId = monster.Id;
             template.VisualSetId = monster.VisualSetId;
@@ -461,7 +561,8 @@ namespace Roguelike.Features.Combat.Ecs
             inactive.Target.Health = 0;
             manager.SetComponentData(entity, inactive);
             manager.SetComponentData(entity, LocalTransform.FromScale(0));
-            maximumRadius = math.max(maximumRadius, template.Radius);
+            maximumRadius = math.max(maximumRadius,
+                template.Radius + template.BodyHalfSegment + math.length(template.BodyOffset));
             maximumMotion = math.max(maximumMotion, template.MoveSpeed * (float)StepSeconds);
             grid.Capacity = Math.Max(grid.Capacity, units.Length);
             requests.Capacity = Math.Max(requests.Capacity,
@@ -559,7 +660,7 @@ namespace Roguelike.Features.Combat.Ecs
             unit.Interval = interval;
             unit.Target.Synchronize(attributes);
             unit.Attack = AttackSnapshot.Capture(attributes, unit.Target.Lifetime, 0, unit.Target.Faction);
-            unit.MoveSpeed = (float)attributes.MoveSpeed;
+            unit.MoveSpeed = (float)attributes.MoveSpeed * rules.WorldUnitsPerPixel;
             if (slot == 0 && settings.IsFormalRun)
             {
                 for (int index = 0; index < playerWeapons.Length; index++)
@@ -651,52 +752,55 @@ namespace Roguelike.Features.Combat.Ecs
             if (combat.DeliveryType == ESkillDeliveryType.Projectile)
             {
                 if (!combat.ProjectileSpeed.HasValue || !combat.ProjectileLifetime.HasValue ||
-                    !skillConfig.ProjectileRadius.HasValue || !skillConfig.ProjectileOffsetX.HasValue ||
-                    !skillConfig.ProjectileOffsetY.HasValue)
+                    !skillConfig.ProjectileRadiusPixels.HasValue || !skillConfig.ProjectileOffsetXPixels.HasValue ||
+                    !skillConfig.ProjectileOffsetYPixels.HasValue)
                     throw new InvalidOperationException($"TbSkill {skillConfig.Id}: incomplete projectile weapon.");
                 CombatMath.Positive(combat.ProjectileSpeed.Value);
                 CombatMath.Positive(combat.ProjectileLifetime.Value);
-                CombatMath.Positive(skillConfig.ProjectileRadius.Value);
+                CombatMath.Positive(skillConfig.ProjectileRadiusPixels.Value);
                 weapon.ProjectileSpeed = combat.ProjectileSpeed.Value;
                 weapon.ProjectileLifetime = combat.ProjectileLifetime.Value;
-                // 与视觉同源：TbVisualSet.scalePermille 同比缩放弹丸判定半径，保证视觉与判定不脱节。
-                weapon.ProjectileRadius = skillConfig.ProjectileRadius.Value * skillConfig.VisualSetId_Ref.ScalePermille / 1000f;
-                weapon.ProjectileOffset = new float2(skillConfig.ProjectileOffsetX.Value,
-                    skillConfig.ProjectileOffsetY.Value);
+                weapon.ProjectileRadius = skillConfig.ProjectileRadiusPixels.Value * rules.WorldUnitsPerPixel;
+                weapon.ProjectileOffset = new float2(skillConfig.ProjectileOffsetXPixels.Value,
+                    skillConfig.ProjectileOffsetYPixels.Value) * rules.WorldUnitsPerPixel;
                 return weapon;
             }
-            if (combat.DeliveryType != ESkillDeliveryType.TargetArea || !skillConfig.AreaRadiusMilli.HasValue)
+            if (combat.DeliveryType != ESkillDeliveryType.TargetArea || !skillConfig.AreaRadiusPixels.HasValue)
                 throw new InvalidOperationException($"TbSkill {skillConfig.Id}: incomplete target-area weapon.");
-            weapon.AreaRadius = ConfigNumber.Decode(skillConfig.AreaRadiusMilli.Value) * skillConfig.VisualSetId_Ref.ScalePermille / 1000f;
+            weapon.AreaRadius = skillConfig.AreaRadiusPixels.Value * rules.WorldUnitsPerPixel;
             CombatMath.Positive(weapon.AreaRadius);
             return weapon;
         }
 
-        /// <summary>入局时将 TbAttributeProfile、TbSkillCombat 与身体半径转为非托管模板。</summary>
+        /// <summary>入局时将 TbAttributeProfile、TbSkillCombat 与身体半径转为非托管模板，并把移动速度由逻辑像素换算到模拟坐标。</summary>
         /// <param name="profile">完整属性方案。</param>
         /// <param name="skillConfig">TbSkill 技能，碰撞半径与偏移独立于其 TbSkillCombat 引用。</param>
-        /// <param name="radius">TbCharacter/TbMonster.bodyRadius。</param>
+        /// <param name="radius">TbCharacter/TbMonster.bodyRadiusPixelsMilli 换算后的模拟半径。</param>
+        /// <param name="bodyOffset">TbCharacter/TbMonster 受击中心像素偏移换算后的模拟偏移。</param>
+        /// <param name="hitEffectOffset">TbCharacter/TbMonster 命中特效挂点像素偏移换算后的模拟偏移。</param>
         /// <param name="movement">TbCharacter/TbMonster 导出的独立移动圆柱。</param>
         /// <param name="position">入口配置转换后的出生位置。</param>
         /// <param name="player">区分玩家弹丸与怪物近战角色。</param>
         /// <returns>冷却就绪且目标为空的出生模板。</returns>
         /// <exception cref="InvalidOperationException">属性、几何或技能配置不合法。</exception>
-        private CombatUnit BuildUnit(AttributeProfileConfig profile, SkillConfig skillConfig, float radius, CombatCylinder movement, float2 position, bool player)
+        private CombatUnit BuildUnit(AttributeProfileConfig profile, SkillConfig skillConfig, float radius, float2 bodyOffset,
+            float2 hitEffectOffset, CombatCylinder movement, float2 position, bool player)
         {
             var skill = skillConfig.CombatProfileId_Ref ?? throw new InvalidOperationException("Missing skill combat profile.");
             var attributes = new CombatAttributes(profile);
             CombatMath.Positive(radius);
-            if (!math.all(math.isfinite(position)) || math.abs(position.x) + radius > settings.Arena.x ||
-                math.abs(position.y) + radius > settings.Arena.y)
+            if (!math.all(math.isfinite(position)) || !math.all(math.isfinite(bodyOffset)) || !math.all(math.isfinite(hitEffectOffset)) ||
+                math.abs(position.x + bodyOffset.x) + radius > settings.Arena.x ||
+                math.abs(position.y + bodyOffset.y) + radius > settings.Arena.y)
                 throw new InvalidOperationException("Combat unit is outside the configured arena.");
             CombatMath.NonNegative(skill.Range);
             if (skill.DeliveryType != (player ? ESkillDeliveryType.Projectile : ESkillDeliveryType.Melee))
                 throw new InvalidOperationException($"TbSkillCombat {skill.Id}: unsupported actor delivery role.");
             if (player)
             {
-                if (!skill.ProjectileSpeed.HasValue || !skillConfig.ProjectileRadius.HasValue || !skill.ProjectileLifetime.HasValue || !skillConfig.ProjectileOffsetX.HasValue || !skillConfig.ProjectileOffsetY.HasValue)
+                if (!skill.ProjectileSpeed.HasValue || !skillConfig.ProjectileRadiusPixels.HasValue || !skill.ProjectileLifetime.HasValue || !skillConfig.ProjectileOffsetXPixels.HasValue || !skillConfig.ProjectileOffsetYPixels.HasValue)
                     throw new InvalidOperationException($"TbSkillCombat {skill.Id}: missing projectile fields.");
-                CombatMath.Positive(skill.ProjectileSpeed.Value); CombatMath.Positive(skillConfig.ProjectileRadius.Value); CombatMath.Positive(skill.ProjectileLifetime.Value);
+                CombatMath.Positive(skill.ProjectileSpeed.Value); CombatMath.Positive(skillConfig.ProjectileRadiusPixels.Value); CombatMath.Positive(skill.ProjectileLifetime.Value);
             }
             else
             {
@@ -705,9 +809,15 @@ namespace Roguelike.Features.Combat.Ecs
                 CombatMath.NonNegative(skill.AttackWindupSeconds.Value);
             }
             int faction = (int)(player ? CombatFaction.Player : CombatFaction.Monster);
+            bool unifiedCapsule = movement.UsesCapsule2D;
             return new CombatUnit { Target = DamageTarget.Spawn(attributes, 0, faction, player),
                 Attack = AttackSnapshot.Capture(attributes, 0, 0, faction), Position = position, PreviousPosition = position, SpawnPosition = position,
-                Radius = radius, Movement = movement, MoveSpeed = (float)attributes.Get(EAttributeType.MoveSpeed), Range = skill.Range,
+                Radius = unifiedCapsule ? movement.Radius : radius,
+                BodyOffset = unifiedCapsule ? movement.Offset : bodyOffset,
+                HitEffectOffset = hitEffectOffset,
+                BodyHalfSegment = unifiedCapsule ? movement.HalfSegment2D : 0f,
+                Movement = movement,
+                MoveSpeed = (float)attributes.Get(EAttributeType.MoveSpeed) * rules.WorldUnitsPerPixel, Range = skill.Range,
                 Interval = CombatMath.AttackInterval(skill.BaseInterval, attributes.Get(EAttributeType.AttackSpeedMultiplier), rules.MinAttackInterval),
                 Delivery = skill.DeliveryType, TargetSlot = -1,
                 BaseInterval = skill.BaseInterval,
@@ -715,9 +825,42 @@ namespace Roguelike.Features.Combat.Ecs
                 Facing = new float2(settings.Presentation.InitialDirectionId_Ref.X, settings.Presentation.InitialDirectionId_Ref.Y),
                 // 近战不消费弹丸字段；零仅为空布局，不作为弹丸参数兜底。
                 SkillId = skillConfig.Id,
-                ProjectileOffset = player ? new float2(skillConfig.ProjectileOffsetX.Value, skillConfig.ProjectileOffsetY.Value) : float2.zero,
+                ProjectileOffset = player ? new float2(skillConfig.ProjectileOffsetXPixels.Value, skillConfig.ProjectileOffsetYPixels.Value) * rules.WorldUnitsPerPixel : float2.zero,
                 ProjectileSpeed = player ? skill.ProjectileSpeed.Value : 0,
-                ProjectileLifetime = player ? skill.ProjectileLifetime.Value : 0, ProjectileRadius = player ? skillConfig.ProjectileRadius.Value * skillConfig.VisualSetId_Ref.ScalePermille / 1000f : 0 };
+                ProjectileLifetime = player ? skill.ProjectileLifetime.Value : 0, ProjectileRadius = player ? skillConfig.ProjectileRadiusPixels.Value * rules.WorldUnitsPerPixel : 0 };
+        }
+
+        /// <summary>从角色或怪物表构建移动形状，按 collisionShape 决定保留旧圆柱还是启用统一纵向胶囊。</summary>
+        /// <param name="radius">表内半径像素。</param>
+        /// <param name="height">表内总高像素。</param>
+        /// <param name="x">表内中心横向偏移像素。</param>
+        /// <param name="y">表内中心纵向偏移像素。</param>
+        /// <param name="elevation">旧圆柱底面高度；统一胶囊不使用。</param>
+        /// <param name="shape">TbCharacter/TbMonster.collisionShape。</param>
+        /// <returns>可由 Burst 使用的纯值碰撞形状。</returns>
+        private CombatCylinder BuildMovement(float? radius, float? height, float? x, float? y,
+            float? elevation, EUnitCollisionShape? shape)
+        {
+            CombatCylinder movement = CombatCylinder.FromConfig(radius, height, x, y, elevation,
+                rules.WorldUnitsPerPixel);
+            return shape == EUnitCollisionShape.VerticalCapsule ? movement.AsVerticalCapsule2D() : movement;
+        }
+
+        /// <summary>把单位命中特效挂点从逻辑像素转换为模拟偏移；旧性能场景未迁移时复用其受击中心。</summary>
+        /// <param name="hitX">TbCharacter/TbMonster.hitEffectOffsetXPixelsMilli 解码值。</param>
+        /// <param name="hitY">TbCharacter/TbMonster.hitEffectOffsetYPixelsMilli 解码值。</param>
+        /// <param name="bodyX">现有受击中心横向像素。</param>
+        /// <param name="bodyY">现有受击中心纵向像素。</param>
+        /// <returns>可直接写入 CombatUnit.HitEffectOffset 的世界偏移。</returns>
+        /// <exception cref="InvalidOperationException">正式关卡缺字段，或只配置了一个轴。</exception>
+        /// <remarks>兼容分支仅服务 UseLegacyTimedSpawn 性能场景；正式 TbStage 必须显式配置并由 Prefab 导出。</remarks>
+        private float2 BuildHitEffectOffset(float? hitX, float? hitY, float bodyX, float bodyY)
+        {
+            if (hitX.HasValue != hitY.HasValue)
+                throw new InvalidOperationException("Combat hit-effect anchor must configure both axes.");
+            if (!hitX.HasValue && settings.IsFormalRun)
+                throw new InvalidOperationException("Formal combat unit requires a hit-effect anchor.");
+            return new float2(hitX ?? bodyX, hitY ?? bodyY) * rules.WorldUnitsPerPixel;
         }
 
         /// <summary>所有公开变更入口先验证生命周期，避免访问已释放原生内存。</summary>

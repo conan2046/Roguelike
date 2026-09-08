@@ -88,6 +88,12 @@
 4. `TbCombatPresentation.shaderName` 和 `textureFilterMode` 是新增表字段；当前 Shader 为 URP Unlit，过滤为 Bilinear，支持改 Point。普通/镜像帧在加载期预建，每单位不创建独立材质、网格或 GameObject。
 5. GPU 对照图 `outputs/combat-config/visual-review/monster-windup-f0-f4.png`：左至右按攻击表列表为右下、左下、右上、左上；上至下为前摇待机、攻击 F0、攻击 F4。采用真实播放器和材质的 Unity 预览绘制，不是完整应用场景截图。
 
+### 战斗血条像素调参
+
+- `Assets/GameContent/UI/Combat/Prefabs/CombatHealthBar.prefab` 仅是编辑器调参载体，挂到角色或怪物 `DamageFloatAnchor` 后观察比例；正式运行仍由 `CombatFeedbackVisuals` 创建 DOTS 实体。
+- 根节点 `Scale=1`。宽度、高度和预览血量比例都在 `CombatHealthBarView` 中文 Inspector 中填写；子节点“显示画布（自动像素换算勿改）”读取 `TbCombatRules.worldUnitsPerPixel`，不需要人工换算或修改缩放。
+- 点击“导出血条像素到 Luban”写入 `TbCombatPresentation.healthBarWidthPixelsMilli / healthBarHeightPixelsMilli` 并重新生成。DOTS 血条直接使用这两个最终像素值，不再按单位碰撞半径隐式改变宽度。
+
 ## 第 20 阶段：交互入口
 
 - 启动协议：显式 `-combatScenario 4`；无参数保持普通启动，无业务默认场景 ID；与 `-performanceScenario` 冲突、重复或非法 ID 都拒绝。编辑器批量测试仍自行组合服务。

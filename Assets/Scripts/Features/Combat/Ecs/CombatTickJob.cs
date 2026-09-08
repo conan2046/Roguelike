@@ -75,7 +75,8 @@ namespace Roguelike.Features.Combat.Ecs
                 var unit = UnitData[Units[slot]];
                 unit.PreviousPosition = unit.Position; UnitData[Units[slot]] = unit;
                 if (unit.Target.Health <= 0) continue;
-                footprint = math.max(footprint, unit.Movement.Radius + math.length(unit.Movement.Offset));
+                footprint = math.max(footprint, unit.Movement.Radius + unit.Movement.HalfSegment2D +
+                    math.length(unit.Movement.Offset));
                 Grid.Add((int2)math.floor(unit.Position / CellSize), slot);
             }
             for (int slot = 0; slot < Units.Length; slot++)
@@ -87,8 +88,9 @@ namespace Roguelike.Features.Combat.Ecs
                 if (slot != 0)
                 {
                     motion = float2.zero;
-                    float2 offset = player.Position - unit.Position;
-                    float distance = math.length(offset);
+                    float2 offset = (player.Position - unit.Position) + (player.BodyOffset - unit.BodyOffset);
+                    float distance = math.sqrt(CombatGeometry.VerticalSegmentDistanceSquared(offset,
+                        unit.BodyHalfSegment + player.BodyHalfSegment));
                     float stop = unit.Range + unit.Radius + player.Radius;
                     if (!unit.AttackActive && distance > stop)
                         motion = offset / distance * math.min(unit.MoveSpeed * Delta, distance - stop);
@@ -97,7 +99,8 @@ namespace Roguelike.Features.Combat.Ecs
                 // 先将期望终点限制在场地内，再扫掠，避免碰撞之后夹边界把单位夹进别人身体。
                 if (slot == 0 || !AllowMonstersOutsideArena)
                     motion = math.clamp(unit.Position + motion + unit.Movement.Offset,
-                        -Arena + unit.Movement.Radius, Arena - unit.Movement.Radius) - unit.Movement.Offset - unit.Position;
+                        -Arena + MovementExtents(unit.Movement), Arena - MovementExtents(unit.Movement)) -
+                        unit.Movement.Offset - unit.Position;
                 Grid.Remove((int2)math.floor(unit.Position / CellSize), slot);
                 unit.Position = MoveCylinder(slot, unit, motion, footprint);
                 UnitData[Units[slot]] = unit;
@@ -116,8 +119,9 @@ namespace Roguelike.Features.Combat.Ecs
             for (int contact = 0; contact <= Units.Length && math.lengthsq(motion) > 0; contact++)
             {
                 if (slot == 0 || !AllowMonstersOutsideArena)
-                    motion = math.clamp(position + motion + unit.Movement.Offset, -Arena + unit.Movement.Radius,
-                        Arena - unit.Movement.Radius) - unit.Movement.Offset - position;
+                    motion = math.clamp(position + motion + unit.Movement.Offset,
+                        -Arena + MovementExtents(unit.Movement), Arena - MovementExtents(unit.Movement)) -
+                        unit.Movement.Offset - position;
                 float2 center = position + unit.Movement.Offset;
                 float extent = unit.Movement.Radius + footprint;
                 int2 lower = (int2)math.floor((math.min(center, center + motion) - extent) / CellSize);
@@ -134,9 +138,11 @@ namespace Roguelike.Features.Combat.Ecs
                             if (other.Target.Health <= 0 || !unit.Movement.HeightOverlaps(other.Movement)) continue;
                             float2 relative = center - other.Position - other.Movement.Offset;
                             float radius = unit.Movement.Radius + other.Movement.Radius;
-                            if (!CombatCylinder.Sweep(relative, motion, radius, out float hit)) continue;
+                            float halfSegment = unit.Movement.HalfSegment2D + other.Movement.HalfSegment2D;
+                            if (!CombatCylinder.Sweep(relative, motion, radius, halfSegment,
+                                out float hit, out float2 hitNormal)) continue;
                             if (hit < fraction || (hit == fraction && (selected < 0 || otherSlot < selected)))
-                            { selected = otherSlot; fraction = hit; normal = math.normalizesafe(relative + motion * hit); }
+                            { selected = otherSlot; fraction = hit; normal = hitNormal; }
                         } while (Grid.TryGetNextValue(out otherSlot, ref iterator));
                     }
                 if (selected < 0) return position + motion;
@@ -156,7 +162,8 @@ namespace Roguelike.Features.Combat.Ecs
         /// <returns>最近合法目标的池槽，找不到返回无效索引。</returns>
         private int FindNearest(in CombatUnit unit, float configuredRange)
         {
-            float search = configuredRange + unit.Radius + MaximumRadius;
+            float search = configuredRange + unit.Radius + unit.BodyHalfSegment +
+                math.length(unit.BodyOffset) + MaximumRadius;
             int2 lower = (int2)math.floor((unit.Position - search) / CellSize);
             int2 upper = (int2)math.floor((unit.Position + search) / CellSize);
             int selected = -1;
@@ -170,9 +177,11 @@ namespace Roguelike.Features.Combat.Ecs
                     {
                         var target = UnitData[Units[slot]];
                         if (target.Target.Health <= 0 || target.Target.Faction == unit.Target.Faction) continue;
-                        float distance = math.lengthsq(target.Position - unit.Position);
+                        float2 bodyOffset = (target.Position - unit.Position) + (target.BodyOffset - unit.BodyOffset);
+                        float halfSegment = unit.BodyHalfSegment + target.BodyHalfSegment;
+                        float distance = CombatGeometry.VerticalSegmentDistanceSquared(bodyOffset, halfSegment);
                         float range = configuredRange + unit.Radius + target.Radius;
-                        if (!CombatGeometry.WithinReach(target.Position - unit.Position, range)) continue;
+                        if (!CombatGeometry.WithinCapsuleReach(bodyOffset, halfSegment, range)) continue;
                         if (distance < best || (distance == best && target.Target.Lifetime < lifetime))
                         { selected = slot; best = distance; lifetime = target.Target.Lifetime; }
                     } while (Grid.TryGetNextValue(out slot, ref iterator));
@@ -224,7 +233,7 @@ namespace Roguelike.Features.Combat.Ecs
             for (int index = 0; index < Projectiles.Length; index++)
             {
                 if (ProjectileData[Projectiles[index]].Active) continue;
-                float2 direction = math.normalizesafe(target.Position - player.Position,
+                float2 direction = math.normalizesafe(target.Position + target.BodyOffset - player.Position,
                     math.normalizesafe(player.Facing));
                 ProjectileData[Projectiles[index]] = new CombatProjectile
                 {
@@ -250,19 +259,21 @@ namespace Roguelike.Features.Combat.Ecs
         /// <summary>锁定最近目标当前位置，对配置半径内每个敌方生命周期生成一次同序号伤害请求。</summary>
         /// <param name="player">释放者阵营和身体数据。</param>
         /// <param name="target">触发时锁定的最近合法目标。</param>
-        /// <param name="weapon">TbSkill.areaRadiusMilli 转换的范围技能。</param>
+        /// <param name="weapon">TbSkill.areaRadiusPixelsMilli 换算后的范围技能。</param>
         /// <param name="attack">所有受击者共享的单次释放快照。</param>
         /// <param name="counters">范围释放统计。</param>
         /// <remarks>目标随后死亡或池槽复用时由请求中的 TargetLifetime 拒绝陈旧结算。</remarks>
         private void CastTargetArea(in CombatUnit player, in CombatUnit target, in CombatWeaponState weapon,
             in AttackSnapshot attack, ref CombatCounters counters)
         {
-            float2 center = target.Position;
+            float2 center = target.Position + target.BodyOffset;
             for (int slot = 1; slot < Units.Length; slot++)
             {
                 CombatUnit candidate = UnitData[Units[slot]];
                 if (candidate.Target.Health <= 0 || candidate.Target.Faction == player.Target.Faction) continue;
-                if (!CombatGeometry.WithinReach(candidate.Position - center, weapon.AreaRadius + candidate.Radius)) continue;
+                if (!CombatGeometry.WithinCapsuleReach((candidate.Position - target.Position) +
+                    (candidate.BodyOffset - target.BodyOffset), candidate.BodyHalfSegment,
+                    weapon.AreaRadius + candidate.Radius)) continue;
                 Requests.Add(new CombatDamageRequest
                 {
                     Attack = attack,
@@ -289,7 +300,9 @@ namespace Roguelike.Features.Combat.Ecs
             var target = UnitData[Units[unit.TargetSlot]];
             float reach = unit.Range + unit.Radius + target.Radius;
             return target.Target.Health > 0 && target.Target.Lifetime == unit.TargetLifetime &&
-                target.Target.Faction != unit.Target.Faction && CombatGeometry.WithinReach(target.Position - unit.Position, reach);
+                target.Target.Faction != unit.Target.Faction && CombatGeometry.WithinCapsuleReach(
+                    (target.Position - unit.Position) + (target.BodyOffset - unit.BodyOffset),
+                    unit.BodyHalfSegment + target.BodyHalfSegment, reach);
         }
 
         /// <summary>先推进已有近战动作；冷却就绪且目标合法时起手并锁定，弹丸仍复用空槽立即发射。</summary>
@@ -332,7 +345,8 @@ namespace Roguelike.Features.Combat.Ecs
                     unit.AttackActive = true;
                     unit.AttackHitProcessed = false;
                     unit.AttackAge = 0;
-                    float2 offset = UnitData[Units[unit.TargetSlot]].Position - unit.Position;
+                    CombatUnit locked = UnitData[Units[unit.TargetSlot]];
+                    float2 offset = (locked.Position - unit.Position) + (locked.BodyOffset - unit.BodyOffset);
                     if (math.lengthsq(offset) == 0) offset = unit.Facing;
                     double best = double.NegativeInfinity;
                     for (int i = 0; i < unit.AttackOptionCount; i++)
@@ -353,7 +367,7 @@ namespace Roguelike.Features.Combat.Ecs
                         if (ProjectileData[Projectiles[index]].Active) continue;
                         var target = UnitData[Units[unit.TargetSlot]];
                         // 初始重叠时沿用配置初始化的单位朝向，使局部碰撞偏移仍有确定方向。
-                        float2 direction = math.normalizesafe(target.Position - unit.Position, math.normalizesafe(unit.Facing));
+                        float2 direction = math.normalizesafe(target.Position + target.BodyOffset - unit.Position, math.normalizesafe(unit.Facing));
                         ProjectileData[Projectiles[index]] = new CombatProjectile { Active = true, BornThisTick = true, Attack = attack,
                             Position = unit.Position, Velocity = direction * unit.ProjectileSpeed, SkillId = unit.SkillId,
                             CollisionOffset = new float2(direction.y, -direction.x) * unit.ProjectileOffset.x + direction * unit.ProjectileOffset.y,
@@ -387,7 +401,9 @@ namespace Roguelike.Features.Combat.Ecs
             var target = UnitData[Units[unit.LockedTargetSlot]];
             float reach = unit.Range + unit.Radius + target.Radius;
             if (target.Target.Health <= 0 || target.Target.Lifetime != unit.LockedTargetLifetime ||
-                target.Target.Faction == unit.Target.Faction || !CombatGeometry.WithinReach(target.Position - unit.Position, reach))
+                target.Target.Faction == unit.Target.Faction || !CombatGeometry.WithinCapsuleReach(
+                    (target.Position - unit.Position) + (target.BodyOffset - unit.BodyOffset),
+                    unit.BodyHalfSegment + target.BodyHalfSegment, reach))
             { counters.MeleeWhiffs++; return; }
             Requests.Add(new CombatDamageRequest { Attack = unit.PendingAttack, TargetSlot = unit.LockedTargetSlot,
                 TargetLifetime = unit.LockedTargetLifetime });
@@ -402,6 +418,7 @@ namespace Roguelike.Features.Combat.Ecs
             {
                 var projectile = ProjectileData[Projectiles[index]];
                 if (!projectile.Active) continue;
+                bool bornThisTick = projectile.BornThisTick;
                 float travelTime = (float)math.min(Delta, projectile.Remaining);
                 float2 start = projectile.Position + projectile.CollisionOffset;
                 float2 end = start + projectile.Velocity * travelTime;
@@ -420,10 +437,12 @@ namespace Roguelike.Features.Combat.Ecs
                             var target = UnitData[Units[slot]];
                             if (target.Target.Health <= 0 || target.Target.Faction == projectile.Attack.Faction) continue;
                             counters.Candidates++;
-                            float2 targetStart = projectile.BornThisTick ? target.Position : target.PreviousPosition;
-                            float2 targetEnd = math.lerp(targetStart, target.Position, travelTime / Delta);
-                            if (CombatGeometry.Sweep(start - targetStart, end - targetEnd,
-                                projectile.Radius + target.Radius, out float fraction) &&
+                            float2 targetStart = (bornThisTick ? target.Position : target.PreviousPosition) + target.BodyOffset;
+                            float2 targetEnd = math.lerp(targetStart, target.Position + target.BodyOffset, travelTime / Delta);
+                            if (CombatGeometry.SweepVerticalCapsule(start - targetStart,
+                                (end - targetEnd) - (start - targetStart),
+                                projectile.Radius + target.Radius, target.BodyHalfSegment,
+                                out float fraction, out _) &&
                                 (fraction < first || (fraction == first && target.Target.Lifetime < lifetime)))
                             { selected = slot; first = fraction; lifetime = target.Target.Lifetime; }
                         } while (Grid.TryGetNextValue(out slot, ref iterator));
@@ -436,13 +455,25 @@ namespace Roguelike.Features.Combat.Ecs
                 {
                     projectile.Position = math.lerp(start, end, first) - projectile.CollisionOffset;
                     Requests.Add(new CombatDamageRequest { Attack = projectile.Attack, TargetSlot = selected, TargetLifetime = lifetime });
-                    Impacts.Add(new CombatImpactEvent { SkillId = projectile.SkillId, Position = projectile.Position,
+                    CombatUnit target = UnitData[Units[selected]];
+                    float2 targetStart = bornThisTick ? target.Position : target.PreviousPosition;
+                    float2 targetEnd = math.lerp(targetStart, target.Position, travelTime / Delta);
+                    float2 hitEffectPosition = math.lerp(targetStart, targetEnd, first) + target.HitEffectOffset;
+                    Impacts.Add(new CombatImpactEvent { SkillId = projectile.SkillId, Position = hitEffectPosition,
                         AttackSequence = projectile.Attack.Sequence, Tick = counters.Tick + 1 });
                 }
                 if (selected >= 0 || projectile.Remaining <= 0)
                 { projectile.Active = false; counters.ActiveProjectiles--; }
                 ProjectileData[Projectiles[index]] = projectile;
             }
+        }
+
+        /// <summary>计算单位移动形状在战斗 XY 平面的轴对齐半尺寸。</summary>
+        /// <param name="movement">单位的纯值移动形状。</param>
+        /// <returns>X 为半径，Y 为胶囊半中轴加半径。</returns>
+        private static float2 MovementExtents(in CombatCylinder movement)
+        {
+            return new float2(movement.Radius, movement.Radius + movement.HalfSegment2D);
         }
 
         /// <summary>调用统一伤害核心；测试恢复策略仍先执行真实扣血及受击无敌。</summary>

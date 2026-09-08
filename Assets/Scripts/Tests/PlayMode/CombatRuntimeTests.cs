@@ -14,6 +14,7 @@ using Roguelike.Infrastructure.Configuration;
 using Roguelike.Infrastructure.Resources;
 using Unity.Entities;
 using Unity.Mathematics;
+using Unity.Rendering;
 using UnityEngine;
 using UnityEngine.TestTools;
 
@@ -222,6 +223,40 @@ namespace Roguelike.Tests
                 Assert.That(runner.Coordinator, Is.Not.Null);
                 yield return CaptureCamera(runner.ViewCamera, "formal-stage.png");
 
+                World combatWorld = FindCombatWorld();
+                Assert.That(runner.Session.TrySpawnMonster(definition.Monsters[0],
+                    cfg.ConfigNumber.Decode(definition.Map.SpawnRadiusPixelsMilli), 1, false,
+                    out int feedbackMonsterSlot), Is.True);
+                CombatUnit feedbackMonster = runner.Session.ReadUnit(feedbackMonsterSlot);
+                CombatUnit feedbackPlayer = runner.Session.ReadUnit(0);
+                feedbackMonster.Position = feedbackPlayer.Position + new float2(0f, 1.5f);
+                feedbackMonster.PreviousPosition = feedbackMonster.Position;
+                combatWorld.EntityManager.SetComponentData(runner.Session.UnitEntity(feedbackMonsterSlot), feedbackMonster);
+                runner.AdvanceFrame(0, default);
+                feedbackMonster = runner.Session.ReadUnit(feedbackMonsterSlot);
+                feedbackMonster.Target.Health--;
+                combatWorld.EntityManager.SetComponentData(runner.Session.UnitEntity(feedbackMonsterSlot), feedbackMonster);
+                runner.AdvanceFrame(0, default);
+                Assert.That(runner.Visuals.IsHitFlashing(feedbackMonsterSlot), Is.True);
+                MaterialMeshInfo hitFlashInfo = combatWorld.EntityManager.GetComponentData<MaterialMeshInfo>(
+                    runner.Session.UnitEntity(feedbackMonsterSlot));
+                Assert.That(MaterialMeshInfo.StaticIndexToArrayIndex(hitFlashInfo.Material),
+                    Is.EqualTo(runner.Visuals.Read(feedbackMonsterSlot).HitFlashMaterialIndex));
+                runner.enabled = false;
+                combatWorld.Update();
+                float feedbackHeight = definition.Monsters[0].DamageFloatHeight ?? 0.35f;
+                float feedbackBarWidth = definition.Presentation.HealthBarWidthPixels *
+                    definition.CombatRules.WorldUnitsPerPixel;
+                float feedbackBarHeight = definition.Presentation.HealthBarHeightPixels *
+                    definition.CombatRules.WorldUnitsPerPixel;
+                float feedbackDigitWidth = definition.CombatRules.WorldUnitsPerPixel * 29f * 1.25f;
+                float feedbackDigitHeight = definition.CombatRules.WorldUnitsPerPixel * 30f * 1.25f;
+                yield return CaptureFeedbackCamera(runner.ViewCamera,
+                    new Vector3(feedbackMonster.Position.x, feedbackMonster.Position.y + feedbackHeight, 0f),
+                    feedbackBarWidth, feedbackBarHeight, feedbackDigitWidth, feedbackDigitHeight,
+                    "combat-feedback.png");
+                runner.enabled = true;
+
                 int required = definition.ExperienceLevels[runner.RunModel.Level - 1].RequiredExperience;
                 runner.RunModel.GrantExperience(required);
                 runner.AdvanceFrame(0, default);
@@ -242,7 +277,6 @@ namespace Roguelike.Tests
 
                 int bossSlot = Enumerable.Range(1, runner.Session.UnitCount - 1)
                     .Single(slot => runner.Session.ReadUnit(slot).IsBoss && runner.Session.ReadUnit(slot).Target.Health > 0);
-                World combatWorld = FindCombatWorld();
                 CombatUnit player = runner.Session.ReadUnit(0);
                 player.Cooldown = 0;
                 player.Attack.Attack = 1000000;
@@ -346,6 +380,66 @@ namespace Roguelike.Tests
             }
             yield return null;
             Assert.That(World.All.Count, Is.EqualTo(originalWorlds));
+        }
+
+        /// <summary>正式资源与相机中把实际扣血怪物移到主角旁，验证只有该槽叠加配置的 50% 白闪并保存画面。</summary>
+        /// <returns>等待 YooAsset、DOTS Presentation 和 GPU 读回的协程。</returns>
+        /// <remarks>只创建运行时对象和 outputs 证据截图；不生成预览资产，不修改 Scene 或 Prefab。</remarks>
+        [UnityTest]
+        public IEnumerator ActualDamageRendersConfiguredHalfTransparentWhiteFlash()
+        {
+            using var initializer = new YooAssetPackageInitializer();
+            yield return Wait(initializer.InitializeAsync(ResourcePlayMode.EditorSimulate, CancellationToken.None));
+            var config = new LubanConfigService(initializer);
+            yield return Wait(config.InitializeAsync(CancellationToken.None));
+            var resources = new YooAssetResourceService(initializer, config);
+            CombatRunDefinition definition = CombatRunDefinition.Create(config.Tables, 1);
+            var root = new GameObject("Hit flash runtime test");
+            var runner = root.AddComponent<CombatRuntimeRunner>();
+            try
+            {
+                yield return Wait(runner.InitializeAsync(definition, resources,
+                    new UnityCombatInput(definition.Presentation), CancellationToken.None));
+                yield return CaptureCamera(runner.ViewCamera, "combat-hit-flash-before.png");
+                World combatWorld = FindCombatWorld();
+                Assert.That(runner.Session.TrySpawnMonster(definition.Monsters[0],
+                    cfg.ConfigNumber.Decode(definition.Map.SpawnRadiusPixelsMilli), 1, false, out int monsterSlot), Is.True);
+                CombatUnit player = runner.Session.ReadUnit(0);
+                CombatUnit monster = runner.Session.ReadUnit(monsterSlot);
+                monster.Position = player.Position + new float2(3f, 0f);
+                monster.PreviousPosition = monster.Position;
+                monster.MoveSpeed = 0;
+                monster.Cooldown = 1000;
+                combatWorld.EntityManager.SetComponentData(runner.Session.UnitEntity(monsterSlot), monster);
+                runner.AdvanceFrame(0, default);
+                runner.enabled = false;
+                for (int frame = 0; frame < 3; frame++)
+                {
+                    combatWorld.Update();
+                    yield return null;
+                }
+
+                monster = runner.Session.ReadUnit(monsterSlot);
+                monster.Target.Health--;
+                combatWorld.EntityManager.SetComponentData(runner.Session.UnitEntity(monsterSlot), monster);
+                runner.AdvanceFrame(0, default);
+                Assert.That(runner.Visuals.IsHitFlashing(monsterSlot), Is.True);
+                Assert.That(runner.Visuals.IsHitFlashing(0), Is.False);
+                MaterialMeshInfo hitFlashInfo = combatWorld.EntityManager.GetComponentData<MaterialMeshInfo>(
+                    runner.Session.UnitEntity(monsterSlot));
+                Assert.That(MaterialMeshInfo.StaticIndexToArrayIndex(hitFlashInfo.Material),
+                    Is.EqualTo(runner.Visuals.Read(monsterSlot).HitFlashMaterialIndex));
+
+                for (int frame = 0; frame < 3; frame++) combatWorld.Update();
+                yield return CaptureHitFlashCamera(runner.ViewCamera,
+                    new Vector3(monster.Position.x, monster.Position.y, 0f), "combat-hit-flash.png");
+            }
+            finally
+            {
+                runner.Close();
+                UnityEngine.Object.Destroy(root);
+            }
+            yield return null;
         }
 
         /// <summary>用正式表定义逐段推进 18 分钟，把刷怪、掉落拾取、两次升级、Boss 胜利和重开串成同一局。</summary>
@@ -453,6 +547,155 @@ namespace Roguelike.Tests
             {
                 camera.targetTexture = oldTarget; RenderTexture.active = oldActive; target.Release();
                 UnityEngine.Object.Destroy(target); UnityEngine.Object.Destroy(pixels);
+            }
+        }
+
+        /// <summary>等待配置白闪 Shader 首次编译并在受击单位周围形成足量提亮像素后保存画面。</summary>
+        /// <param name="camera">运行器创建的战斗相机。</param>
+        /// <param name="worldPosition">受击单位的 ECS 世界坐标。</param>
+        /// <param name="fileName">输出到 runtime-review 的证据文件名。</param>
+        /// <returns>逐帧执行 GPU 读回，直到白闪可见或超时。</returns>
+        /// <remarks>只创建内存 RenderTexture/Texture2D；截图进入 outputs，不保存 Unity 预览资源。</remarks>
+        private static IEnumerator CaptureHitFlashCamera(Camera camera, Vector3 worldPosition, string fileName)
+        {
+            var target = new RenderTexture(1280, 720, 24);
+            var pixels = new Texture2D(1280, 720, TextureFormat.RGB24, false);
+            RenderTexture oldTarget = camera.targetTexture;
+            RenderTexture oldActive = RenderTexture.active;
+            try
+            {
+                target.Create();
+                camera.targetTexture = target;
+                int brightened = 0;
+                double deadline = Time.realtimeSinceStartupAsDouble + 10;
+                do
+                {
+                    yield return null;
+                    camera.Render();
+                    RenderTexture.active = target;
+                    pixels.ReadPixels(new Rect(0, 0, target.width, target.height), 0, 0);
+                    pixels.Apply();
+                    Vector3 center = camera.WorldToScreenPoint(worldPosition);
+                    int minX = Mathf.Clamp(Mathf.FloorToInt(center.x) - 140, 0, target.width - 1);
+                    int maxX = Mathf.Clamp(Mathf.CeilToInt(center.x) + 140, 0, target.width - 1);
+                    int minY = Mathf.Clamp(Mathf.FloorToInt(center.y) - 30, 0, target.height - 1);
+                    int maxY = Mathf.Clamp(Mathf.CeilToInt(center.y) + 220, 0, target.height - 1);
+                    brightened = 0;
+                    for (int y = minY; y <= maxY; y++)
+                    for (int x = minX; x <= maxX; x++)
+                    {
+                        Color32 color = pixels.GetPixel(x, y);
+                        if (color.r >= 165 && color.g >= 165 && color.b >= 165) brightened++;
+                    }
+                    RenderTexture.active = oldActive;
+                } while (brightened < 100 && Time.realtimeSinceStartupAsDouble < deadline);
+
+                Directory.CreateDirectory("outputs/combat-config/runtime-review");
+                File.WriteAllBytes(Path.Combine("outputs/combat-config/runtime-review", fileName), pixels.EncodeToPNG());
+                Debug.Log($"Combat hit flash pixels: brightened={brightened}");
+                Assert.That(brightened, Is.GreaterThanOrEqualTo(100),
+                    "The actually damaged target must render with the configured half-transparent white flash.");
+            }
+            finally
+            {
+                camera.targetTexture = oldTarget;
+                RenderTexture.active = oldActive;
+                target.Release();
+                UnityEngine.Object.Destroy(target);
+                UnityEngine.Object.Destroy(pixels);
+            }
+        }
+
+        /// <summary>读取单位锚点附近的真实相机像素，验证满血填充和受击数字都进入最终画面。</summary>
+        /// <param name="camera">运行器创建的战斗相机。</param>
+        /// <param name="worldAnchor">单位血条与跳字共用的世界坐标锚点。</param>
+        /// <param name="barWidth">按战斗规则计算的血条世界宽度。</param>
+        /// <param name="barHeight">按正式纹理比例计算的血条世界高度。</param>
+        /// <param name="digitWidth">伤害数字单字符的初始世界宽度。</param>
+        /// <param name="digitHeight">伤害数字单字符的初始世界高度。</param>
+        /// <param name="fileName">保存到 runtime-review 的诊断截图名。</param>
+        /// <returns>等待 Entities Graphics 提交反馈实体并完成 GPU 读回的协程。</returns>
+        /// <remarks>只创建内存 RenderTexture/Texture2D，截图写入 outputs，不生成或保存 Unity 预览资产。</remarks>
+        private static IEnumerator CaptureFeedbackCamera(Camera camera, Vector3 worldAnchor,
+            float barWidth, float barHeight, float digitWidth, float digitHeight, string fileName)
+        {
+            var target = new RenderTexture(1280, 720, 24);
+            var pixels = new Texture2D(1280, 720, TextureFormat.RGB24, false);
+            RenderTexture oldTarget = camera.targetTexture;
+            RenderTexture oldActive = RenderTexture.active;
+            try
+            {
+                target.Create();
+                camera.targetTexture = target;
+                int red = 0;
+                int gold = 0;
+                Vector3 barMin = default;
+                Vector3 barMax = default;
+                Vector3 digitMin = default;
+                Vector3 digitMax = default;
+                double deadline = Time.realtimeSinceStartupAsDouble + 10;
+                do
+                {
+                    camera.Render();
+                    RenderTexture.active = target;
+                    pixels.ReadPixels(new Rect(0, 0, target.width, target.height), 0, 0);
+                    pixels.Apply();
+                    Vector3 barCenter = worldAnchor + Vector3.down * (barHeight * 0.5f);
+                    barMin = camera.WorldToScreenPoint(
+                        barCenter + new Vector3(-barWidth * 0.5f, -barHeight * 0.5f, 0f));
+                    barMax = camera.WorldToScreenPoint(
+                        barCenter + new Vector3(barWidth * 0.5f, barHeight * 0.5f, 0f));
+                    digitMin = camera.WorldToScreenPoint(
+                        worldAnchor + new Vector3(-digitWidth * 0.6f, 0f, 0f));
+                    digitMax = camera.WorldToScreenPoint(
+                        worldAnchor + new Vector3(digitWidth * 0.6f, digitHeight, 0f));
+                    red = 0;
+                    gold = 0;
+                    int barMinX = Mathf.Clamp(Mathf.FloorToInt(Mathf.Min(barMin.x, barMax.x)) - 2, 0, target.width - 1);
+                    int barMaxX = Mathf.Clamp(Mathf.CeilToInt(Mathf.Max(barMin.x, barMax.x)) + 2, 0, target.width - 1);
+                    // 截图断言只确认锚点附近存在血条；给 1280x720 GPU 读回保留固定像素容差。
+                    const int barVerticalTolerancePixels = 16;
+                    int barMinY = Mathf.Clamp(Mathf.FloorToInt(Mathf.Min(barMin.y, barMax.y)) -
+                                               barVerticalTolerancePixels, 0, target.height - 1);
+                    int barMaxY = Mathf.Clamp(Mathf.CeilToInt(Mathf.Max(barMin.y, barMax.y)) +
+                                               barVerticalTolerancePixels, 0, target.height - 1);
+                    for (int y = barMinY; y <= barMaxY; y++)
+                    for (int x = barMinX; x <= barMaxX; x++)
+                    {
+                        Color32 color = pixels.GetPixel(x, y);
+                        if (color.r > 140 && color.r > color.g * 2 && color.r > color.b * 2) red++;
+                    }
+
+                    int digitMinX = Mathf.Clamp(Mathf.FloorToInt(Mathf.Min(digitMin.x, digitMax.x)) - 2, 0, target.width - 1);
+                    int digitMaxX = Mathf.Clamp(Mathf.CeilToInt(Mathf.Max(digitMin.x, digitMax.x)) + 2, 0, target.width - 1);
+                    int digitMinY = Mathf.Clamp(Mathf.FloorToInt(Mathf.Min(digitMin.y, digitMax.y)) - 2, 0, target.height - 1);
+                    int digitMaxY = Mathf.Clamp(Mathf.CeilToInt(Mathf.Max(digitMin.y, digitMax.y)) + 2, 0, target.height - 1);
+                    for (int y = digitMinY; y <= digitMaxY; y++)
+                    for (int x = digitMinX; x <= digitMaxX; x++)
+                    {
+                        Color32 color = pixels.GetPixel(x, y);
+                        if (color.r > 150 && color.g > 70 && color.r > color.g && color.g > color.b * 1.4f) gold++;
+                    }
+                    RenderTexture.active = oldActive;
+                    if (red >= 8 && gold >= 8) break;
+                    yield return null;
+                } while ((red < 8 || gold < 8) && Time.realtimeSinceStartupAsDouble < deadline);
+
+                Directory.CreateDirectory("outputs/combat-config/runtime-review");
+                File.WriteAllBytes(Path.Combine("outputs/combat-config/runtime-review", fileName), pixels.EncodeToPNG());
+                Debug.Log($"Combat feedback pixels: red={red}, gold={gold}, " +
+                          $"bar=({barMin.x:F1},{barMin.y:F1})-({barMax.x:F1},{barMax.y:F1}), " +
+                          $"digit=({digitMin.x:F1},{digitMin.y:F1})-({digitMax.x:F1},{digitMax.y:F1})");
+                Assert.That(red, Is.GreaterThanOrEqualTo(8), "Full-health HP fill must render red above the blue bar background.");
+                Assert.That(gold, Is.GreaterThanOrEqualTo(8), "A health decrease must render the configured gold damage digit atlas.");
+            }
+            finally
+            {
+                camera.targetTexture = oldTarget;
+                RenderTexture.active = oldActive;
+                target.Release();
+                UnityEngine.Object.Destroy(target);
+                UnityEngine.Object.Destroy(pixels);
             }
         }
 
