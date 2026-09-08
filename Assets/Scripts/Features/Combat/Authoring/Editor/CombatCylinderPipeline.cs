@@ -18,9 +18,9 @@ namespace Roguelike.Features.Combat.Authoring.Editor
     public static class CombatCylinderPipeline
     {
         public const string Root = "Assets/Prefabs/Combat";
-        internal static readonly string[] MovementFields = { "moveRadiusPixelsMilli", "moveHeightPixelsMilli", "moveOffsetXPixelsMilli", "moveOffsetYPixelsMilli", "moveElevationPixelsMilli" };
-        internal static readonly string[] BodyFields = { "bodyRadiusPixelsMilli", "bodyOffsetXPixelsMilli", "bodyOffsetYPixelsMilli" };
-        internal static readonly string[] HitEffectFields = { "hitEffectOffsetXPixelsMilli", "hitEffectOffsetYPixelsMilli" };
+        internal static readonly string[] MovementFields = { "moveRadiusPixels", "moveHeightPixels", "moveOffsetXPixels", "moveOffsetYPixels", "moveElevationPixels" };
+        internal static readonly string[] BodyFields = { "bodyRadiusPixels", "bodyOffsetXPixels", "bodyOffsetYPixels" };
+        internal static readonly string[] HitEffectFields = { "hitEffectOffsetXPixels", "hitEffectOffsetYPixels" };
         internal static readonly string[] CollisionShapeFields = { "collisionShape" };
         /// <summary>缩放写入 TbVisualSet 而非角色/怪物表；与像素字段分表导出，避免相互覆盖或重复烘焙。</summary>
         public static readonly string[] VisualFields = { "scalePermille" };

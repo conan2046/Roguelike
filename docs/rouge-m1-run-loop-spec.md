@@ -115,9 +115,9 @@ VictorySettlement / DefeatSettlement
 | `TbStage` 扩展 | `id, name, mapId, stageRuleId, combatRulesId, presentationId, uiSetId, initialCharacterId, initialSkillIds` | 正式关卡聚合入口 |
 | `TbStageRule` | `id, durationMilli, bossTimeMilli, spawnPhaseIds, experienceLevelGroupId, dropProfileId, upgradePoolId, bossEncounterId, randomSeed` | 一局规则和关联配置；固定步进继续读取 `TbCombatRules` |
 | `TbSpawnPhase` | `id, beginTimeMilli, endTimeMilli, unitsPerWave, unitIntervalMilli, waveIntervalMilli, monsterWeights` | 时间阶段和普通怪波次，由 `TbStageRule.spawnPhaseIds` 排序引用 |
-| `TbBossEncounter` | `id, monsterId, spawnRadiusPixelsMilli, healthBarText, victoryOnDeath` | 最终 Boss 的生成和胜利规则；属性读取 Boss 的 `TbMonster.attributeProfileId` |
+| `TbBossEncounter` | `id, monsterId, spawnRadiusPixels, healthBarText, victoryOnDeath` | 最终 Boss 的生成和胜利规则；半径直接填写逻辑像素；属性读取 Boss 的 `TbMonster.attributeProfileId` |
 | `TbExperienceLevel` | `id, groupId, level, requiredExperience` | 每一级显式升级阈值 |
-| `TbDropProfile` | `id, experienceItemId, experienceValue, magnetRadiusMilli, pickupRadiusMilli, magnetSpeedMilli` | 经验掉落及拾取手感 |
+| `TbDropProfile` | `id, experienceItemId, experienceValue, magnetRadiusPixels, pickupRadiusPixels, magnetSpeedPixelsPerSecond` | 经验掉落及拾取手感；空间参数直接填写逻辑像素 |
 | `TbUpgradePool` | `id, drawCount, optionIds` | 三选一池和候选引用 |
 | `TbUpgradeOption` | `id, name, description, type, targetSkillId, maxRank, weight, modifiers, healMilli, iconResourceId` | 升级项资格、显示和效果 |
 | `TbCombatUiSet` | `id, hudPrefabResourceId, bossBarPrefabResourceId, upgradePanelPrefabResourceId, settlementPrefabResourceId, levelUpTitle, victoryText, defeatText, restartText` | 正式 UI 资源与显示文本；Prefab 完成前仅保留表结构 |
@@ -148,7 +148,7 @@ VictorySettlement / DefeatSettlement
 | `projectileClipId` | 弹丸存活期间播放的飞行表现；Projectile 技能必填 |
 | `impactClipId` | 弹丸命中后播放一次的命中表现，可空 |
 | `areaClipIds` | `TargetArea` 技能在目标位置同时播放的表现片段列表 |
-| `areaRadiusPixelsMilli` | `TargetArea` 群体伤害半径，像素乘 1000；由技能预制体导出 |
+| `areaRadiusPixels` | `TargetArea` 群体伤害半径，直接填写像素；由技能预制体导出 |
 
 已确认的表现角色如下；未确认片段不进入运行时引用：
 

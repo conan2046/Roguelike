@@ -23,12 +23,12 @@ public sealed partial class MapConfig : Luban.BeanBase
         Name = _buf.ReadString();
         if(_buf.ReadBool()){ VisualSetId = _buf.ReadInt(); } else { VisualSetId = null; }
         VisualSetId_Ref = null;
-        ArenaHalfWidthMilli = _buf.ReadInt();
-        ArenaHalfHeightMilli = _buf.ReadInt();
-        PlayerStartXMilli = _buf.ReadInt();
-        PlayerStartYMilli = _buf.ReadInt();
-        SpawnRadiusPixelsMilli = _buf.ReadInt();
-        CameraPaddingMilli = _buf.ReadInt();
+        ArenaHalfWidthPixels = _buf.ReadFloat();
+        ArenaHalfHeightPixels = _buf.ReadFloat();
+        PlayerStartXPixels = _buf.ReadFloat();
+        PlayerStartYPixels = _buf.ReadFloat();
+        SpawnRadiusPixels = _buf.ReadFloat();
+        CameraPaddingPixels = _buf.ReadFloat();
         TileSizePixels = _buf.ReadInt();
         MapWidthPixels = _buf.ReadInt();
         MapHeightPixels = _buf.ReadInt();
@@ -57,29 +57,29 @@ public sealed partial class MapConfig : Luban.BeanBase
     public readonly int? VisualSetId;
     public VisualSetConfig VisualSetId_Ref;
     /// <summary>
-    /// 开放场地半宽，世界单位乘1000
+    /// 开放场地半宽，逻辑像素；直接填写像素值，最多3位小数。
     /// </summary>
-    public readonly int ArenaHalfWidthMilli;
+    public readonly float ArenaHalfWidthPixels;
     /// <summary>
-    /// 开放场地半高，世界单位乘1000
+    /// 开放场地半高，逻辑像素；直接填写像素值，最多3位小数。
     /// </summary>
-    public readonly int ArenaHalfHeightMilli;
+    public readonly float ArenaHalfHeightPixels;
     /// <summary>
-    /// 玩家出生X，世界单位乘1000
+    /// 玩家出生X，逻辑像素；直接填写像素值，最多3位小数。
     /// </summary>
-    public readonly int PlayerStartXMilli;
+    public readonly float PlayerStartXPixels;
     /// <summary>
-    /// 玩家出生Y，世界单位乘1000
+    /// 玩家出生Y，逻辑像素；直接填写像素值，最多3位小数。
     /// </summary>
-    public readonly int PlayerStartYMilli;
+    public readonly float PlayerStartYPixels;
     /// <summary>
-    /// 跟随角色圆周出生半径，逻辑像素乘1000
+    /// 跟随角色圆周出生半径，逻辑像素；直接填写像素值，最多3位小数。
     /// </summary>
-    public readonly int SpawnRadiusPixelsMilli;
+    public readonly float SpawnRadiusPixels;
     /// <summary>
-    /// 正交相机边缘留白，世界单位乘1000
+    /// 正交相机边缘留白，逻辑像素；直接填写像素值，最多3位小数。
     /// </summary>
-    public readonly int CameraPaddingMilli;
+    public readonly float CameraPaddingPixels;
     /// <summary>
     /// 单格边长，像素
     /// </summary>
@@ -127,12 +127,12 @@ public sealed partial class MapConfig : Luban.BeanBase
         + "id:" + Id + ","
         + "name:" + Name + ","
         + "visualSetId:" + VisualSetId + ","
-        + "arenaHalfWidthMilli:" + ArenaHalfWidthMilli + ","
-        + "arenaHalfHeightMilli:" + ArenaHalfHeightMilli + ","
-        + "playerStartXMilli:" + PlayerStartXMilli + ","
-        + "playerStartYMilli:" + PlayerStartYMilli + ","
-        + "spawnRadiusPixelsMilli:" + SpawnRadiusPixelsMilli + ","
-        + "cameraPaddingMilli:" + CameraPaddingMilli + ","
+        + "arenaHalfWidthPixels:" + ArenaHalfWidthPixels + ","
+        + "arenaHalfHeightPixels:" + ArenaHalfHeightPixels + ","
+        + "playerStartXPixels:" + PlayerStartXPixels + ","
+        + "playerStartYPixels:" + PlayerStartYPixels + ","
+        + "spawnRadiusPixels:" + SpawnRadiusPixels + ","
+        + "cameraPaddingPixels:" + CameraPaddingPixels + ","
         + "tileSizePixels:" + TileSizePixels + ","
         + "mapWidthPixels:" + MapWidthPixels + ","
         + "mapHeightPixels:" + MapHeightPixels + ","

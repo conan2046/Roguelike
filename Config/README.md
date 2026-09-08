@@ -87,13 +87,13 @@ ECS 层位于独立程序集 `Features/Combat/Ecs`，由 Unity EditMode 的 `Com
 
 渲染参数位于 `TbCombatPresentation`：`shaderName` 必填且运行时可找到，并须支持 URP Unlit 材质接口；`textureFilterMode` 为 `Point` 或 `Bilinear`。当前方案沿用 URP Unlit/Bilinear，未知配置明确拒绝，不回退默认 Shader。Unity 材质属性名与透明混合枚举经确认属于渲染接口常量，不要求策划配置。
 
-血条尺寸位于 `TbCombatPresentation.healthBarWidthPixelsMilli` 和 `healthBarHeightPixelsMilli`，存储逻辑像素乘 1000。编辑源为 `CombatHealthBar.prefab` 的中文 Inspector；根节点缩放固定为 1，内部画布仅负责读取战斗规则完成场景显示换算。点击“导出血条像素到 Luban”后，运行时 DOTS 只消费生成配置，不读取或实例化该 Prefab。
+血条尺寸位于 `TbCombatPresentation.healthBarWidthPixels` 和 `healthBarHeightPixels`，直接存储逻辑像素浮点值。编辑源为 `CombatHealthBar.prefab` 的中文 Inspector；根节点缩放固定为 1，内部画布仅负责读取战斗规则完成场景显示换算。点击“导出血条像素到 Luban”后，运行时 DOTS 只消费生成配置，不读取或实例化该 Prefab。
 
 - `TbSkillCombat.attackWindupSeconds`：对齐朝向后保持怪物 `_zd`，到开始 `_gj` 的基础前摇秒数。近战必填、有限且非负；当前普通普攻机制 ID 2 配 `0.2`，弹丸机制留空。Boss 后续使用独立技能战斗行，不在代码里判断 Boss 或补默认值。
 - `TbAttackDirection.hitFrameIndex`：进入 `_gj` 的动作帧时判定一次，零基索引；当前四方向映射 ID 1–4 均为 F4。不是图集帧编号，也不是前摇时长。
 - 命中基础时点 = 前摇 + ANI 中 F4 之前累计时长；完整动作时点 = 前摇 + ANI 总时长。ANI 单位换算读取 `TbCombatPresentation`。攻速按基础间隔/有效间隔推进原速进度，200 毫秒为 1 倍速基础值。
 - 改前摇、帧号或方向后运行生成、产物一致性校验和战斗配置校验；缺配/越界拒绝入局，不回退即时伤害。当前启用既有 btm1 与 M1 五个怪物的已核对攻击资源。
-- 测试关卡单位的命中特效位置由角色/怪物 Prefab 的 `命中特效挂点` 导出为 `hitEffectOffsetXPixelsMilli/Y`；技能的弹丸、命中、范围表现分别由中文表现节点导出位置与缩放。表现参数不改变 CircleCollider2D 或 DOTS 判定范围。
+- 测试关卡单位的命中特效位置由角色/怪物 Prefab 的 `命中特效挂点` 导出为 `hitEffectOffsetXPixels/Y`；技能的弹丸、命中、范围表现分别由中文表现节点导出位置与缩放。表现参数不改变 CircleCollider2D 或 DOTS 判定范围。
 
 ## M1 单局配置
 
@@ -109,7 +109,7 @@ ECS 层位于独立程序集 `Features/Combat/Ecs`，由 Unity EditMode 的 `Com
 | `TbUpgradePool` | 1 | 无放回抽取 3 项，引用选项 40001–40009 |
 | `TbUpgradeOption` | 40001–40009 | 四个技能解锁、四个属性强化、一个立即恢复 |
 
-所有 `*Milli` 字段均用整数保存原单位乘 1000 的值；`*PixelsMilli` 表示逻辑像素乘 1000，其余距离字段表示世界单位乘 1000。比例强化的 `AddPercent` 以比例乘 1000 保存，例如 5% 写 50。时间字段均以秒乘 1000 保存。
+所有空间距离、半径、偏移和速度统一使用 `*Pixels` / `*PixelsPerSecond` 浮点字段，直接填写逻辑像素，不乘 1000。运行时只在入局边界按 `TbCombatRules.worldUnitsPerPixel` 转为 Unity 世界单位。时间、颜色、属性精度等非空间 `*Milli` 仍以原值乘 1000 的整数保存；`*Permille` 仍表示千分比。比例强化的 `AddPercent` 以比例乘 1000 保存，例如 5% 写 50。
 
 2026-09-05 已验证：Luban 生成成功；重新生成的 C# 与 bytes 哈希一致；战斗配置检查通过 3064 项，覆盖三种技能投递、`skill_1_f` 唯一镜像、四阶段完整周期、215 波、2395 个普通怪、四类普通怪权重、独立 Boss、经验曲线、升级池和正式 UI 引用。
 

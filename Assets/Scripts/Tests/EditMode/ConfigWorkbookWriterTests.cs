@@ -31,15 +31,15 @@ namespace Roguelike.Tests
                     temporary,
                     new[]
                     {
-                        "moveRadiusPixelsMilli",
-                        "moveHeightPixelsMilli",
-                        "moveOffsetXPixelsMilli",
-                        "moveOffsetYPixelsMilli",
-                        "moveElevationPixelsMilli"
+                        "moveRadiusPixels",
+                        "moveHeightPixels",
+                        "moveOffsetXPixels",
+                        "moveOffsetYPixels",
+                        "moveElevationPixels"
                     },
-                    new Dictionary<int, int[]>
+                    new Dictionary<int, float[]>
                     {
-                        [10001] = new[] { 50000, 149000, 0, 0, 0 }
+                        [10001] = new[] { 50f, 149f, 0f, 0f, 0f }
                     }));
             }
             finally
@@ -139,11 +139,11 @@ namespace Roguelike.Tests
                 circle.offset = new Vector2(0f, 0.5f);
 
                 float pixelScale = CombatCylinderPipeline.ReadTables().TbCombatRules.DataList[0].WorldUnitsPerPixel;
-                int[] values = SkillCollisionPipeline.Values(shape);
+                float[] values = SkillCollisionPipeline.Values(shape);
 
-                Assert.That(cfg.ConfigNumber.Decode(values[0]), Is.EqualTo(0.36f * 0.5f / pixelScale).Within(0.001f));
-                Assert.That(cfg.ConfigNumber.Decode(values[1]), Is.Zero.Within(0.001f));
-                Assert.That(cfg.ConfigNumber.Decode(values[2]), Is.EqualTo(0.5f * 0.5f / pixelScale).Within(0.001f));
+                Assert.That(values[0], Is.EqualTo(0.36f * 0.5f / pixelScale).Within(0.001f));
+                Assert.That(values[1], Is.Zero.Within(0.001f));
+                Assert.That(values[2], Is.EqualTo(0.5f * 0.5f / pixelScale).Within(0.001f));
             }
             finally
             {
@@ -186,16 +186,16 @@ namespace Roguelike.Tests
                 area.Kind = SkillVisualPlacementAuthoring.VisualKind.Area;
 
                 float pixelScale = CombatCylinderPipeline.ReadTables().TbCombatRules.DataList[0].WorldUnitsPerPixel;
-                int?[] values = SkillCollisionPipeline.VisualPlacementValues(shape);
+                float?[] values = SkillCollisionPipeline.VisualPlacementValues(shape);
 
-                Assert.That(cfg.ConfigNumber.Decode(values[0].Value), Is.EqualTo(-0.4f * 0.5f / pixelScale).Within(0.001f));
-                Assert.That(cfg.ConfigNumber.Decode(values[1].Value), Is.EqualTo(-0.2f * 0.5f / pixelScale).Within(0.001f));
-                Assert.That(cfg.ConfigNumber.Decode(values[2].Value), Is.EqualTo(1.25f).Within(0.001f));
-                Assert.That(cfg.ConfigNumber.Decode(values[3].Value), Is.EqualTo(0.6f * 0.5f / pixelScale).Within(0.001f));
-                Assert.That(cfg.ConfigNumber.Decode(values[4].Value), Is.EqualTo(0.8f * 0.5f / pixelScale).Within(0.001f));
-                Assert.That(cfg.ConfigNumber.Decode(values[5].Value), Is.EqualTo(0.75f).Within(0.001f));
-                Assert.That(cfg.ConfigNumber.Decode(values[6].Value), Is.EqualTo(-0.2f * 0.5f / pixelScale).Within(0.001f));
-                Assert.That(cfg.ConfigNumber.Decode(values[7].Value), Is.EqualTo(0.1f * 0.5f / pixelScale).Within(0.001f));
+                Assert.That(values[0].Value, Is.EqualTo(-0.4f * 0.5f / pixelScale).Within(0.001f));
+                Assert.That(values[1].Value, Is.EqualTo(-0.2f * 0.5f / pixelScale).Within(0.001f));
+                Assert.That(values[2].Value / cfg.ConfigNumber.Scale, Is.EqualTo(1.25f).Within(0.001f));
+                Assert.That(values[3].Value, Is.EqualTo(0.6f * 0.5f / pixelScale).Within(0.001f));
+                Assert.That(values[4].Value, Is.EqualTo(0.8f * 0.5f / pixelScale).Within(0.001f));
+                Assert.That(values[5].Value / cfg.ConfigNumber.Scale, Is.EqualTo(0.75f).Within(0.001f));
+                Assert.That(values[6].Value, Is.EqualTo(-0.2f * 0.5f / pixelScale).Within(0.001f));
+                Assert.That(values[7].Value, Is.EqualTo(0.1f * 0.5f / pixelScale).Within(0.001f));
             }
             finally
             {

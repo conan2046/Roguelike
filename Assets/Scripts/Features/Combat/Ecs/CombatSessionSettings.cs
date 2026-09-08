@@ -101,9 +101,9 @@ namespace Roguelike.Features.Combat.Ecs
                 AvailablePlayerSkills = definition.AvailableSkills,
                 InitialPlayerSkillIds = definition.InitialSkills.Select(item => item.Id).ToArray(),
                 Monsters = monsters,
-                Arena = new float2(ConfigNumber.Decode(definition.Map.ArenaHalfWidthMilli), ConfigNumber.Decode(definition.Map.ArenaHalfHeightMilli)),
-                PlayerStart = new float2(ConfigNumber.Decode(definition.Map.PlayerStartXMilli), ConfigNumber.Decode(definition.Map.PlayerStartYMilli)),
-                SpawnRadiusPixels = ConfigNumber.Decode(definition.Map.SpawnRadiusPixelsMilli),
+                Arena = new float2(definition.Map.ArenaHalfWidthPixels, definition.Map.ArenaHalfHeightPixels) * definition.CombatRules.WorldUnitsPerPixel,
+                PlayerStart = new float2(definition.Map.PlayerStartXPixels, definition.Map.PlayerStartYPixels) * definition.CombatRules.WorldUnitsPerPixel,
+                SpawnRadiusPixels = definition.Map.SpawnRadiusPixels,
                 RandomSeed = definition.Rule.RandomSeed,
                 InitialMonsterCount = 0,
                 SpawnColumns = 1,
@@ -143,6 +143,7 @@ namespace Roguelike.Features.Combat.Ecs
             if (value == null || value.Kind != EPerformanceKind.Combat || value.CombatRulesId_Ref == null || value.PresentationId_Ref?.InitialDirectionId_Ref == null ||
                 value.CharacterId_Ref?.DefaultSkillId_Ref?.CombatProfileId_Ref == null || !value.CharacterId_Ref.BodyRadiusPixels.HasValue ||
                 !value.CharacterId_Ref.BodyOffsetXPixels.HasValue || !value.CharacterId_Ref.BodyOffsetYPixels.HasValue ||
+                !value.CharacterId_Ref.DamageFloatHeightPixels.HasValue ||
                 value.CharacterProfileOverrideId_Ref == null || value.MonsterProfileOverrideId_Ref == null ||
                 value.MonsterIds_Ref == null || value.MonsterIds_Ref.Count == 0 || value.EntityCount <= 0 || value.SpawnColumns <= 0 ||
                 !value.ArenaHalfWidth.HasValue || !value.ArenaHalfHeight.HasValue || !value.PlayerStartX.HasValue || !value.PlayerStartY.HasValue ||
@@ -164,7 +165,7 @@ namespace Roguelike.Features.Combat.Ecs
                 throw new InvalidOperationException($"TbPerformanceScenario {value.Id}: unknown policy.");
             foreach (var monster in value.MonsterIds_Ref)
                 if (monster?.DefaultSkillId_Ref?.CombatProfileId_Ref == null || !monster.BodyRadiusPixels.HasValue ||
-                    !monster.BodyOffsetXPixels.HasValue || !monster.BodyOffsetYPixels.HasValue)
+                    !monster.BodyOffsetXPixels.HasValue || !monster.BodyOffsetYPixels.HasValue || !monster.DamageFloatHeightPixels.HasValue)
                     throw new InvalidOperationException($"TbPerformanceScenario {value.Id}: monster is not combat-ready.");
             ValidateRules(value.CombatRulesId_Ref);
         }

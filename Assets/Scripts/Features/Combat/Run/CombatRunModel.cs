@@ -158,7 +158,7 @@ namespace Roguelike.Features.Combat.Run
         /// <summary>玩家进入 TbDropProfile.magnetRadius 时将一个未拾取掉落锁定为吸附态。</summary>
         /// <param name="dropId">RecordMonsterDeath 返回的本局掉落 ID。</param>
         /// <returns>是否首次从 Dropped 进入 Magnetized。</returns>
-        /// <remarks>只修改掉落逻辑状态；位置移动由 ECS 按 TbDropProfile.magnetSpeedMilli 执行。</remarks>
+        /// <remarks>只修改掉落逻辑状态；位置移动由 ECS 按 TbDropProfile.magnetSpeedPixelsPerSecond 执行。</remarks>
         public bool TryMagnetizeDrop(ulong dropId)
         {
             if (!IsSimulationActive(State) || !drops.TryGetValue(dropId, out var state) || state != ExperienceDropState.Dropped)

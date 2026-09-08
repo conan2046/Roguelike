@@ -82,7 +82,7 @@ namespace Roguelike.Features.Combat.Authoring.Editor
     public static class CombatHealthBarPipeline
     {
         private static readonly string[] Fields =
-            { "healthBarWidthPixelsMilli", "healthBarHeightPixelsMilli" };
+            { "healthBarWidthPixels", "healthBarHeightPixels" };
 
         /// <summary>从正式 CombatHealthBar Prefab 导出像素宽高并重新生成 Luban。</summary>
         /// <exception cref="InvalidOperationException">Prefab 缺失血条调参组件或导出链失败时抛出。</exception>
@@ -132,12 +132,12 @@ namespace Roguelike.Features.Combat.Authoring.Editor
             byte[] backup = File.ReadAllBytes(path);
             try
             {
-                ConfigWorkbookWriter.Patch(path, Fields, new Dictionary<int, int[]>
+                ConfigWorkbookWriter.Patch(path, Fields, new Dictionary<int, float[]>
                 {
                     [view.PresentationId] = new[]
                     {
-                        ConfigNumber.Encode(view.WidthPixels),
-                        ConfigNumber.Encode(view.HeightPixels)
+                        (float)Math.Round(view.WidthPixels, 3, MidpointRounding.AwayFromZero),
+                        (float)Math.Round(view.HeightPixels, 3, MidpointRounding.AwayFromZero)
                     }
                 });
                 CombatCollisionPipeline.RunLuban();
@@ -151,8 +151,8 @@ namespace Roguelike.Features.Combat.Authoring.Editor
             AssetDatabase.Refresh();
             CombatPresentationConfig saved = CombatCylinderPipeline.ReadTables()
                 .TbCombatPresentation.Get(view.PresentationId);
-            if (saved.HealthBarWidthPixelsMilli != ConfigNumber.Encode(view.WidthPixels) ||
-                saved.HealthBarHeightPixelsMilli != ConfigNumber.Encode(view.HeightPixels))
+            if (Mathf.Abs(saved.HealthBarWidthPixels - view.WidthPixels) > 0.00051f ||
+                Mathf.Abs(saved.HealthBarHeightPixels - view.HeightPixels) > 0.00051f)
                 throw new InvalidOperationException("Luban 生成后的血条像素尺寸与 Prefab 不一致。");
             Debug.Log($"血条像素配置导出完成：{view.WidthPixels}×{view.HeightPixels}，运行时 DOTS 只读取 Luban。");
         }

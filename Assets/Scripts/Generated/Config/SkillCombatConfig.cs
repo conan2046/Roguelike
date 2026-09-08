@@ -22,8 +22,8 @@ public sealed partial class SkillCombatConfig : Luban.BeanBase
         Id = _buf.ReadInt();
         DeliveryType = (ESkillDeliveryType)_buf.ReadInt();
         BaseIntervalMilli = _buf.ReadInt();
-        RangeMilli = _buf.ReadInt();
-        if(_buf.ReadBool()){ ProjectileSpeedMilli = _buf.ReadInt(); } else { ProjectileSpeedMilli = null; }
+        RangePixels = _buf.ReadFloat();
+        if(_buf.ReadBool()){ ProjectileSpeedPixelsPerSecond = _buf.ReadFloat(); } else { ProjectileSpeedPixelsPerSecond = null; }
         if(_buf.ReadBool()){ ProjectileLifetimeMilli = _buf.ReadInt(); } else { ProjectileLifetimeMilli = null; }
         if(_buf.ReadBool()){ AttackWindupSecondsMilli = _buf.ReadInt(); } else { AttackWindupSecondsMilli = null; }
     }
@@ -46,13 +46,13 @@ public sealed partial class SkillCombatConfig : Luban.BeanBase
     /// </summary>
     public readonly int BaseIntervalMilli;
     /// <summary>
-    /// 攻击范围，按碰撞体边缘，世界单位；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
+    /// 攻击范围；按碰撞体边缘，逻辑像素；直接填写像素值，最多3位小数。
     /// </summary>
-    public readonly int RangeMilli;
+    public readonly float RangePixels;
     /// <summary>
-    /// 弹丸速度，世界单位每秒；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
+    /// 弹丸速度，逻辑像素/秒；直接填写像素值，最多3位小数。
     /// </summary>
-    public readonly int? ProjectileSpeedMilli;
+    public readonly float? ProjectileSpeedPixelsPerSecond;
     /// <summary>
     /// 弹丸寿命，秒；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
     /// </summary>
@@ -75,8 +75,8 @@ public sealed partial class SkillCombatConfig : Luban.BeanBase
         + "id:" + Id + ","
         + "deliveryType:" + DeliveryType + ","
         + "baseIntervalMilli:" + BaseIntervalMilli + ","
-        + "rangeMilli:" + RangeMilli + ","
-        + "projectileSpeedMilli:" + ProjectileSpeedMilli + ","
+        + "rangePixels:" + RangePixels + ","
+        + "projectileSpeedPixelsPerSecond:" + ProjectileSpeedPixelsPerSecond + ","
         + "projectileLifetimeMilli:" + ProjectileLifetimeMilli + ","
         + "attackWindupSecondsMilli:" + AttackWindupSecondsMilli + ","
         + "}";

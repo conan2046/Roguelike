@@ -144,18 +144,19 @@ namespace Roguelike.Features.Combat.Run
         {
             Require(Rule.DurationMilli > 0 && Rule.BossTimeMilli > 0 && Rule.BossTimeMilli <= Rule.DurationMilli,
                 $"TbStageRule {Rule.Id}: invalid duration or boss time.");
-            Require(CombatRules.SimulationHz > 0 && CombatRules.MaxCatchUpSteps > 0,
+            Require(CombatRules.SimulationHz > 0 && CombatRules.MaxCatchUpSteps > 0 &&
+                    CombatRules.WorldUnitsPerPixel > 0 && CombatRules.SpatialCellSizePixels > 0,
                 $"TbCombatRules {CombatRules.Id}: invalid fixed-step limits.");
-            Require(Map.ArenaHalfWidthMilli > 0 && Map.ArenaHalfHeightMilli > 0 && Map.SpawnRadiusPixelsMilli > 0 &&
-                    Map.CameraPaddingMilli >= 0 && Math.Abs(Map.PlayerStartXMilli) < Map.ArenaHalfWidthMilli &&
-                    Math.Abs(Map.PlayerStartYMilli) < Map.ArenaHalfHeightMilli, $"TbMap {Map.Id}: invalid arena or player start.");
-            Require(Character.AttributeProfileId_Ref != null && Character.VisualSetId_Ref != null && Character.BodyRadiusPixelsMilli > 0 &&
-                    Character.BodyOffsetXPixelsMilli.HasValue && Character.BodyOffsetYPixelsMilli.HasValue &&
-                    Character.HitEffectOffsetXPixelsMilli.HasValue && Character.HitEffectOffsetYPixelsMilli.HasValue &&
-                    Character.MoveRadiusPixelsMilli > 0 && Character.MoveHeightPixelsMilli > 0,
+            Require(Map.ArenaHalfWidthPixels > 0 && Map.ArenaHalfHeightPixels > 0 && Map.SpawnRadiusPixels > 0 &&
+                    Map.CameraPaddingPixels >= 0 && Math.Abs(Map.PlayerStartXPixels) < Map.ArenaHalfWidthPixels &&
+                    Math.Abs(Map.PlayerStartYPixels) < Map.ArenaHalfHeightPixels, $"TbMap {Map.Id}: invalid arena or player start.");
+            Require(Character.AttributeProfileId_Ref != null && Character.VisualSetId_Ref != null && Character.BodyRadiusPixels > 0 &&
+                    Character.BodyOffsetXPixels.HasValue && Character.BodyOffsetYPixels.HasValue &&
+                    Character.HitEffectOffsetXPixels.HasValue && Character.HitEffectOffsetYPixels.HasValue &&
+                    Character.MoveRadiusPixels > 0 && Character.MoveHeightPixels > 0 && Character.DamageFloatHeightPixels.HasValue,
                 $"TbCharacter {Character.Id}: formal combat data is incomplete.");
             Require(Drop != null && Drop.ExperienceItemId_Ref != null && Drop.ExperienceValue > 0 &&
-                    Drop.MagnetRadiusMilli > Drop.PickupRadiusMilli && Drop.PickupRadiusMilli > 0 && Drop.MagnetSpeedMilli > 0,
+                    Drop.MagnetRadiusPixels > Drop.PickupRadiusPixels && Drop.PickupRadiusPixels > 0 && Drop.MagnetSpeedPixelsPerSecond > 0,
                 $"TbStageRule {Rule.Id}: invalid drop profile.");
         }
 
@@ -243,22 +244,22 @@ namespace Roguelike.Features.Combat.Run
             Require(skill?.VisualSetId_Ref != null && skill.CombatProfileId_Ref != null,
                 "TbSkill: unresolved player skill.");
             var combat = skill.CombatProfileId_Ref;
-            Require(combat.BaseIntervalMilli > 0 && combat.RangeMilli >= 0,
+            Require(combat.BaseIntervalMilli > 0 && combat.RangePixels >= 0,
                 $"TbSkillCombat {combat.Id}: invalid common fields.");
             if (combat.DeliveryType == ESkillDeliveryType.Projectile)
             {
-                Require(combat.ProjectileSpeedMilli > 0 && combat.ProjectileLifetimeMilli > 0 && skill.ProjectileRadiusPixelsMilli > 0 &&
-                        skill.ProjectileOffsetXPixelsMilli.HasValue && skill.ProjectileOffsetYPixelsMilli.HasValue &&
-                        skill.ProjectileVisualOffsetXPixelsMilli.HasValue && skill.ProjectileVisualOffsetYPixelsMilli.HasValue &&
+                Require(combat.ProjectileSpeedPixelsPerSecond > 0 && combat.ProjectileLifetimeMilli > 0 && skill.ProjectileRadiusPixels > 0 &&
+                        skill.ProjectileOffsetXPixels.HasValue && skill.ProjectileOffsetYPixels.HasValue &&
+                        skill.ProjectileVisualOffsetXPixels.HasValue && skill.ProjectileVisualOffsetYPixels.HasValue &&
                         skill.ProjectileVisualScalePermille > 0 &&
-                        (!skill.ImpactClipId.HasValue || (skill.ImpactVisualOffsetXPixelsMilli.HasValue &&
-                            skill.ImpactVisualOffsetYPixelsMilli.HasValue && skill.ImpactVisualScalePermille > 0)) &&
+                        (!skill.ImpactClipId.HasValue || (skill.ImpactVisualOffsetXPixels.HasValue &&
+                            skill.ImpactVisualOffsetYPixels.HasValue && skill.ImpactVisualScalePermille > 0)) &&
                         skill.ProjectileClipId_Ref != null && (!skill.ImpactClipId.HasValue || skill.ImpactClipId_Ref != null),
                     $"TbSkill {skill.Id}: incomplete projectile fields.");
                 return;
             }
-            Require(combat.DeliveryType == ESkillDeliveryType.TargetArea && skill.AreaRadiusPixelsMilli > 0 &&
-                    skill.AreaVisualOffsetXPixelsMilli.HasValue && skill.AreaVisualOffsetYPixelsMilli.HasValue &&
+            Require(combat.DeliveryType == ESkillDeliveryType.TargetArea && skill.AreaRadiusPixels > 0 &&
+                    skill.AreaVisualOffsetXPixels.HasValue && skill.AreaVisualOffsetYPixels.HasValue &&
                     skill.AreaVisualScalePermille > 0 &&
                     skill.AreaClipIds_Ref != null && skill.AreaClipIds_Ref.Count > 0 && skill.AreaClipIds_Ref.All(item => item != null),
                 $"TbSkill {skill.Id}: incomplete target-area fields.");
@@ -272,10 +273,11 @@ namespace Roguelike.Features.Combat.Run
         {
             Require(monster?.AttributeProfileId_Ref != null && monster.DefaultSkillId_Ref?.CombatProfileId_Ref != null &&
                     monster.VisualSetId_Ref?.StandClipId_Ref != null && monster.VisualSetId_Ref.MoveClipId_Ref != null &&
-                    monster.VisualSetId_Ref.AttackClipId_Ref != null && monster.BodyRadiusPixelsMilli > 0 &&
-                    monster.BodyOffsetXPixelsMilli.HasValue && monster.BodyOffsetYPixelsMilli.HasValue &&
-                    monster.HitEffectOffsetXPixelsMilli.HasValue && monster.HitEffectOffsetYPixelsMilli.HasValue &&
-                    monster.MoveRadiusPixelsMilli > 0 && monster.MoveHeightPixelsMilli > 0 && monster.MovementType.HasValue &&
+                    monster.VisualSetId_Ref.AttackClipId_Ref != null && monster.BodyRadiusPixels > 0 &&
+                    monster.BodyOffsetXPixels.HasValue && monster.BodyOffsetYPixels.HasValue &&
+                    monster.HitEffectOffsetXPixels.HasValue && monster.HitEffectOffsetYPixels.HasValue &&
+                    monster.MoveRadiusPixels > 0 && monster.MoveHeightPixels > 0 && monster.DamageFloatHeightPixels.HasValue &&
+                    monster.MovementType.HasValue &&
                     Enum.IsDefined(typeof(EMovementType), monster.MovementType.Value) &&
                     monster.DefaultSkillId_Ref.CombatProfileId_Ref.DeliveryType == ESkillDeliveryType.Melee,
                 $"TbMonster from {source}: formal combat data is incomplete.");
@@ -285,7 +287,7 @@ namespace Roguelike.Features.Combat.Run
         /// <exception cref="InvalidOperationException">Boss 引用或规则非法。</exception>
         private void ValidateBoss()
         {
-            Require(Boss?.MonsterId_Ref != null && Boss.SpawnRadiusPixelsMilli > 0 &&
+            Require(Boss?.MonsterId_Ref != null && Boss.SpawnRadiusPixels > 0 &&
                     !string.IsNullOrWhiteSpace(Boss.HealthBarText), $"TbStageRule {Rule.Id}: invalid boss encounter.");
             ValidateMonster(Boss.MonsterId_Ref, "boss encounter");
         }

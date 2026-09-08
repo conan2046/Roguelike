@@ -92,7 +92,7 @@
 
 - `Assets/GameContent/UI/Combat/Prefabs/CombatHealthBar.prefab` 仅是编辑器调参载体，挂到角色或怪物 `DamageFloatAnchor` 后观察比例；正式运行仍由 `CombatFeedbackVisuals` 创建 DOTS 实体。
 - 根节点 `Scale=1`。宽度、高度和预览血量比例都在 `CombatHealthBarView` 中文 Inspector 中填写；子节点“显示画布（自动像素换算勿改）”读取 `TbCombatRules.worldUnitsPerPixel`，不需要人工换算或修改缩放。
-- 点击“导出血条像素到 Luban”写入 `TbCombatPresentation.healthBarWidthPixelsMilli / healthBarHeightPixelsMilli` 并重新生成。DOTS 血条直接使用这两个最终像素值，不再按单位碰撞半径隐式改变宽度。
+- 点击“导出血条像素到 Luban”写入 `TbCombatPresentation.healthBarWidthPixels / healthBarHeightPixels` 并重新生成。字段直接保存像素浮点值，不再乘 1000；DOTS 血条不按单位碰撞半径隐式改变宽度。
 
 ## 第 20 阶段：交互入口
 

@@ -27,18 +27,18 @@ public sealed partial class CharacterConfig : Luban.BeanBase
         AttributeProfileId_Ref = null;
         if(_buf.ReadBool()){ DefaultSkillId = _buf.ReadInt(); } else { DefaultSkillId = null; }
         DefaultSkillId_Ref = null;
-        if(_buf.ReadBool()){ BodyRadiusPixelsMilli = _buf.ReadInt(); } else { BodyRadiusPixelsMilli = null; }
-        if(_buf.ReadBool()){ MoveRadiusPixelsMilli = _buf.ReadInt(); } else { MoveRadiusPixelsMilli = null; }
-        if(_buf.ReadBool()){ MoveHeightPixelsMilli = _buf.ReadInt(); } else { MoveHeightPixelsMilli = null; }
-        if(_buf.ReadBool()){ MoveOffsetXPixelsMilli = _buf.ReadInt(); } else { MoveOffsetXPixelsMilli = null; }
-        if(_buf.ReadBool()){ MoveOffsetYPixelsMilli = _buf.ReadInt(); } else { MoveOffsetYPixelsMilli = null; }
-        if(_buf.ReadBool()){ MoveElevationPixelsMilli = _buf.ReadInt(); } else { MoveElevationPixelsMilli = null; }
-        if(_buf.ReadBool()){ DamageFloatHeight = _buf.ReadFloat(); } else { DamageFloatHeight = null; }
-        if(_buf.ReadBool()){ BodyOffsetXPixelsMilli = _buf.ReadInt(); } else { BodyOffsetXPixelsMilli = null; }
-        if(_buf.ReadBool()){ BodyOffsetYPixelsMilli = _buf.ReadInt(); } else { BodyOffsetYPixelsMilli = null; }
+        if(_buf.ReadBool()){ BodyRadiusPixels = _buf.ReadFloat(); } else { BodyRadiusPixels = null; }
+        if(_buf.ReadBool()){ MoveRadiusPixels = _buf.ReadFloat(); } else { MoveRadiusPixels = null; }
+        if(_buf.ReadBool()){ MoveHeightPixels = _buf.ReadFloat(); } else { MoveHeightPixels = null; }
+        if(_buf.ReadBool()){ MoveOffsetXPixels = _buf.ReadFloat(); } else { MoveOffsetXPixels = null; }
+        if(_buf.ReadBool()){ MoveOffsetYPixels = _buf.ReadFloat(); } else { MoveOffsetYPixels = null; }
+        if(_buf.ReadBool()){ MoveElevationPixels = _buf.ReadFloat(); } else { MoveElevationPixels = null; }
+        if(_buf.ReadBool()){ DamageFloatHeightPixels = _buf.ReadFloat(); } else { DamageFloatHeightPixels = null; }
+        if(_buf.ReadBool()){ BodyOffsetXPixels = _buf.ReadFloat(); } else { BodyOffsetXPixels = null; }
+        if(_buf.ReadBool()){ BodyOffsetYPixels = _buf.ReadFloat(); } else { BodyOffsetYPixels = null; }
         if(_buf.ReadBool()){ CollisionShape = (EUnitCollisionShape)_buf.ReadInt(); } else { CollisionShape = null; }
-        if(_buf.ReadBool()){ HitEffectOffsetXPixelsMilli = _buf.ReadInt(); } else { HitEffectOffsetXPixelsMilli = null; }
-        if(_buf.ReadBool()){ HitEffectOffsetYPixelsMilli = _buf.ReadInt(); } else { HitEffectOffsetYPixelsMilli = null; }
+        if(_buf.ReadBool()){ HitEffectOffsetXPixels = _buf.ReadFloat(); } else { HitEffectOffsetXPixels = null; }
+        if(_buf.ReadBool()){ HitEffectOffsetYPixels = _buf.ReadFloat(); } else { HitEffectOffsetYPixels = null; }
     }
 
     public static CharacterConfig DeserializeCharacterConfig(ByteBuf _buf)
@@ -70,53 +70,53 @@ public sealed partial class CharacterConfig : Luban.BeanBase
     public readonly int? DefaultSkillId;
     public SkillConfig DefaultSkillId_Ref;
     /// <summary>
-    /// 受击判定半径（像素）；由角色预制体“受击判定范围”节点导出；像素值&#215;1000存整数，实际值=表值/1000，最多3位小数。
+    /// 受击判定半径；由角色预制体“受击判定范围”节点导出，逻辑像素；直接填写像素值，最多3位小数。
     /// </summary>
-    public readonly int? BodyRadiusPixelsMilli;
+    public readonly float? BodyRadiusPixels;
     /// <summary>
-    /// 移动圆柱半径，逻辑像素；由预制体导出；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
+    /// 移动圆柱半径；由预制体导出，逻辑像素；直接填写像素值，最多3位小数。
     /// </summary>
-    public readonly int? MoveRadiusPixelsMilli;
+    public readonly float? MoveRadiusPixels;
     /// <summary>
-    /// 移动圆柱高度，逻辑像素；由预制体导出；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
+    /// 移动圆柱高度；由预制体导出，逻辑像素；直接填写像素值，最多3位小数。
     /// </summary>
-    public readonly int? MoveHeightPixelsMilli;
+    public readonly float? MoveHeightPixels;
     /// <summary>
-    /// 圆柱底心横向偏移，逻辑像素；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
+    /// 圆柱底心横向偏移，逻辑像素；直接填写像素值，最多3位小数。
     /// </summary>
-    public readonly int? MoveOffsetXPixelsMilli;
+    public readonly float? MoveOffsetXPixels;
     /// <summary>
-    /// 圆柱底心地面纵向偏移，逻辑像素；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
+    /// 圆柱底心地面纵向偏移，逻辑像素；直接填写像素值，最多3位小数。
     /// </summary>
-    public readonly int? MoveOffsetYPixelsMilli;
+    public readonly float? MoveOffsetYPixels;
     /// <summary>
-    /// 圆柱底面离地高度，逻辑像素；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
+    /// 圆柱底面离地高度，逻辑像素；直接填写像素值，最多3位小数。
     /// </summary>
-    public readonly int? MoveElevationPixelsMilli;
+    public readonly float? MoveElevationPixels;
     /// <summary>
-    /// 掉血/伤害数字浮动锚点高度（世界单位，Y轴向上）；由预制体 DamageFloatAnchor 节点 localPosition.y 导出；运行时叠加到单位世界坐标上方定位伤害数字。
+    /// 掉血/伤害数字浮动锚点高度；由预制体 DamageFloatAnchor 节点导出，逻辑像素；直接填写像素值，最多3位小数。
     /// </summary>
-    public readonly float? DamageFloatHeight;
+    public readonly float? DamageFloatHeightPixels;
     /// <summary>
-    /// 受击判定中心横向偏移（像素）；由角色预制体“受击判定范围”节点导出；像素值&#215;1000存整数。
+    /// 受击判定中心横向偏移；由角色预制体“受击判定范围”节点导出，逻辑像素；直接填写像素值，最多3位小数。
     /// </summary>
-    public readonly int? BodyOffsetXPixelsMilli;
+    public readonly float? BodyOffsetXPixels;
     /// <summary>
-    /// 受击判定中心前向偏移（像素）；由角色预制体“受击判定范围”节点导出；像素值&#215;1000存整数。
+    /// 受击判定中心前向偏移；由角色预制体“受击判定范围”节点导出，逻辑像素；直接填写像素值，最多3位小数。
     /// </summary>
-    public readonly int? BodyOffsetYPixelsMilli;
+    public readonly float? BodyOffsetYPixels;
     /// <summary>
     /// 统一碰撞形状；VerticalCapsule 表示移动阻挡与受击判定共用预制体 CapsuleCollider2D。
     /// </summary>
     public readonly EUnitCollisionShape? CollisionShape;
     /// <summary>
-    /// 命中特效挂点横向偏移（逻辑像素）；由角色预制体“命中特效挂点”节点 localPosition.x 导出；像素值&#215;1000存整数。
+    /// 命中特效挂点横向偏移；由角色预制体“命中特效挂点”节点导出，逻辑像素；直接填写像素值，最多3位小数。
     /// </summary>
-    public readonly int? HitEffectOffsetXPixelsMilli;
+    public readonly float? HitEffectOffsetXPixels;
     /// <summary>
-    /// 命中特效挂点纵向偏移（逻辑像素）；由角色预制体“命中特效挂点”节点 localPosition.y 导出；像素值&#215;1000存整数。
+    /// 命中特效挂点纵向偏移；由角色预制体“命中特效挂点”节点导出，逻辑像素；直接填写像素值，最多3位小数。
     /// </summary>
-    public readonly int? HitEffectOffsetYPixelsMilli;
+    public readonly float? HitEffectOffsetYPixels;
    
     public const int __ID__ = 676994987;
     public override int GetTypeId() => __ID__;
@@ -136,18 +136,18 @@ public sealed partial class CharacterConfig : Luban.BeanBase
         + "visualSetId:" + VisualSetId + ","
         + "attributeProfileId:" + AttributeProfileId + ","
         + "defaultSkillId:" + DefaultSkillId + ","
-        + "bodyRadiusPixelsMilli:" + BodyRadiusPixelsMilli + ","
-        + "moveRadiusPixelsMilli:" + MoveRadiusPixelsMilli + ","
-        + "moveHeightPixelsMilli:" + MoveHeightPixelsMilli + ","
-        + "moveOffsetXPixelsMilli:" + MoveOffsetXPixelsMilli + ","
-        + "moveOffsetYPixelsMilli:" + MoveOffsetYPixelsMilli + ","
-        + "moveElevationPixelsMilli:" + MoveElevationPixelsMilli + ","
-        + "damageFloatHeight:" + DamageFloatHeight + ","
-        + "bodyOffsetXPixelsMilli:" + BodyOffsetXPixelsMilli + ","
-        + "bodyOffsetYPixelsMilli:" + BodyOffsetYPixelsMilli + ","
+        + "bodyRadiusPixels:" + BodyRadiusPixels + ","
+        + "moveRadiusPixels:" + MoveRadiusPixels + ","
+        + "moveHeightPixels:" + MoveHeightPixels + ","
+        + "moveOffsetXPixels:" + MoveOffsetXPixels + ","
+        + "moveOffsetYPixels:" + MoveOffsetYPixels + ","
+        + "moveElevationPixels:" + MoveElevationPixels + ","
+        + "damageFloatHeightPixels:" + DamageFloatHeightPixels + ","
+        + "bodyOffsetXPixels:" + BodyOffsetXPixels + ","
+        + "bodyOffsetYPixels:" + BodyOffsetYPixels + ","
         + "collisionShape:" + CollisionShape + ","
-        + "hitEffectOffsetXPixelsMilli:" + HitEffectOffsetXPixelsMilli + ","
-        + "hitEffectOffsetYPixelsMilli:" + HitEffectOffsetYPixelsMilli + ","
+        + "hitEffectOffsetXPixels:" + HitEffectOffsetXPixels + ","
+        + "hitEffectOffsetYPixels:" + HitEffectOffsetYPixels + ","
         + "}";
     }
 }

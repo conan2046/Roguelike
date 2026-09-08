@@ -44,15 +44,15 @@ Collider2D 编辑平面与战斗平面均为 XY。导出后 DOTS 使用等价的
 - **导出全部预制体并生成配置**：统一更新三张业务 Excel 和表现缩放，再调用一次生成脚本。日志为 `Library/CombatCollisionExport.log`。
 - **刷新修改状态**：检查模板与生成 bytes 一致性，列出待导出资源；窗口获得焦点时也会刷新。
 
-移动字段为 `moveRadiusPixelsMilli`、`moveHeightPixelsMilli`、`moveOffsetXPixelsMilli`、`moveOffsetYPixelsMilli`、`moveElevationPixelsMilli`；受击字段为 `bodyRadiusPixelsMilli`、`bodyOffsetXPixelsMilli`、`bodyOffsetYPixelsMilli`；命中特效挂点字段为 `hitEffectOffsetXPixelsMilli`、`hitEffectOffsetYPixelsMilli`。合并胶囊会把前两组字段写成同一几何，`collisionShape=VerticalCapsule`。全部存储“像素×1000”的整数。Prefab 是编辑源，表是运行时可审计结果；运行时只读 Luban，不读 Prefab。
+移动字段为 `moveRadiusPixels`、`moveHeightPixels`、`moveOffsetXPixels`、`moveOffsetYPixels`、`moveElevationPixels`；受击字段为 `bodyRadiusPixels`、`bodyOffsetXPixels`、`bodyOffsetYPixels`；命中特效挂点字段为 `hitEffectOffsetXPixels`、`hitEffectOffsetYPixels`。合并胶囊会把前两组字段写成同一几何，`collisionShape=VerticalCapsule`。全部直接存储像素浮点值，最多三位小数，不再乘 1000。Prefab 是编辑源，表是运行时可审计结果；运行时只读 Luban，不读 Prefab。
 
 ## 技能碰撞
 
 `Assets/Prefabs/Combat/Skill/` 按 `TbSkill.id` 保存技能编辑节点。弹丸使用 `弹丸命中范围`，目标位置范围技使用 `范围技能命中范围`。Inspector 直接填写半径、横向偏移和前向偏移像素；范围技能不显示无效偏移。
 
-保存后执行统一导出。弹丸写入 `projectileRadiusPixelsMilli`、`projectileOffsetXPixelsMilli`、`projectileOffsetYPixelsMilli`；范围技写入 `areaRadiusPixelsMilli`。根节点缩放不再二次乘入碰撞，旧英文节点首次导出时会按当前可见大小一次性迁移为最终像素值。
+保存后执行统一导出。弹丸写入 `projectileRadiusPixels`、`projectileOffsetXPixels`、`projectileOffsetYPixels`；范围技写入 `areaRadiusPixels`。这些字段直接保存像素浮点值；根节点缩放不再二次乘入碰撞，旧英文节点首次导出时会按当前可见大小一次性迁移为最终像素值。
 
-所有已接入弹丸或目标位置范围投递的技能按实际资源拥有独立表现节点：`弹丸表现`、`命中特效表现`、`范围特效表现`。Position X/Y 控制表现偏移，Scale X/Y/Z 必须相同并控制显示大小；这些值写入 TbSkill 对应的 `*VisualOffset*PixelsMilli` 与 `*VisualScalePermille`，不会改变 CircleCollider2D 或 DOTS 命中范围。选中表现节点时，Prefab Stage 的内存预览会切换到该节点对应的正式 ANI 片段。
+所有已接入弹丸或目标位置范围投递的技能按实际资源拥有独立表现节点：`弹丸表现`、`命中特效表现`、`范围特效表现`。Position X/Y 控制表现偏移，Scale X/Y/Z 必须相同并控制显示大小；偏移写入 TbSkill 对应的 `*VisualOffset*Pixels` 直接像素字段，缩放继续写入 `*VisualScalePermille`，不会改变 CircleCollider2D 或 DOTS 命中范围。选中表现节点时，Prefab Stage 的内存预览会切换到该节点对应的正式 ANI 片段。
 
 `TbSkillCombat` 不再持有弹丸半径，继续定义发射方式、间隔、射程、速度、寿命及近战前摇。同一战斗配置可供不同半径的技能共用。ECS 在发射时旋转碰撞与弹丸表现的局部偏移；几何接触后，命中特效使用目标 `命中特效挂点` 再叠加技能自己的 `命中特效表现` 偏移。
 

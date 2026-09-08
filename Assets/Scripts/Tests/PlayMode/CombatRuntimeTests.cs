@@ -100,7 +100,7 @@ namespace Roguelike.Tests
             var resources = new YooAssetResourceService(initializer, config);
             var scenario = config.Tables.TbPerformanceScenario.Get(4);
             // 本用例验证输入/死亡/退出，保留出生即有目标的隔离夹具；圆周刷怪由专用用例验收。
-            foreach (string field in new[] { "SpawnRadiusPixelsMilli", "SpawnIntervalSecondsMilli", "SpawnBatchCount", "SpawnUnitIntervalSecondsMilli" })
+            foreach (string field in new[] { "SpawnRadiusPixels", "SpawnIntervalSecondsMilli", "SpawnBatchCount", "SpawnUnitIntervalSecondsMilli" })
                 typeof(cfg.PerformanceScenarioConfig).GetField(field).SetValue(scenario, null);
             int originalWorlds = World.All.Count;
             int originalFrameRate = Application.targetFrameRate, originalVSync = QualitySettings.vSyncCount;
@@ -225,7 +225,7 @@ namespace Roguelike.Tests
 
                 World combatWorld = FindCombatWorld();
                 Assert.That(runner.Session.TrySpawnMonster(definition.Monsters[0],
-                    cfg.ConfigNumber.Decode(definition.Map.SpawnRadiusPixelsMilli), 1, false,
+                    definition.Map.SpawnRadiusPixels, 1, false,
                     out int feedbackMonsterSlot), Is.True);
                 CombatUnit feedbackMonster = runner.Session.ReadUnit(feedbackMonsterSlot);
                 CombatUnit feedbackPlayer = runner.Session.ReadUnit(0);
@@ -244,7 +244,8 @@ namespace Roguelike.Tests
                     Is.EqualTo(runner.Visuals.Read(feedbackMonsterSlot).HitFlashMaterialIndex));
                 runner.enabled = false;
                 combatWorld.Update();
-                float feedbackHeight = definition.Monsters[0].DamageFloatHeight ?? 0.35f;
+                float feedbackHeight = definition.Monsters[0].DamageFloatHeightPixels.Value *
+                    definition.CombatRules.WorldUnitsPerPixel;
                 float feedbackBarWidth = definition.Presentation.HealthBarWidthPixels *
                     definition.CombatRules.WorldUnitsPerPixel;
                 float feedbackBarHeight = definition.Presentation.HealthBarHeightPixels *
@@ -310,7 +311,7 @@ namespace Roguelike.Tests
                 defeatedPlayer.Cooldown = 1000;
                 combatWorld.EntityManager.SetComponentData(runner.Session.UnitEntity(0), defeatedPlayer);
                 Assert.That(runner.Session.TrySpawnMonster(definition.Monsters[0],
-                    cfg.ConfigNumber.Decode(definition.Map.SpawnRadiusPixelsMilli), 1, false, out int monsterSlot), Is.True);
+                    definition.Map.SpawnRadiusPixels, 1, false, out int monsterSlot), Is.True);
                 CombatUnit monster = runner.Session.ReadUnit(monsterSlot);
                 monster.Position = defeatedPlayer.Position;
                 monster.PreviousPosition = monster.Position;
@@ -403,7 +404,7 @@ namespace Roguelike.Tests
                 yield return CaptureCamera(runner.ViewCamera, "combat-hit-flash-before.png");
                 World combatWorld = FindCombatWorld();
                 Assert.That(runner.Session.TrySpawnMonster(definition.Monsters[0],
-                    cfg.ConfigNumber.Decode(definition.Map.SpawnRadiusPixelsMilli), 1, false, out int monsterSlot), Is.True);
+                    definition.Map.SpawnRadiusPixels, 1, false, out int monsterSlot), Is.True);
                 CombatUnit player = runner.Session.ReadUnit(0);
                 CombatUnit monster = runner.Session.ReadUnit(monsterSlot);
                 monster.Position = player.Position + new float2(3f, 0f);
@@ -558,6 +559,8 @@ namespace Roguelike.Tests
         /// <remarks>只创建内存 RenderTexture/Texture2D；截图进入 outputs，不保存 Unity 预览资源。</remarks>
         private static IEnumerator CaptureHitFlashCamera(Camera camera, Vector3 worldPosition, string fileName)
         {
+            // 不同 ANI 帧的非透明面积不同；50 像素足以证明白闪进入最终相机，同时避免把帧轮廓差异当成渲染失败。
+            const int minimumVisibleFlashPixels = 50;
             var target = new RenderTexture(1280, 720, 24);
             var pixels = new Texture2D(1280, 720, TextureFormat.RGB24, false);
             RenderTexture oldTarget = camera.targetTexture;
@@ -588,12 +591,12 @@ namespace Roguelike.Tests
                         if (color.r >= 165 && color.g >= 165 && color.b >= 165) brightened++;
                     }
                     RenderTexture.active = oldActive;
-                } while (brightened < 100 && Time.realtimeSinceStartupAsDouble < deadline);
+                } while (brightened < minimumVisibleFlashPixels && Time.realtimeSinceStartupAsDouble < deadline);
 
                 Directory.CreateDirectory("outputs/combat-config/runtime-review");
                 File.WriteAllBytes(Path.Combine("outputs/combat-config/runtime-review", fileName), pixels.EncodeToPNG());
                 Debug.Log($"Combat hit flash pixels: brightened={brightened}");
-                Assert.That(brightened, Is.GreaterThanOrEqualTo(100),
+                Assert.That(brightened, Is.GreaterThanOrEqualTo(minimumVisibleFlashPixels),
                     "The actually damaged target must render with the configured half-transparent white flash.");
             }
             finally

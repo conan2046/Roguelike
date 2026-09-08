@@ -61,7 +61,7 @@ namespace Roguelike.Features.Combat.Authoring.Editor
             if (EditorGUI.EndChangeCheck())
             {
                 Undo.RecordObject(shape, "调整技能命中范围");
-                shape.RadiusPixels = ConfigNumber.Decode(ConfigNumber.Encode(Mathf.Max(0f, radius / scale)));
+                shape.RadiusPixels = (float)Math.Round(Mathf.Max(0f, radius / scale), 3, MidpointRounding.AwayFromZero);
                 EditorUtility.SetDirty(shape);
                 PrefabUtility.RecordPrefabInstancePropertyModifications(shape);
             }
@@ -100,16 +100,16 @@ namespace Roguelike.Features.Combat.Authoring.Editor
         {
             try
             {
-                int[] values = shape.Kind == SkillCollisionAuthoring.CollisionKind.Projectile
+                float[] values = shape.Kind == SkillCollisionAuthoring.CollisionKind.Projectile
                     ? SkillCollisionPipeline.Values(shape)
                     : SkillCollisionPipeline.AreaValues(shape);
                 EditorGUILayout.Space(2f);
                 EditorGUILayout.LabelField("运行时最终值（导出后）", EditorStyles.boldLabel);
-                EditorGUILayout.LabelField("半径", ConfigNumber.Decode(values[0]).ToString("0.###") + " 像素");
+                EditorGUILayout.LabelField("半径", values[0].ToString("0.###") + " 像素");
                 if (values.Length > 1)
                 {
-                    EditorGUILayout.LabelField("位置 X", ConfigNumber.Decode(values[1]).ToString("0.###") + " 像素");
-                    EditorGUILayout.LabelField("位置 Y", ConfigNumber.Decode(values[2]).ToString("0.###") + " 像素");
+                    EditorGUILayout.LabelField("位置 X", values[1].ToString("0.###") + " 像素");
+                    EditorGUILayout.LabelField("位置 Y", values[2].ToString("0.###") + " 像素");
                 }
             }
             catch (Exception exception)
@@ -124,8 +124,8 @@ namespace Roguelike.Features.Combat.Authoring.Editor
         internal static float PixelScale()
         {
             var tables = CombatCylinderPipeline.ReadTables();
-            int[] rules = tables.TbPerformanceScenario.DataList.Where(item => item.Kind == EPerformanceKind.Combat && item.CombatRulesId.HasValue)
-                .Select(item => item.CombatRulesId.Value).Distinct().ToArray();
+            int[] rules = tables.TbPerformanceScenario.DataList.Where(item => item.Kind == EPerformanceKind.Combat)
+                .Select(item => item.CombatRulesId).Distinct().ToArray();
             if (rules.Length != 1) throw new InvalidOperationException("技能预览需要唯一的战斗规则编号。");
             float scale = tables.TbCombatRules.Get(rules[0]).WorldUnitsPerPixel;
             if (!(scale > 0f)) throw new InvalidOperationException("战斗规则中的像素比例必须大于零。");

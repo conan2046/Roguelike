@@ -23,9 +23,9 @@ public sealed partial class DropProfileConfig : Luban.BeanBase
         ExperienceItemId = _buf.ReadInt();
         ExperienceItemId_Ref = null;
         ExperienceValue = _buf.ReadInt();
-        MagnetRadiusMilli = _buf.ReadInt();
-        PickupRadiusMilli = _buf.ReadInt();
-        MagnetSpeedMilli = _buf.ReadInt();
+        MagnetRadiusPixels = _buf.ReadFloat();
+        PickupRadiusPixels = _buf.ReadFloat();
+        MagnetSpeedPixelsPerSecond = _buf.ReadFloat();
     }
 
     public static DropProfileConfig DeserializeDropProfileConfig(ByteBuf _buf)
@@ -47,17 +47,17 @@ public sealed partial class DropProfileConfig : Luban.BeanBase
     /// </summary>
     public readonly int ExperienceValue;
     /// <summary>
-    /// 吸附半径，世界单位乘1000
+    /// 吸附半径，逻辑像素；直接填写像素值，最多3位小数。
     /// </summary>
-    public readonly int MagnetRadiusMilli;
+    public readonly float MagnetRadiusPixels;
     /// <summary>
-    /// 拾取半径，世界单位乘1000
+    /// 拾取半径，逻辑像素；直接填写像素值，最多3位小数。
     /// </summary>
-    public readonly int PickupRadiusMilli;
+    public readonly float PickupRadiusPixels;
     /// <summary>
-    /// 吸附速度，世界单位每秒乘1000
+    /// 吸附速度，逻辑像素/秒；直接填写像素值，最多3位小数。
     /// </summary>
-    public readonly int MagnetSpeedMilli;
+    public readonly float MagnetSpeedPixelsPerSecond;
    
     public const int __ID__ = 2084803452;
     public override int GetTypeId() => __ID__;
@@ -73,9 +73,9 @@ public sealed partial class DropProfileConfig : Luban.BeanBase
         + "id:" + Id + ","
         + "experienceItemId:" + ExperienceItemId + ","
         + "experienceValue:" + ExperienceValue + ","
-        + "magnetRadiusMilli:" + MagnetRadiusMilli + ","
-        + "pickupRadiusMilli:" + PickupRadiusMilli + ","
-        + "magnetSpeedMilli:" + MagnetSpeedMilli + ","
+        + "magnetRadiusPixels:" + MagnetRadiusPixels + ","
+        + "pickupRadiusPixels:" + PickupRadiusPixels + ","
+        + "magnetSpeedPixelsPerSecond:" + MagnetSpeedPixelsPerSecond + ","
         + "}";
     }
 }

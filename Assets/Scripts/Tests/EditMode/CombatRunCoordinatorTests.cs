@@ -52,7 +52,7 @@ namespace Roguelike.Tests
             int[] slots = new int[3];
             for (int index = 0; index < slots.Length; index++)
                 Assert.That(fixture.Session.TrySpawnMonster(fixture.Definition.Monsters[index],
-                    ConfigNumber.Decode(fixture.Definition.Map.SpawnRadiusPixelsMilli), (ulong)(index + 1), false,
+                    fixture.Definition.Map.SpawnRadiusPixels, (ulong)(index + 1), false,
                     out slots[index]), Is.True);
             float2[] positions = { new float2(2, 0), new float2(2.4f, 0), new float2(5.5f, 0) };
             long[] health = new long[slots.Length];
@@ -196,7 +196,8 @@ namespace Roguelike.Tests
             fixture.Model.Advance(fixture.Definition.Rule.BossTimeMilli - oneTickMilli);
             CombatUnit player = fixture.Session.ReadUnit(0);
             var originalMovement = player.Movement;
-            player.Movement.Radius = ConfigNumber.Decode(fixture.Definition.Map.SpawnRadiusPixelsMilli) + 100;
+            player.Movement.Radius = fixture.Definition.Map.SpawnRadiusPixels *
+                fixture.Definition.CombatRules.WorldUnitsPerPixel + 100;
             fixture.World.EntityManager.SetComponentData(fixture.Session.UnitEntity(0), player);
 
             Assert.That(fixture.Coordinator.Advance(fixture.Session.StepSeconds, float2.zero), Is.EqualTo(1));

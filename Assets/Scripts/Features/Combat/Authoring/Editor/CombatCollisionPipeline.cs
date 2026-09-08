@@ -67,13 +67,13 @@ namespace Roguelike.Features.Combat.Authoring.Editor
             foreach (IGrouping<bool, CombatCylinderAuthoring> group in CombatCylinderPipeline.Shapes().GroupBy(shape => shape.IsHero))
             {
                 var movement = group.ToDictionary(shape => shape.ConfigId,
-                    shape => CombatCylinderPipeline.Values(shape, tables).Select(value => ConfigNumber.Encode(value)).ToArray());
+                    shape => CombatCylinderPipeline.Values(shape, tables).Select(Quantize).ToArray());
                 var body = group.ToDictionary(shape => shape.ConfigId, shape =>
                 {
                     float[] values = CombatCylinderPipeline.BodyValues(shape, tables);
                     return values[0] > 0f
-                        ? values.Select(value => (int?)ConfigNumber.Encode(value)).ToArray()
-                        : new int?[] { null, null, null };
+                        ? values.Select(value => (float?)Quantize(value)).ToArray()
+                        : new float?[] { null, null, null };
                 });
                 string path = group.Key ? characterPath : monsterPath;
                 ConfigWorkbookWriter.Patch(path, CombatCylinderPipeline.MovementFields, movement);
@@ -88,7 +88,7 @@ namespace Roguelike.Features.Combat.Authoring.Editor
                 var hitEffect = group.Select(shape => new { shape.ConfigId, Values = CombatCylinderPipeline.HitEffectValues(shape, tables) })
                     .Where(item => item.Values.Length > 0)
                     .ToDictionary(item => item.ConfigId,
-                        item => item.Values.Select(value => (int?)ConfigNumber.Encode(value)).ToArray());
+                        item => item.Values.Select(value => (float?)Quantize(value)).ToArray());
                 if (hitEffect.Count > 0)
                     ConfigWorkbookWriter.PatchOptional(path, CombatCylinderPipeline.HitEffectFields, hitEffect);
                 foreach (CombatCylinderAuthoring shape in group)
@@ -105,9 +105,9 @@ namespace Roguelike.Features.Combat.Authoring.Editor
         /// <param name="visualUpdates">与单位共用的表现缩放更新集合。</param>
         private static void ExportSkills(Tables tables, string skillPath, Dictionary<int, int[]> visualUpdates)
         {
-            var projectile = new Dictionary<int, int[]>();
-            var area = new Dictionary<int, int[]>();
-            var visualPlacement = new Dictionary<int, int?[]>();
+            var projectile = new Dictionary<int, float[]>();
+            var area = new Dictionary<int, float[]>();
+            var visualPlacement = new Dictionary<int, float?[]>();
             foreach (SkillCollisionAuthoring shape in SkillCollisionPipeline.Shapes())
             {
                 SkillConfig skill = tables.TbSkill.Get(shape.SkillId);
@@ -115,7 +115,7 @@ namespace Roguelike.Features.Combat.Authoring.Editor
                     projectile.Add(skill.Id, SkillCollisionPipeline.Values(shape));
                 else if (skill.CombatProfileId_Ref?.DeliveryType == ESkillDeliveryType.TargetArea)
                     area.Add(skill.Id, SkillCollisionPipeline.AreaValues(shape));
-                int?[] placement = SkillCollisionPipeline.VisualPlacementValues(shape);
+                float?[] placement = SkillCollisionPipeline.VisualPlacementValues(shape);
                 if (placement.Any(value => value.HasValue)) visualPlacement.Add(skill.Id, placement);
                 AddVisualScale(visualUpdates, skill.VisualSetId, SkillCollisionPipeline.ScalePermille(shape));
             }
@@ -233,8 +233,8 @@ namespace Roguelike.Features.Combat.Authoring.Editor
         /// <param name="tables">提供像素比例、投递类型和旧范围半径的当前配置。</param>
         private static void MigrateLegacySkills(Tables tables)
         {
-            int[] rulesIds = tables.TbPerformanceScenario.DataList.Where(item => item.Kind == EPerformanceKind.Combat && item.CombatRulesId.HasValue)
-                .Select(item => item.CombatRulesId.Value).Distinct().ToArray();
+            int[] rulesIds = tables.TbPerformanceScenario.DataList.Where(item => item.Kind == EPerformanceKind.Combat)
+                .Select(item => item.CombatRulesId).Distinct().ToArray();
             if (rulesIds.Length != 1) throw new InvalidOperationException("迁移技能碰撞需要唯一战斗规则。");
             float pixelScale = tables.TbCombatRules.Get(rulesIds[0]).WorldUnitsPerPixel;
             foreach (string guid in AssetDatabase.FindAssets("t:Prefab", new[] { SkillCollisionPipeline.Root }))
@@ -280,9 +280,9 @@ namespace Roguelike.Features.Combat.Authoring.Editor
             return scale.x;
         }
 
-        /// <summary>把迁移结果量化到千分之一像素，保证重复导出稳定。</summary>
+        /// <summary>把迁移结果量化到三位小数像素，保证重复导出稳定。</summary>
         /// <param name="value">待量化像素值。</param>
         /// <returns>三位小数像素值。</returns>
-        private static float Quantize(float value) => ConfigNumber.Decode(ConfigNumber.Encode(value));
+        private static float Quantize(float value) => (float)Math.Round(value, 3, MidpointRounding.AwayFromZero);
     }
 }

@@ -37,7 +37,7 @@ namespace Roguelike.Tests
             ulong sequence = 1;
             foreach (var monster in definition.Monsters)
             {
-                Assert.That(session.TrySpawnMonster(monster, ConfigNumber.Decode(definition.Map.SpawnRadiusPixelsMilli),
+                Assert.That(session.TrySpawnMonster(monster, definition.Map.SpawnRadiusPixels,
                     sequence++, false, out int slot), Is.True);
                 var unit = session.ReadUnit(slot);
                 Assert.That(unit.ConfigId, Is.EqualTo(monster.Id));
@@ -49,11 +49,11 @@ namespace Roguelike.Tests
                     Is.EqualTo((float)new CombatAttributes(monster.AttributeProfileId_Ref)
                         .Get(EAttributeType.MoveSpeed) * definition.CombatRules.WorldUnitsPerPixel).Within(1e-6));
                 Assert.That(math.distance(unit.Position, session.ReadUnit(0).Position),
-                    Is.EqualTo(ConfigNumber.Decode(definition.Map.SpawnRadiusPixelsMilli) * definition.CombatRules.WorldUnitsPerPixel).Within(1e-5));
+                    Is.EqualTo(definition.Map.SpawnRadiusPixels * definition.CombatRules.WorldUnitsPerPixel).Within(1e-5));
             }
 
             Assert.That(session.TrySpawnMonster(definition.Boss.MonsterId_Ref,
-                ConfigNumber.Decode(definition.Boss.SpawnRadiusPixelsMilli), sequence, true, out int bossSlot), Is.True);
+                definition.Boss.SpawnRadiusPixels, sequence, true, out int bossSlot), Is.True);
             var boss = session.ReadUnit(bossSlot);
             Assert.That(boss.ConfigId, Is.EqualTo(definition.Boss.MonsterId));
             Assert.That(boss.IsBoss, Is.True);
@@ -61,23 +61,23 @@ namespace Roguelike.Tests
                 Is.EqualTo((float)new CombatAttributes(definition.Boss.MonsterId_Ref.AttributeProfileId_Ref)
                     .Get(EAttributeType.MoveSpeed) * definition.CombatRules.WorldUnitsPerPixel).Within(1e-6));
             Assert.Throws<InvalidOperationException>(() => session.TrySpawnMonster(definition.Boss.MonsterId_Ref,
-                ConfigNumber.Decode(definition.Boss.SpawnRadiusPixelsMilli), sequence + 1, true, out _));
+                definition.Boss.SpawnRadiusPixels, sequence + 1, true, out _));
         }
 
         /// <summary>两种技能共享同一机制时，表内各自半径必须传到正式 ECS 扫掠并改变擦边命中结果。</summary>
-        /// <param name="radiusPixelsMilli">TbSkill 像素半径千分整数。</param><param name="hit">横向间距为 0.4 的目标是否应命中。</param>
-        [TestCase(8000, false)]
-        [TestCase(40000, true)]
-        public void SkillRadiusControlsIndependentProjectileCollision(int radiusPixelsMilli, bool hit)
+        /// <param name="radiusPixels">TbSkill 直接像素半径。</param><param name="hit">横向间距为 0.4 的目标是否应命中。</param>
+        [TestCase(8f, false)]
+        [TestCase(40f, true)]
+        public void SkillRadiusControlsIndependentProjectileCollision(float radiusPixels, bool hit)
         {
             var tables = LoadTables(); var scenario = tables.TbPerformanceScenario.Get(4);
             var source = scenario.CharacterId_Ref.DefaultSkillId_Ref;
-            var skill = SkillWithCollision(source, radiusPixelsMilli, 0, 0);
+            var skill = SkillWithCollision(source, radiusPixels, 0, 0);
             scenario.CharacterId_Ref.DefaultSkillId_Ref = skill;
             Assert.That(skill.CombatProfileId_Ref, Is.SameAs(source.CombatProfileId_Ref));
             using var world = new World("Independent skill radius"); using var session = CreateSession(world, scenario);
             Assert.That(session.ReadUnit(0).ProjectileRadius,
-                Is.EqualTo(radiusPixelsMilli / 1000f * scenario.CombatRulesId_Ref.WorldUnitsPerPixel).Within(1e-6f));
+                Is.EqualTo(radiusPixels * scenario.CombatRulesId_Ref.WorldUnitsPerPixel).Within(1e-6f));
             for (int slot = 1; slot < session.UnitCount; slot++)
             {
                 var unit = session.ReadUnit(slot); unit.Position = new float2(2, 0); unit.MoveSpeed = 0; unit.Cooldown = 1000;
@@ -101,7 +101,7 @@ namespace Roguelike.Tests
         public void SkillOffsetRotatesAndParticipatesInSweep()
         {
             var tables = LoadTables(); var scenario = tables.TbPerformanceScenario.Get(4);
-            scenario.CharacterId_Ref.DefaultSkillId_Ref = SkillWithCollision(scenario.CharacterId_Ref.DefaultSkillId_Ref, 8000, 50000, 100000);
+            scenario.CharacterId_Ref.DefaultSkillId_Ref = SkillWithCollision(scenario.CharacterId_Ref.DefaultSkillId_Ref, 8f, 50f, 100f);
             using var world = new World("Skill local offset"); using var session = CreateSession(world, scenario);
             for (int slot = 1; slot < session.UnitCount; slot++)
             {
@@ -129,7 +129,7 @@ namespace Roguelike.Tests
             var tables = LoadTables();
             var scenario = tables.TbPerformanceScenario.Get(4);
             scenario.CharacterId_Ref.DefaultSkillId_Ref = SkillWithCollision(
-                scenario.CharacterId_Ref.DefaultSkillId_Ref, 35000, 0, 0);
+                scenario.CharacterId_Ref.DefaultSkillId_Ref, 35f, 0, 0);
             using var world = new World("Body offset projectile sweep");
             using var session = CreateSession(world, scenario);
             for (int slot = 1; slot < session.UnitCount; slot++)
@@ -158,26 +158,26 @@ namespace Roguelike.Tests
         }
 
         /// <summary>隔离配置测试通过生成的二进制协议创建技能变体，保留相同机制和视觉引用，不写源表。</summary>
-        /// <param name="source">实际 TbSkill 行。</param><param name="radius">像素半径千分整数。</param>
-        /// <param name="x">局部右向像素偏移千分整数。</param><param name="y">局部前向像素偏移千分整数。</param>
+        /// <param name="source">实际 TbSkill 行。</param><param name="radius">直接像素半径。</param>
+        /// <param name="x">局部右向直接像素偏移。</param><param name="y">局部前向直接像素偏移。</param>
         /// <returns>仅当前测试持有的技能配置。</returns>
-        private static SkillConfig SkillWithCollision(SkillConfig source, int radius, int x, int y)
+        private static SkillConfig SkillWithCollision(SkillConfig source, float radius, float x, float y)
         {
             var b = new ByteBuf(); b.WriteInt(source.Id); b.WriteString(source.Name); b.WriteInt(source.VisualSetId);
             b.WriteBool(true); b.WriteInt(source.CombatProfileId.Value);
-            b.WriteBool(true); b.WriteInt(radius); b.WriteBool(true); b.WriteInt(x); b.WriteBool(true); b.WriteInt(y);
+            b.WriteBool(true); b.WriteFloat(radius); b.WriteBool(true); b.WriteFloat(x); b.WriteBool(true); b.WriteFloat(y);
             b.WriteBool(source.ProjectileClipId.HasValue); if (source.ProjectileClipId.HasValue) b.WriteInt(source.ProjectileClipId.Value);
             b.WriteBool(source.ImpactClipId.HasValue); if (source.ImpactClipId.HasValue) b.WriteInt(source.ImpactClipId.Value);
             b.WriteSize(source.AreaClipIds.Count); foreach (int clipId in source.AreaClipIds) b.WriteInt(clipId);
-            b.WriteBool(source.AreaRadiusPixelsMilli.HasValue); if (source.AreaRadiusPixelsMilli.HasValue) b.WriteInt(source.AreaRadiusPixelsMilli.Value);
-            b.WriteBool(source.ProjectileVisualOffsetXPixelsMilli.HasValue); if (source.ProjectileVisualOffsetXPixelsMilli.HasValue) b.WriteInt(source.ProjectileVisualOffsetXPixelsMilli.Value);
-            b.WriteBool(source.ProjectileVisualOffsetYPixelsMilli.HasValue); if (source.ProjectileVisualOffsetYPixelsMilli.HasValue) b.WriteInt(source.ProjectileVisualOffsetYPixelsMilli.Value);
+            b.WriteBool(source.AreaRadiusPixels.HasValue); if (source.AreaRadiusPixels.HasValue) b.WriteFloat(source.AreaRadiusPixels.Value);
+            b.WriteBool(source.ProjectileVisualOffsetXPixels.HasValue); if (source.ProjectileVisualOffsetXPixels.HasValue) b.WriteFloat(source.ProjectileVisualOffsetXPixels.Value);
+            b.WriteBool(source.ProjectileVisualOffsetYPixels.HasValue); if (source.ProjectileVisualOffsetYPixels.HasValue) b.WriteFloat(source.ProjectileVisualOffsetYPixels.Value);
             b.WriteBool(source.ProjectileVisualScalePermille.HasValue); if (source.ProjectileVisualScalePermille.HasValue) b.WriteInt(source.ProjectileVisualScalePermille.Value);
-            b.WriteBool(source.ImpactVisualOffsetXPixelsMilli.HasValue); if (source.ImpactVisualOffsetXPixelsMilli.HasValue) b.WriteInt(source.ImpactVisualOffsetXPixelsMilli.Value);
-            b.WriteBool(source.ImpactVisualOffsetYPixelsMilli.HasValue); if (source.ImpactVisualOffsetYPixelsMilli.HasValue) b.WriteInt(source.ImpactVisualOffsetYPixelsMilli.Value);
+            b.WriteBool(source.ImpactVisualOffsetXPixels.HasValue); if (source.ImpactVisualOffsetXPixels.HasValue) b.WriteFloat(source.ImpactVisualOffsetXPixels.Value);
+            b.WriteBool(source.ImpactVisualOffsetYPixels.HasValue); if (source.ImpactVisualOffsetYPixels.HasValue) b.WriteFloat(source.ImpactVisualOffsetYPixels.Value);
             b.WriteBool(source.ImpactVisualScalePermille.HasValue); if (source.ImpactVisualScalePermille.HasValue) b.WriteInt(source.ImpactVisualScalePermille.Value);
-            b.WriteBool(source.AreaVisualOffsetXPixelsMilli.HasValue); if (source.AreaVisualOffsetXPixelsMilli.HasValue) b.WriteInt(source.AreaVisualOffsetXPixelsMilli.Value);
-            b.WriteBool(source.AreaVisualOffsetYPixelsMilli.HasValue); if (source.AreaVisualOffsetYPixelsMilli.HasValue) b.WriteInt(source.AreaVisualOffsetYPixelsMilli.Value);
+            b.WriteBool(source.AreaVisualOffsetXPixels.HasValue); if (source.AreaVisualOffsetXPixels.HasValue) b.WriteFloat(source.AreaVisualOffsetXPixels.Value);
+            b.WriteBool(source.AreaVisualOffsetYPixels.HasValue); if (source.AreaVisualOffsetYPixels.HasValue) b.WriteFloat(source.AreaVisualOffsetYPixels.Value);
             b.WriteBool(source.AreaVisualScalePermille.HasValue); if (source.AreaVisualScalePermille.HasValue) b.WriteInt(source.AreaVisualScalePermille.Value);
             return new SkillConfig(b)
             {
@@ -528,7 +528,7 @@ namespace Roguelike.Tests
             var tables = LoadTables();
             var scenario = tables.TbPerformanceScenario.Get(4);
             scenario.CharacterId_Ref.DefaultSkillId_Ref = SkillWithCollision(
-                scenario.CharacterId_Ref.DefaultSkillId_Ref, 35000, 0, 0);
+                scenario.CharacterId_Ref.DefaultSkillId_Ref, 35f, 0, 0);
             using var world = new World("Combat projectile sweep test");
             using var session = CreateSession(world, scenario);
             for (int slot = 1; slot < session.UnitCount; slot++)
@@ -608,7 +608,7 @@ namespace Roguelike.Tests
         {
             var scenario = LoadTables().TbPerformanceScenario.Get(4);
             scenario.CharacterId_Ref.DefaultSkillId_Ref = SkillWithCollision(
-                scenario.CharacterId_Ref.DefaultSkillId_Ref, 35000, 0, 0);
+                scenario.CharacterId_Ref.DefaultSkillId_Ref, 35f, 0, 0);
             using var world = new World("Combat simultaneous death test");
             using var session = CreateSession(world, scenario);
             var player = session.ReadUnit(0);
@@ -665,7 +665,7 @@ namespace Roguelike.Tests
             var tables = LoadTables();
             var scenario = tables.TbPerformanceScenario.Get(5);
             scenario.CharacterId_Ref.DefaultSkillId_Ref = SkillWithCollision(
-                scenario.CharacterId_Ref.DefaultSkillId_Ref, 35000, 0, 0);
+                scenario.CharacterId_Ref.DefaultSkillId_Ref, 35f, 0, 0);
             using var world = new World("Combat recycling test");
             using var session = CreateSession(world, scenario);
             var player = session.ReadUnit(0);
@@ -880,9 +880,9 @@ namespace Roguelike.Tests
         {
             var buffer = new ByteBuf();
             buffer.WriteInt(source.Id); buffer.WriteInt((int)source.DeliveryType);
-            buffer.WriteInt(source.BaseIntervalMilli); buffer.WriteInt(source.RangeMilli);
-            buffer.WriteBool(source.ProjectileSpeed.HasValue);
-            if (source.ProjectileSpeed.HasValue) buffer.WriteInt(source.ProjectileSpeedMilli.Value);
+            buffer.WriteInt(source.BaseIntervalMilli); buffer.WriteFloat(source.RangePixels);
+            buffer.WriteBool(source.ProjectileSpeedPixelsPerSecond.HasValue);
+            if (source.ProjectileSpeedPixelsPerSecond.HasValue) buffer.WriteFloat(source.ProjectileSpeedPixelsPerSecond.Value);
             buffer.WriteBool(source.ProjectileLifetime.HasValue);
             if (source.ProjectileLifetime.HasValue) buffer.WriteInt(source.ProjectileLifetimeMilli.Value);
             buffer.WriteBool(windup.HasValue);
@@ -976,7 +976,7 @@ namespace Roguelike.Tests
                 Path.Combine(Application.streamingAssetsPath, "Config", "Luban", name + ".bytes"))));
             // 既有近战/寻敌夹具需要出生即有固定目标；只修改测试内存副本，不改变正式场景 4。
             if (!timedSpawn)
-                foreach (string field in new[] { "SpawnRadiusPixelsMilli", "SpawnIntervalSecondsMilli", "SpawnBatchCount", "SpawnUnitIntervalSecondsMilli" })
+                foreach (string field in new[] { "SpawnRadiusPixels", "SpawnIntervalSecondsMilli", "SpawnBatchCount", "SpawnUnitIntervalSecondsMilli" })
                     typeof(PerformanceScenarioConfig).GetField(field).SetValue(tables.TbPerformanceScenario.Get(4), null);
             return tables;
         }

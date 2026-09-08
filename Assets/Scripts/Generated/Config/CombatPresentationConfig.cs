@@ -39,12 +39,12 @@ public sealed partial class CombatPresentationConfig : Luban.BeanBase
         StatusFormat = _buf.ReadString();
         DeadText = _buf.ReadString();
         HelpText = _buf.ReadString();
-        PanelWidthMilli = _buf.ReadInt();
-        PanelHeightMilli = _buf.ReadInt();
+        PanelWidthPixels = _buf.ReadFloat();
+        PanelHeightPixels = _buf.ReadFloat();
         FontSize = _buf.ReadInt();
-        CameraDepthMilli = _buf.ReadInt();
-        CameraNearMilli = _buf.ReadInt();
-        CameraFarMilli = _buf.ReadInt();
+        CameraDepthPixels = _buf.ReadFloat();
+        CameraNearPixels = _buf.ReadFloat();
+        CameraFarPixels = _buf.ReadFloat();
         BackgroundRMilli = _buf.ReadInt();
         BackgroundGMilli = _buf.ReadInt();
         BackgroundBMilli = _buf.ReadInt();
@@ -63,8 +63,8 @@ public sealed partial class CombatPresentationConfig : Luban.BeanBase
         UnitRenderQueue = _buf.ReadInt();
         SkillRenderQueue = _buf.ReadInt();
         FeedbackRenderQueue = _buf.ReadInt();
-        HealthBarWidthPixelsMilli = _buf.ReadInt();
-        HealthBarHeightPixelsMilli = _buf.ReadInt();
+        HealthBarWidthPixels = _buf.ReadFloat();
+        HealthBarHeightPixels = _buf.ReadFloat();
     }
 
     public static CombatPresentationConfig DeserializeCombatPresentationConfig(ByteBuf _buf)
@@ -151,29 +151,29 @@ public sealed partial class CombatPresentationConfig : Luban.BeanBase
     /// </summary>
     public readonly string HelpText;
     /// <summary>
-    /// 调试面板像素宽；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
+    /// 调试面板宽度，逻辑像素；直接填写像素值，最多3位小数。
     /// </summary>
-    public readonly int PanelWidthMilli;
+    public readonly float PanelWidthPixels;
     /// <summary>
-    /// 调试面板像素高；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
+    /// 调试面板高度，逻辑像素；直接填写像素值，最多3位小数。
     /// </summary>
-    public readonly int PanelHeightMilli;
+    public readonly float PanelHeightPixels;
     /// <summary>
     /// 调试文字字号
     /// </summary>
     public readonly int FontSize;
     /// <summary>
-    /// 相机距XY平面距离；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
+    /// 相机距XY平面距离，逻辑像素；直接填写像素值，最多3位小数。
     /// </summary>
-    public readonly int CameraDepthMilli;
+    public readonly float CameraDepthPixels;
     /// <summary>
-    /// 相机近裁面；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
+    /// 相机近裁面，逻辑像素；直接填写像素值，最多3位小数。
     /// </summary>
-    public readonly int CameraNearMilli;
+    public readonly float CameraNearPixels;
     /// <summary>
-    /// 相机远裁面；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
+    /// 相机远裁面，逻辑像素；直接填写像素值，最多3位小数。
     /// </summary>
-    public readonly int CameraFarMilli;
+    public readonly float CameraFarPixels;
     /// <summary>
     /// 背景红；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
     /// </summary>
@@ -248,13 +248,13 @@ public sealed partial class CombatPresentationConfig : Luban.BeanBase
     /// </summary>
     public readonly int FeedbackRenderQueue;
     /// <summary>
-    /// 战斗血条最终显示宽度；逻辑像素&#215;1000，由 CombatHealthBar Prefab 导出。
+    /// 战斗血条最终显示宽度；由 CombatHealthBar Prefab 导出，逻辑像素；直接填写像素值，最多3位小数。
     /// </summary>
-    public readonly int HealthBarWidthPixelsMilli;
+    public readonly float HealthBarWidthPixels;
     /// <summary>
-    /// 战斗血条最终显示高度；逻辑像素&#215;1000，由 CombatHealthBar Prefab 导出。
+    /// 战斗血条最终显示高度；由 CombatHealthBar Prefab 导出，逻辑像素；直接填写像素值，最多3位小数。
     /// </summary>
-    public readonly int HealthBarHeightPixelsMilli;
+    public readonly float HealthBarHeightPixels;
    
     public const int __ID__ = 600358192;
     public override int GetTypeId() => __ID__;
@@ -292,12 +292,12 @@ public sealed partial class CombatPresentationConfig : Luban.BeanBase
         + "statusFormat:" + StatusFormat + ","
         + "deadText:" + DeadText + ","
         + "helpText:" + HelpText + ","
-        + "panelWidthMilli:" + PanelWidthMilli + ","
-        + "panelHeightMilli:" + PanelHeightMilli + ","
+        + "panelWidthPixels:" + PanelWidthPixels + ","
+        + "panelHeightPixels:" + PanelHeightPixels + ","
         + "fontSize:" + FontSize + ","
-        + "cameraDepthMilli:" + CameraDepthMilli + ","
-        + "cameraNearMilli:" + CameraNearMilli + ","
-        + "cameraFarMilli:" + CameraFarMilli + ","
+        + "cameraDepthPixels:" + CameraDepthPixels + ","
+        + "cameraNearPixels:" + CameraNearPixels + ","
+        + "cameraFarPixels:" + CameraFarPixels + ","
         + "backgroundRMilli:" + BackgroundRMilli + ","
         + "backgroundGMilli:" + BackgroundGMilli + ","
         + "backgroundBMilli:" + BackgroundBMilli + ","
@@ -316,8 +316,8 @@ public sealed partial class CombatPresentationConfig : Luban.BeanBase
         + "unitRenderQueue:" + UnitRenderQueue + ","
         + "skillRenderQueue:" + SkillRenderQueue + ","
         + "feedbackRenderQueue:" + FeedbackRenderQueue + ","
-        + "healthBarWidthPixelsMilli:" + HealthBarWidthPixelsMilli + ","
-        + "healthBarHeightPixelsMilli:" + HealthBarHeightPixelsMilli + ","
+        + "healthBarWidthPixels:" + HealthBarWidthPixels + ","
+        + "healthBarHeightPixels:" + HealthBarHeightPixels + ","
         + "}";
     }
 }

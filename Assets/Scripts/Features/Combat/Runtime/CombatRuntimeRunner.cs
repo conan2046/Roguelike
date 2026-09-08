@@ -164,15 +164,17 @@ namespace Roguelike.Features.Combat.Runtime
         /// <remarks>不接管、修改或保存原场景相机。</remarks>
         private void CreateCamera()
         {
+            CombatRulesConfig rules = scenario != null ? scenario.CombatRulesId_Ref : runDefinition.CombatRules;
+            float worldUnitsPerPixel = rules.WorldUnitsPerPixel;
             var cameraObject = new GameObject("Combat Camera");
             cameraObject.transform.SetParent(transform, false);
             ViewCamera = cameraObject.AddComponent<Camera>();
             ViewCamera.orthographic = true;
             ViewCamera.clearFlags = CameraClearFlags.SolidColor;
             ViewCamera.backgroundColor = new Color(presentation.BackgroundR, presentation.BackgroundG, presentation.BackgroundB);
-            ViewCamera.nearClipPlane = presentation.CameraNear;
-            ViewCamera.farClipPlane = presentation.CameraFar;
-            ViewCamera.transform.localPosition = new Vector3(0, 0, -presentation.CameraDepth);
+            ViewCamera.nearClipPlane = presentation.CameraNearPixels * worldUnitsPerPixel;
+            ViewCamera.farClipPlane = presentation.CameraFarPixels * worldUnitsPerPixel;
+            ViewCamera.transform.localPosition = new Vector3(0, 0, -presentation.CameraDepthPixels * worldUnitsPerPixel);
             UpdateCameraFit();
             UpdateCameraFollow();
         }
@@ -185,8 +187,8 @@ namespace Roguelike.Features.Combat.Runtime
             if (scenario.MapId_Ref == null || scenario.CombatRulesId_Ref == null)
                 throw new InvalidOperationException("Combat scenario requires TbMap and TbCombatRules references.");
             _ = CombatMapDefinition.Create(scenario.MapId_Ref);
-            CombatMath.Positive(presentation.PanelWidth);
-            CombatMath.Positive(presentation.PanelHeight);
+            CombatMath.Positive(presentation.PanelWidthPixels);
+            CombatMath.Positive(presentation.PanelHeightPixels);
             CombatMath.Positive(presentation.FontSize);
             CombatMath.NonNegative(scenario.CameraPadding);
             if (string.IsNullOrWhiteSpace(presentation.Title) || string.IsNullOrWhiteSpace(presentation.StatusFormat) ||
@@ -200,10 +202,10 @@ namespace Roguelike.Features.Combat.Runtime
         /// <exception cref="InvalidOperationException">深度或裁剪面非法。</exception>
         private void ValidateCameraPresentation()
         {
-            CombatMath.Positive(presentation.CameraDepth);
-            CombatMath.Positive(presentation.CameraNear);
-            CombatMath.Positive(presentation.CameraFar);
-            if (presentation.CameraNear >= presentation.CameraDepth || presentation.CameraFar <= presentation.CameraDepth)
+            CombatMath.Positive(presentation.CameraDepthPixels);
+            CombatMath.Positive(presentation.CameraNearPixels);
+            CombatMath.Positive(presentation.CameraFarPixels);
+            if (presentation.CameraNearPixels >= presentation.CameraDepthPixels || presentation.CameraFarPixels <= presentation.CameraDepthPixels)
                 throw new InvalidOperationException("TbCombatPresentation: invalid camera clipping configuration.");
         }
 
@@ -288,7 +290,7 @@ namespace Roguelike.Features.Combat.Runtime
         }
 
         /// <summary>按 TbMap 配置的逻辑像素高度和当前屏幕宽高比计算正交视野。</summary>
-        /// <remarks>视口高度来自 TbMap.cameraViewportHeightPixels，像素到世界单位比例来自 TbCombatRules.worldUnitsPerPixelMilli；横向视野由 Camera.aspect 自动适配。</remarks>
+        /// <remarks>视口高度来自 TbMap.cameraViewportHeightPixels，像素到世界单位比例来自 TbCombatRules.worldUnitsPerPixel；横向视野由 Camera.aspect 自动适配。</remarks>
         private void UpdateCameraFit()
         {
             MapConfig map = scenario != null ? scenario.MapId_Ref : runDefinition.Map;
@@ -309,7 +311,7 @@ namespace Roguelike.Features.Combat.Runtime
             float viewportHalfHeight = ViewCamera.orthographicSize;
             float x = ClampCameraAxis(player.Position.x, mapHalfWidth, viewportHalfWidth);
             float y = ClampCameraAxis(player.Position.y, mapHalfHeight, viewportHalfHeight);
-            ViewCamera.transform.localPosition = new Vector3(x, y, -presentation.CameraDepth);
+            ViewCamera.transform.localPosition = new Vector3(x, y, -presentation.CameraDepthPixels * rules.WorldUnitsPerPixel);
         }
 
         /// <summary>将单轴相机中心限制在地图内；当视口大于地图时固定在地图中心。</summary>
@@ -399,7 +401,7 @@ namespace Roguelike.Features.Combat.Runtime
                 labelStyle = new GUIStyle(GUI.skin.label) { fontSize = presentation.FontSize, wordWrap = true };
                 buttonStyle = new GUIStyle(GUI.skin.button) { fontSize = presentation.FontSize };
             }
-            GUILayout.BeginArea(new Rect(0, 0, presentation.PanelWidth, presentation.PanelHeight), GUI.skin.box);
+            GUILayout.BeginArea(new Rect(0, 0, presentation.PanelWidthPixels, presentation.PanelHeightPixels), GUI.skin.box);
             GUILayout.Label(presentation.Title, labelStyle);
             GUILayout.Label(status, labelStyle);
             GUILayout.Label(Session.Statistics.PlayerDead ? presentation.DeadText : presentation.HelpText, labelStyle);

@@ -14,17 +14,17 @@ using Debug = UnityEngine.Debug;
 
 namespace Roguelike.Features.Combat.Authoring.Editor
 {
-    /// <summary>按 TbSkill 生成编辑预制体，将圆形节点导出为 Luban 千分整数；保持现有角色怪物资产。</summary>
+    /// <summary>按 TbSkill 生成编辑预制体，将圆形节点导出为 Luban 直接像素浮点值；保持现有角色怪物资产。</summary>
     public static class SkillCollisionPipeline
     {
         public const string Root = "Assets/Prefabs/Combat/Skill";
-        internal static readonly string[] ProjectileFields = { "projectileRadiusPixelsMilli", "projectileOffsetXPixelsMilli", "projectileOffsetYPixelsMilli" };
-        internal static readonly string[] AreaFields = { "areaRadiusPixelsMilli" };
+        internal static readonly string[] ProjectileFields = { "projectileRadiusPixels", "projectileOffsetXPixels", "projectileOffsetYPixels" };
+        internal static readonly string[] AreaFields = { "areaRadiusPixels" };
         internal static readonly string[] VisualPlacementFields =
         {
-            "projectileVisualOffsetXPixelsMilli", "projectileVisualOffsetYPixelsMilli", "projectileVisualScalePermille",
-            "impactVisualOffsetXPixelsMilli", "impactVisualOffsetYPixelsMilli", "impactVisualScalePermille",
-            "areaVisualOffsetXPixelsMilli", "areaVisualOffsetYPixelsMilli", "areaVisualScalePermille"
+            "projectileVisualOffsetXPixels", "projectileVisualOffsetYPixels", "projectileVisualScalePermille",
+            "impactVisualOffsetXPixels", "impactVisualOffsetYPixels", "impactVisualScalePermille",
+            "areaVisualOffsetXPixels", "areaVisualOffsetYPixels", "areaVisualScalePermille"
         };
         /// <summary>缩放写入 TbVisualSet 而非 TbSkill；与半径字段分表导出，避免相互覆盖或重复烘焙。</summary>
         public static readonly string[] VisualFields = { "scalePermille" };
@@ -63,7 +63,7 @@ namespace Roguelike.Features.Combat.Authoring.Editor
                 throw new InvalidOperationException("技能纹理解码失败: " + skill.Id);
             var mesh = AniMeshFactory.CreateFrame(AniFrameLayout.Build(data, 0, 0, texture.width, texture.height), rules.WorldUnitsPerPixel * skill.VisualSetId_Ref.ScalePermille / 1000f);
             mesh.name = skill.Name + " first frame";
-            float previewRadiusPixels = ConfigNumber.Decode(ConfigNumber.Encode(mesh.bounds.size.x / (2 * rules.WorldUnitsPerPixel)));
+            float previewRadiusPixels = QuantizePixels(mesh.bounds.size.x / (2 * rules.WorldUnitsPerPixel));
             UnityEngine.Object.DestroyImmediate(texture);
             UnityEngine.Object.DestroyImmediate(mesh);
             var root = new GameObject(skill.Name);
@@ -99,12 +99,11 @@ namespace Roguelike.Features.Combat.Authoring.Editor
             return result;
         }
 
-        /// <summary>导出或校验时将像素编辑尺寸量化为 TbSkill 的弹丸半径与偏移千分整数。</summary>
+        /// <summary>导出或校验时将像素编辑尺寸量化为 TbSkill 的三位小数直接像素值。</summary>
         /// <param name="shape">根节点直接子级的弹丸命中组件。</param>
         /// <returns>半径、横向偏移、前向偏移，与 ProjectileFields 顺序一致。</returns>
         /// <exception cref="InvalidOperationException">旋转、缩放、高度、根位置或半径不符合圆形协议。</exception>
-        /// <exception cref="OverflowException">数值非有限或超过千分整数范围。</exception>
-        public static int[] Values(SkillCollisionAuthoring shape)
+        public static float[] Values(SkillCollisionAuthoring shape)
         {
             var node = shape.transform; var root = node.parent;
             if (root == null || root.parent != null || root.localPosition != Vector3.zero ||
@@ -122,16 +121,16 @@ namespace Roguelike.Features.Combat.Authoring.Editor
                 : ((Vector2)node.localPosition + circle.offset) * rootScale / scale;
             if (circle != null && !circle.isTrigger)
                 throw new InvalidOperationException("技能 CircleCollider2D 必须启用 Is Trigger。");
-            int radius = ConfigNumber.Encode(radiusPixels);
+            float radius = QuantizePixels(radiusPixels);
             if (radius <= 0) throw new InvalidOperationException("技能半径量化后必须大于零。");
-            return new[] { radius, ConfigNumber.Encode(offsetPixels.x), ConfigNumber.Encode(offsetPixels.y) };
+            return new[] { radius, QuantizePixels(offsetPixels.x), QuantizePixels(offsetPixels.y) };
         }
 
-        /// <summary>将范围技能像素半径量化为配置千分整数。</summary>
+        /// <summary>将范围技能像素半径量化为配置三位小数直接像素值。</summary>
         /// <param name="shape">范围技能命中组件。</param>
-        /// <returns>仅包含范围半径的整数数组。</returns>
+        /// <returns>仅包含范围半径的浮点数组。</returns>
         /// <exception cref="InvalidOperationException">节点用途错误或半径非法。</exception>
-        public static int[] AreaValues(SkillCollisionAuthoring shape)
+        public static float[] AreaValues(SkillCollisionAuthoring shape)
         {
             if (shape.Kind != SkillCollisionAuthoring.CollisionKind.TargetArea)
                 throw new InvalidOperationException("该节点不是范围技能命中范围。");
@@ -141,7 +140,7 @@ namespace Roguelike.Features.Combat.Authoring.Editor
             float radiusPixels = circle == null
                 ? shape.RadiusPixels
                 : circle.radius * UniformRootScale(shape.transform.parent) / SkillCollisionEditor.PixelScale();
-            int radius = ConfigNumber.Encode(radiusPixels);
+            float radius = QuantizePixels(radiusPixels);
             if (radius <= 0) throw new InvalidOperationException("范围技能半径量化后必须大于零。");
             return new[] { radius };
         }
@@ -173,13 +172,13 @@ namespace Roguelike.Features.Combat.Authoring.Editor
 
         /// <summary>读取技能根节点下三类表现节点，换算为 TbSkill 的偏移像素与相对缩放。</summary>
         /// <param name="shape">同一技能 Prefab 的碰撞组件。</param>
-        /// <returns>与 VisualPlacementFields 顺序一致的九个可空整数。</returns>
+        /// <returns>与 VisualPlacementFields 顺序一致的九个可空数值；偏移为像素，缩放仍为千分比整数。</returns>
         /// <exception cref="InvalidOperationException">节点重复、层级、旋转、Z 偏移或非等比缩放不符合协议。</exception>
-        public static int?[] VisualPlacementValues(SkillCollisionAuthoring shape)
+        public static float?[] VisualPlacementValues(SkillCollisionAuthoring shape)
         {
             Transform root = shape.transform.parent;
             if (root == null) throw new InvalidOperationException("技能碰撞节点缺少根节点。");
-            var result = new int?[VisualPlacementFields.Length];
+            var result = new float?[VisualPlacementFields.Length];
             var seen = new HashSet<SkillVisualPlacementAuthoring.VisualKind>();
             float pixelScale = SkillCollisionEditor.PixelScale();
             float rootScale = root.localScale.x;
@@ -198,11 +197,22 @@ namespace Roguelike.Features.Combat.Authoring.Editor
                 Vector2 runtimeOffset = placement.Kind == SkillVisualPlacementAuthoring.VisualKind.Projectile
                     ? new Vector2(authoredOffset.y, -authoredOffset.x)
                     : authoredOffset;
-                result[index] = ConfigNumber.Encode(runtimeOffset.x);
-                result[index + 1] = ConfigNumber.Encode(runtimeOffset.y);
+                result[index] = QuantizePixels(runtimeOffset.x);
+                result[index + 1] = QuantizePixels(runtimeOffset.y);
                 result[index + 2] = ConfigNumber.Encode(scale.x);
             }
             return result;
+        }
+
+        /// <summary>将像素值稳定量化到表允许的三位小数。</summary>
+        /// <param name="value">Prefab 几何换算后的像素值。</param>
+        /// <returns>可直接写入 Luban float 字段的像素值。</returns>
+        /// <exception cref="InvalidOperationException">值不是有限数。</exception>
+        private static float QuantizePixels(float value)
+        {
+            if (float.IsNaN(value) || float.IsInfinity(value))
+                throw new InvalidOperationException("技能像素值必须为有限数。");
+            return (float)Math.Round(value, 3, MidpointRounding.AwayFromZero);
         }
 
         /// <summary>菜单将已保存的弹丸技能节点写入源表并生成 Luban，非弹丸与目录条目保持空碰撞配置。</summary>
@@ -220,23 +230,23 @@ namespace Roguelike.Features.Combat.Authoring.Editor
                 var skill = tables.TbSkill.Get(shape.SkillId); found.Add(skill.Id);
                 if (skill.CombatProfileId_Ref?.DeliveryType == ESkillDeliveryType.Projectile)
                 {
-                    var expected = new[] { skill.ProjectileRadiusPixelsMilli, skill.ProjectileOffsetXPixelsMilli, skill.ProjectileOffsetYPixelsMilli };
+                    var expected = new[] { skill.ProjectileRadiusPixels, skill.ProjectileOffsetXPixels, skill.ProjectileOffsetYPixels };
                     var actual = Values(shape);
                     for (int i = 0; i < actual.Length; i++)
-                        if (!expected[i].HasValue || actual[i] != expected[i].Value) throw new InvalidOperationException("技能尚未导出: " + skill.Id + "/" + ProjectileFields[i]);
+                        if (!expected[i].HasValue || Mathf.Abs(actual[i] - expected[i].Value) > 0.00051f) throw new InvalidOperationException("技能尚未导出: " + skill.Id + "/" + ProjectileFields[i]);
                 }
                 else if (skill.CombatProfileId_Ref?.DeliveryType == ESkillDeliveryType.TargetArea)
                 {
-                    int[] actual = AreaValues(shape);
-                    if (!skill.AreaRadiusPixelsMilli.HasValue || actual[0] != skill.AreaRadiusPixelsMilli.Value)
+                    float[] actual = AreaValues(shape);
+                    if (!skill.AreaRadiusPixels.HasValue || Mathf.Abs(actual[0] - skill.AreaRadiusPixels.Value) > 0.00051f)
                         throw new InvalidOperationException("技能尚未导出: " + skill.Id + "/" + AreaFields[0]);
                 }
-                int?[] placementActual = VisualPlacementValues(shape);
-                int?[] placementExpected =
+                float?[] placementActual = VisualPlacementValues(shape);
+                float?[] placementExpected =
                 {
-                    skill.ProjectileVisualOffsetXPixelsMilli, skill.ProjectileVisualOffsetYPixelsMilli, skill.ProjectileVisualScalePermille,
-                    skill.ImpactVisualOffsetXPixelsMilli, skill.ImpactVisualOffsetYPixelsMilli, skill.ImpactVisualScalePermille,
-                    skill.AreaVisualOffsetXPixelsMilli, skill.AreaVisualOffsetYPixelsMilli, skill.AreaVisualScalePermille
+                    skill.ProjectileVisualOffsetXPixels, skill.ProjectileVisualOffsetYPixels, skill.ProjectileVisualScalePermille,
+                    skill.ImpactVisualOffsetXPixels, skill.ImpactVisualOffsetYPixels, skill.ImpactVisualScalePermille,
+                    skill.AreaVisualOffsetXPixels, skill.AreaVisualOffsetYPixels, skill.AreaVisualScalePermille
                 };
                 for (int i = 0; i < placementActual.Length; i++)
                     if (placementActual[i] != placementExpected[i])

@@ -22,7 +22,7 @@ public sealed partial class BossEncounterConfig : Luban.BeanBase
         Id = _buf.ReadInt();
         MonsterId = _buf.ReadInt();
         MonsterId_Ref = null;
-        SpawnRadiusPixelsMilli = _buf.ReadInt();
+        SpawnRadiusPixels = _buf.ReadFloat();
         HealthBarText = _buf.ReadString();
         VictoryOnDeath = _buf.ReadBool();
     }
@@ -42,9 +42,9 @@ public sealed partial class BossEncounterConfig : Luban.BeanBase
     public readonly int MonsterId;
     public MonsterConfig MonsterId_Ref;
     /// <summary>
-    /// 相对玩家生成半径，逻辑像素乘1000
+    /// 相对玩家生成半径，逻辑像素；直接填写像素值，最多3位小数。
     /// </summary>
-    public readonly int SpawnRadiusPixelsMilli;
+    public readonly float SpawnRadiusPixels;
     /// <summary>
     /// Boss血条名称
     /// </summary>
@@ -67,7 +67,7 @@ public sealed partial class BossEncounterConfig : Luban.BeanBase
         return "{ "
         + "id:" + Id + ","
         + "monsterId:" + MonsterId + ","
-        + "spawnRadiusPixelsMilli:" + SpawnRadiusPixelsMilli + ","
+        + "spawnRadiusPixels:" + SpawnRadiusPixels + ","
         + "healthBarText:" + HealthBarText + ","
         + "victoryOnDeath:" + VictoryOnDeath + ","
         + "}";

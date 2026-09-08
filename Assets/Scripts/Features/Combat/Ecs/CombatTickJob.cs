@@ -259,7 +259,7 @@ namespace Roguelike.Features.Combat.Ecs
         /// <summary>锁定最近目标当前位置，对配置半径内每个敌方生命周期生成一次同序号伤害请求。</summary>
         /// <param name="player">释放者阵营和身体数据。</param>
         /// <param name="target">触发时锁定的最近合法目标。</param>
-        /// <param name="weapon">TbSkill.areaRadiusPixelsMilli 换算后的范围技能。</param>
+        /// <param name="weapon">TbSkill.areaRadiusPixels 入局换算后的范围技能。</param>
         /// <param name="attack">所有受击者共享的单次释放快照。</param>
         /// <param name="counters">范围释放统计。</param>
         /// <remarks>目标随后死亡或池槽复用时由请求中的 TargetLifetime 拒绝陈旧结算。</remarks>

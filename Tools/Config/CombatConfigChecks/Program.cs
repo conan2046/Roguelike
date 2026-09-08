@@ -101,6 +101,7 @@ internal static class Program
             ValidateActor(actor.AttributeProfileId, actor.AttributeProfileId_Ref, actor.DefaultSkillId, actor.DefaultSkillId_Ref, $"TbCharacter {actor.Id}");
             ValidateBody(actor.BodyRadiusPixels, actor.BodyOffsetXPixels, actor.BodyOffsetYPixels, $"TbCharacter {actor.Id}");
             ValidateCylinder(actor.MoveRadiusPixels, actor.MoveHeightPixels, actor.MoveOffsetXPixels, actor.MoveOffsetYPixels, actor.MoveElevationPixels);
+            Require(Positive(actor.DamageFloatHeightPixels), $"TbCharacter {actor.Id}: damage float height missing.");
             var tiers = tables.TbHeroWeapon.DataList.Where(w => w.CharacterId == actor.Id).OrderBy(w => w.Tier).ToArray();
             Require(tiers.Length == 5 && tiers.Select(w => w.Tier).SequenceEqual(Enumerable.Range(0, 5)), "Hero requires exactly five distinct weapon tiers.");
             Require(tiers[0].IntegratedInBody && tiers[0].VisualSetId == actor.VisualSetId && tiers.Skip(1).All(w => !w.IntegratedInBody), "Only weapon tier zero is integrated in the body.");
@@ -112,6 +113,7 @@ internal static class Program
             ValidateActor(actor.AttributeProfileId, actor.AttributeProfileId_Ref, actor.DefaultSkillId, actor.DefaultSkillId_Ref, $"TbMonster {actor.Id}");
             ValidateBody(actor.BodyRadiusPixels, actor.BodyOffsetXPixels, actor.BodyOffsetYPixels, $"TbMonster {actor.Id}");
             ValidateCylinder(actor.MoveRadiusPixels, actor.MoveHeightPixels, actor.MoveOffsetXPixels, actor.MoveOffsetYPixels, actor.MoveElevationPixels);
+            Require(Positive(actor.DamageFloatHeightPixels), $"TbMonster {actor.Id}: damage float height missing.");
         }
         foreach (var skill in tables.TbSkill.DataList)
         {
@@ -125,7 +127,7 @@ internal static class Program
                         $"TbSkill {skill.Id}: missing projectile visual.");
                     Require(!skill.ImpactClipId.HasValue || skill.ImpactClipId_Ref?.Action == EAnimationAction.Impact,
                         $"TbSkill {skill.Id}: invalid impact visual.");
-                    Require(skill.AreaClipIds.Count == 0 && !skill.AreaRadiusPixelsMilli.HasValue,
+                    Require(skill.AreaClipIds.Count == 0 && !skill.AreaRadiusPixels.HasValue,
                         $"TbSkill {skill.Id}: projectile has target-area data.");
                     break;
                 case ESkillDeliveryType.TargetArea:
@@ -133,34 +135,34 @@ internal static class Program
                         $"TbSkill {skill.Id}: target area has projectile collision.");
                     Require(!skill.ProjectileClipId.HasValue && !skill.ImpactClipId.HasValue,
                         $"TbSkill {skill.Id}: target area has projectile visuals.");
-                    Require(skill.AreaRadiusPixelsMilli > 0 && skill.AreaClipIds.Count > 0 &&
+                    Require(skill.AreaRadiusPixels > 0 && skill.AreaClipIds.Count > 0 &&
                         skill.AreaClipIds_Ref.All(x => x?.Action == EAnimationAction.Area),
                         $"TbSkill {skill.Id}: missing target-area radius or visuals.");
                     break;
                 default:
                     Require(!skill.ProjectileRadiusPixels.HasValue && !skill.ProjectileOffsetXPixels.HasValue && !skill.ProjectileOffsetYPixels.HasValue &&
-                        !skill.ProjectileClipId.HasValue && !skill.ImpactClipId.HasValue && skill.AreaClipIds.Count == 0 && !skill.AreaRadiusPixelsMilli.HasValue,
+                        !skill.ProjectileClipId.HasValue && !skill.ImpactClipId.HasValue && skill.AreaClipIds.Count == 0 && !skill.AreaRadiusPixels.HasValue,
                         $"TbSkill {skill.Id}: inactive or melee skill has delivery-specific data.");
                     break;
             }
         }
         foreach (var skill in tables.TbSkillCombat.DataList)
         {
-            Require(float.IsFinite(skill.BaseInterval) && skill.BaseInterval > 0 && float.IsFinite(skill.Range) && skill.Range >= 0, $"TbSkillCombat {skill.Id}: invalid interval/range.");
+            Require(float.IsFinite(skill.BaseInterval) && skill.BaseInterval > 0 && float.IsFinite(skill.RangePixels) && skill.RangePixels >= 0, $"TbSkillCombat {skill.Id}: invalid interval/range.");
             switch (skill.DeliveryType)
             {
                 case ESkillDeliveryType.Projectile:
-                    Require(Positive(skill.ProjectileSpeed) && Positive(skill.ProjectileLifetime), $"TbSkillCombat {skill.Id}: missing projectile dimensions.");
-                    Require(skill.ProjectileSpeed * skill.ProjectileLifetime >= skill.Range, $"TbSkillCombat {skill.Id}: projectile cannot cover range.");
+                    Require(Positive(skill.ProjectileSpeedPixelsPerSecond) && Positive(skill.ProjectileLifetime), $"TbSkillCombat {skill.Id}: missing projectile dimensions.");
+                    Require(skill.ProjectileSpeedPixelsPerSecond * skill.ProjectileLifetime >= skill.RangePixels, $"TbSkillCombat {skill.Id}: projectile cannot cover range.");
                     Require(!skill.AttackWindupSeconds.HasValue, $"TbSkillCombat {skill.Id}: projectile has melee windup.");
                     break;
                 case ESkillDeliveryType.Melee:
                     Require(skill.AttackWindupSeconds.HasValue && float.IsFinite(skill.AttackWindupSeconds.Value) && skill.AttackWindupSeconds.Value >= 0,
                         $"TbSkillCombat {skill.Id}: missing or invalid attack windup.");
-                    Require(!skill.ProjectileSpeed.HasValue && !skill.ProjectileLifetime.HasValue, $"TbSkillCombat {skill.Id}: melee has projectile data.");
+                    Require(!skill.ProjectileSpeedPixelsPerSecond.HasValue && !skill.ProjectileLifetime.HasValue, $"TbSkillCombat {skill.Id}: melee has projectile data.");
                     break;
                 case ESkillDeliveryType.TargetArea:
-                    Require(!skill.ProjectileSpeed.HasValue && !skill.ProjectileLifetime.HasValue && !skill.AttackWindupSeconds.HasValue,
+                    Require(!skill.ProjectileSpeedPixelsPerSecond.HasValue && !skill.ProjectileLifetime.HasValue && !skill.AttackWindupSeconds.HasValue,
                         $"TbSkillCombat {skill.Id}: target area has incompatible delivery data.");
                     break;
                 default:
@@ -270,7 +272,7 @@ internal static class Program
         var boss = stageRule.BossEncounterId_Ref;
         Require(boss.MonsterId == 10032 && boss.MonsterId_Ref?.AttributeProfileId == 9 &&
             boss.MonsterId_Ref.DefaultSkillId == 20002 && boss.MonsterId_Ref.MovementType == EMovementType.Ground &&
-            boss.SpawnRadiusPixelsMilli > 0 && !string.IsNullOrWhiteSpace(boss.HealthBarText) && boss.VictoryOnDeath,
+            boss.SpawnRadiusPixels > 0 && !string.IsNullOrWhiteSpace(boss.HealthBarText) && boss.VictoryOnDeath,
             "TbBossEncounter 1: approved boss contract changed.");
 
         var experienceLevels = tables.TbExperienceLevel.DataList
@@ -281,8 +283,8 @@ internal static class Program
             "TbExperienceLevel group 1: levels 2-20 require a strictly increasing curve.");
 
         var drop = stageRule.DropProfileId_Ref;
-        Require(drop.ExperienceItemId_Ref != null && drop.ExperienceValue > 0 && drop.MagnetRadiusMilli > 0 &&
-            drop.PickupRadiusMilli > 0 && drop.PickupRadiusMilli <= drop.MagnetRadiusMilli && drop.MagnetSpeedMilli > 0,
+        Require(drop.ExperienceItemId_Ref != null && drop.ExperienceValue > 0 && drop.MagnetRadiusPixels > 0 &&
+            drop.PickupRadiusPixels > 0 && drop.PickupRadiusPixels <= drop.MagnetRadiusPixels && drop.MagnetSpeedPixelsPerSecond > 0,
             "TbDropProfile 1: invalid experience pickup contract.");
 
         var pool = stageRule.UpgradePoolId_Ref;
@@ -324,7 +326,9 @@ internal static class Program
         {
             if (scenario.Kind != EPerformanceKind.Combat)
             {
-                Require(!scenario.CombatRulesId.HasValue && !scenario.CharacterId.HasValue && !scenario.PlayerHealthPolicy.HasValue, $"Old scenario {scenario.Id}: combat values leaked.");
+                Require(scenario.CombatRulesId_Ref != null && Positive(scenario.CombatRulesId_Ref.WorldUnitsPerPixel) &&
+                    !scenario.CharacterId.HasValue && !scenario.PlayerHealthPolicy.HasValue,
+                    $"Performance scenario {scenario.Id}: pixel scale missing or combat values leaked.");
                 continue;
             }
             Require(scenario.CombatRulesId_Ref != null && scenario.CharacterId_Ref != null && scenario.CharacterProfileOverrideId_Ref != null && scenario.MonsterProfileOverrideId_Ref != null, $"Combat scenario {scenario.Id}: references missing.");

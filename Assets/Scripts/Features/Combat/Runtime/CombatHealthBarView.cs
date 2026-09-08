@@ -33,8 +33,8 @@ namespace Roguelike.Features.Combat.Runtime
 
         /// <summary>构建正式调参 Prefab 时绑定表现 ID、像素尺寸和内部 UI 节点。</summary>
         /// <param name="configuredPresentationId">对应的 TbCombatPresentation.id。</param>
-        /// <param name="configuredWidthPixels">TbCombatPresentation.healthBarWidthPixelsMilli 解码后的逻辑像素宽度。</param>
-        /// <param name="configuredHeightPixels">TbCombatPresentation.healthBarHeightPixelsMilli 解码后的逻辑像素高度。</param>
+        /// <param name="configuredWidthPixels">TbCombatPresentation.healthBarWidthPixels 直接像素宽度。</param>
+        /// <param name="configuredHeightPixels">TbCombatPresentation.healthBarHeightPixels 直接像素高度。</param>
         /// <param name="configuredCanvasRoot">只负责显示换算的 World Space Canvas。</param>
         /// <param name="configuredFill">左对齐的当前血量填充节点。</param>
         /// <remarks>只由编辑器构建器调用；运行时 DOTS 不实例化该 Prefab。</remarks>
@@ -50,7 +50,7 @@ namespace Roguelike.Features.Combat.Runtime
         }
 
         /// <summary>把当前像素字段同步到内部画布，并按预览生命比例刷新填充。</summary>
-        /// <param name="sceneUnitsPerPixel">TbCombatRules.worldUnitsPerPixelMilli 解码值，仅用于编辑器把像素画到场景。</param>
+        /// <param name="sceneUnitsPerPixel">TbCombatRules.worldUnitsPerPixel 直接比例值，仅用于编辑器把像素画到场景。</param>
         /// <exception cref="InvalidOperationException">像素尺寸、换算比例或内部节点绑定无效时抛出。</exception>
         /// <remarks>根节点始终保持 Scale=1；场景显示换算封装在“显示画布（自动像素换算勿改）”子节点，不写入玩法配置。</remarks>
         public void ApplyPreview(float sceneUnitsPerPixel)

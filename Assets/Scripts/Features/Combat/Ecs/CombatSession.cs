@@ -735,14 +735,15 @@ namespace Roguelike.Features.Combat.Ecs
         {
             SkillCombatConfig combat = skillConfig?.CombatProfileId_Ref ??
                 throw new InvalidOperationException("Formal player weapon requires TbSkillCombat.");
-            CombatMath.NonNegative(combat.Range);
+            float range = combat.RangePixels * rules.WorldUnitsPerPixel;
+            CombatMath.NonNegative(range);
             CombatMath.Positive(combat.BaseInterval);
             var weapon = new CombatWeaponState
             {
                 Attack = attack,
                 SkillId = skillConfig.Id,
                 Delivery = combat.DeliveryType,
-                Range = combat.Range,
+                Range = range,
                 BaseInterval = combat.BaseInterval,
                 Interval = CombatMath.AttackInterval(combat.BaseInterval,
                     new CombatAttributes(settings.CharacterProfile).Get(EAttributeType.AttackSpeedMultiplier),
@@ -751,14 +752,15 @@ namespace Roguelike.Features.Combat.Ecs
             };
             if (combat.DeliveryType == ESkillDeliveryType.Projectile)
             {
-                if (!combat.ProjectileSpeed.HasValue || !combat.ProjectileLifetime.HasValue ||
+                if (!combat.ProjectileSpeedPixelsPerSecond.HasValue || !combat.ProjectileLifetime.HasValue ||
                     !skillConfig.ProjectileRadiusPixels.HasValue || !skillConfig.ProjectileOffsetXPixels.HasValue ||
                     !skillConfig.ProjectileOffsetYPixels.HasValue)
                     throw new InvalidOperationException($"TbSkill {skillConfig.Id}: incomplete projectile weapon.");
-                CombatMath.Positive(combat.ProjectileSpeed.Value);
+                float projectileSpeed = combat.ProjectileSpeedPixelsPerSecond.Value * rules.WorldUnitsPerPixel;
+                CombatMath.Positive(projectileSpeed);
                 CombatMath.Positive(combat.ProjectileLifetime.Value);
                 CombatMath.Positive(skillConfig.ProjectileRadiusPixels.Value);
-                weapon.ProjectileSpeed = combat.ProjectileSpeed.Value;
+                weapon.ProjectileSpeed = projectileSpeed;
                 weapon.ProjectileLifetime = combat.ProjectileLifetime.Value;
                 weapon.ProjectileRadius = skillConfig.ProjectileRadiusPixels.Value * rules.WorldUnitsPerPixel;
                 weapon.ProjectileOffset = new float2(skillConfig.ProjectileOffsetXPixels.Value,
@@ -775,7 +777,7 @@ namespace Roguelike.Features.Combat.Ecs
         /// <summary>入局时将 TbAttributeProfile、TbSkillCombat 与身体半径转为非托管模板，并把移动速度由逻辑像素换算到模拟坐标。</summary>
         /// <param name="profile">完整属性方案。</param>
         /// <param name="skillConfig">TbSkill 技能，碰撞半径与偏移独立于其 TbSkillCombat 引用。</param>
-        /// <param name="radius">TbCharacter/TbMonster.bodyRadiusPixelsMilli 换算后的模拟半径。</param>
+        /// <param name="radius">TbCharacter/TbMonster.bodyRadiusPixels 换算后的模拟半径。</param>
         /// <param name="bodyOffset">TbCharacter/TbMonster 受击中心像素偏移换算后的模拟偏移。</param>
         /// <param name="hitEffectOffset">TbCharacter/TbMonster 命中特效挂点像素偏移换算后的模拟偏移。</param>
         /// <param name="movement">TbCharacter/TbMonster 导出的独立移动圆柱。</param>
@@ -788,19 +790,20 @@ namespace Roguelike.Features.Combat.Ecs
         {
             var skill = skillConfig.CombatProfileId_Ref ?? throw new InvalidOperationException("Missing skill combat profile.");
             var attributes = new CombatAttributes(profile);
+            float range = skill.RangePixels * rules.WorldUnitsPerPixel;
             CombatMath.Positive(radius);
             if (!math.all(math.isfinite(position)) || !math.all(math.isfinite(bodyOffset)) || !math.all(math.isfinite(hitEffectOffset)) ||
                 math.abs(position.x + bodyOffset.x) + radius > settings.Arena.x ||
                 math.abs(position.y + bodyOffset.y) + radius > settings.Arena.y)
                 throw new InvalidOperationException("Combat unit is outside the configured arena.");
-            CombatMath.NonNegative(skill.Range);
+            CombatMath.NonNegative(range);
             if (skill.DeliveryType != (player ? ESkillDeliveryType.Projectile : ESkillDeliveryType.Melee))
                 throw new InvalidOperationException($"TbSkillCombat {skill.Id}: unsupported actor delivery role.");
             if (player)
             {
-                if (!skill.ProjectileSpeed.HasValue || !skillConfig.ProjectileRadiusPixels.HasValue || !skill.ProjectileLifetime.HasValue || !skillConfig.ProjectileOffsetXPixels.HasValue || !skillConfig.ProjectileOffsetYPixels.HasValue)
+                if (!skill.ProjectileSpeedPixelsPerSecond.HasValue || !skillConfig.ProjectileRadiusPixels.HasValue || !skill.ProjectileLifetime.HasValue || !skillConfig.ProjectileOffsetXPixels.HasValue || !skillConfig.ProjectileOffsetYPixels.HasValue)
                     throw new InvalidOperationException($"TbSkillCombat {skill.Id}: missing projectile fields.");
-                CombatMath.Positive(skill.ProjectileSpeed.Value); CombatMath.Positive(skillConfig.ProjectileRadiusPixels.Value); CombatMath.Positive(skill.ProjectileLifetime.Value);
+                CombatMath.Positive(skill.ProjectileSpeedPixelsPerSecond.Value); CombatMath.Positive(skillConfig.ProjectileRadiusPixels.Value); CombatMath.Positive(skill.ProjectileLifetime.Value);
             }
             else
             {
@@ -817,7 +820,7 @@ namespace Roguelike.Features.Combat.Ecs
                 HitEffectOffset = hitEffectOffset,
                 BodyHalfSegment = unifiedCapsule ? movement.HalfSegment2D : 0f,
                 Movement = movement,
-                MoveSpeed = (float)attributes.Get(EAttributeType.MoveSpeed) * rules.WorldUnitsPerPixel, Range = skill.Range,
+                MoveSpeed = (float)attributes.Get(EAttributeType.MoveSpeed) * rules.WorldUnitsPerPixel, Range = range,
                 Interval = CombatMath.AttackInterval(skill.BaseInterval, attributes.Get(EAttributeType.AttackSpeedMultiplier), rules.MinAttackInterval),
                 Delivery = skill.DeliveryType, TargetSlot = -1,
                 BaseInterval = skill.BaseInterval,
@@ -826,7 +829,7 @@ namespace Roguelike.Features.Combat.Ecs
                 // 近战不消费弹丸字段；零仅为空布局，不作为弹丸参数兜底。
                 SkillId = skillConfig.Id,
                 ProjectileOffset = player ? new float2(skillConfig.ProjectileOffsetXPixels.Value, skillConfig.ProjectileOffsetYPixels.Value) * rules.WorldUnitsPerPixel : float2.zero,
-                ProjectileSpeed = player ? skill.ProjectileSpeed.Value : 0,
+                ProjectileSpeed = player ? skill.ProjectileSpeedPixelsPerSecond.Value * rules.WorldUnitsPerPixel : 0,
                 ProjectileLifetime = player ? skill.ProjectileLifetime.Value : 0, ProjectileRadius = player ? skillConfig.ProjectileRadiusPixels.Value * rules.WorldUnitsPerPixel : 0 };
         }
 
@@ -847,8 +850,8 @@ namespace Roguelike.Features.Combat.Ecs
         }
 
         /// <summary>把单位命中特效挂点从逻辑像素转换为模拟偏移；旧性能场景未迁移时复用其受击中心。</summary>
-        /// <param name="hitX">TbCharacter/TbMonster.hitEffectOffsetXPixelsMilli 解码值。</param>
-        /// <param name="hitY">TbCharacter/TbMonster.hitEffectOffsetYPixelsMilli 解码值。</param>
+        /// <param name="hitX">TbCharacter/TbMonster.hitEffectOffsetXPixels 像素值。</param>
+        /// <param name="hitY">TbCharacter/TbMonster.hitEffectOffsetYPixels 像素值。</param>
         /// <param name="bodyX">现有受击中心横向像素。</param>
         /// <param name="bodyY">现有受击中心纵向像素。</param>
         /// <returns>可直接写入 CombatUnit.HitEffectOffset 的世界偏移。</returns>

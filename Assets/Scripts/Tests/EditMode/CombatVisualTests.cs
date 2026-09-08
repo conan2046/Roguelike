@@ -267,7 +267,7 @@ namespace Roguelike.Tests
             using var visuals = new CombatEntityVisuals(world, session, definition, assets);
             session.SynchronizePlayerSkills(definition.AvailableSkills.Select(item => item.Id));
             Assert.That(session.TrySpawnMonster(definition.Monsters[0],
-                ConfigNumber.Decode(definition.Map.SpawnRadiusPixelsMilli), 1, false, out int slot), Is.True);
+                definition.Map.SpawnRadiusPixels, 1, false, out int slot), Is.True);
             CombatUnit monster = session.ReadUnit(slot);
             monster.Position = new float2(2, 0);
             monster.PreviousPosition = monster.Position;
@@ -324,7 +324,7 @@ namespace Roguelike.Tests
                 CombatWeaponState weapon = session.ReadPlayerWeapon(weaponIndex);
                 Assert.That(weapon.Active, Is.True);
                 Assert.That(session.TrySpawnMonster(definition.Monsters[0],
-                    ConfigNumber.Decode(definition.Map.SpawnRadiusPixelsMilli), (ulong)skill.Id, false,
+                    definition.Map.SpawnRadiusPixels, (ulong)skill.Id, false,
                     out int monsterSlot), Is.True);
                 CombatUnit player = session.ReadUnit(0);
                 CombatUnit monster = session.ReadUnit(monsterSlot);
@@ -500,7 +500,7 @@ namespace Roguelike.Tests
             var tables = new Tables(name => new ByteBuf(File.ReadAllBytes(Path.Combine(Application.streamingAssetsPath, "Config", "Luban", name + ".bytes"))));
             // 固定选帧夹具保留出生目标；动态绑定测试显式消费真实定时配置。
             if (!timedSpawn)
-                foreach (string field in new[] { "SpawnRadiusPixelsMilli", "SpawnIntervalSecondsMilli", "SpawnBatchCount", "SpawnUnitIntervalSecondsMilli" })
+                foreach (string field in new[] { "SpawnRadiusPixels", "SpawnIntervalSecondsMilli", "SpawnBatchCount", "SpawnUnitIntervalSecondsMilli" })
                     typeof(PerformanceScenarioConfig).GetField(field).SetValue(tables.TbPerformanceScenario.Get(4), null);
             return tables;
         }

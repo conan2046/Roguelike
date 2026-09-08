@@ -236,7 +236,8 @@ namespace Roguelike.Features.Performance
                     $"TbPerformanceScenario {scenario.Id} requires the combat runner, which is not implemented yet.");
             }
 
-            if (scenario.EntityCount <= 0 ||
+            if (scenario.CombatRulesId_Ref == null || scenario.CombatRulesId_Ref.WorldUnitsPerPixel <= 0f ||
+                scenario.EntityCount <= 0 ||
                 scenario.WarmupSeconds < 0f ||
                 scenario.SampleSeconds <= 0f ||
                 scenario.TargetAverageFps <= 0f ||

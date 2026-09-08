@@ -91,12 +91,12 @@ namespace Roguelike.Features.Combat.Authoring.Editor
                     bool dirty = false;
                     if (skill.CombatProfileId_Ref?.DeliveryType == cfg.ESkillDeliveryType.Projectile)
                     {
-                        int[] actual = SkillCollisionPipeline.Values(shape);
-                        int?[] expected = { skill.ProjectileRadiusPixelsMilli, skill.ProjectileOffsetXPixelsMilli, skill.ProjectileOffsetYPixelsMilli };
-                        dirty = actual.Where((value, index) => !expected[index].HasValue || value != expected[index].Value).Any();
+                        float[] actual = SkillCollisionPipeline.Values(shape);
+                        float?[] expected = { skill.ProjectileRadiusPixels, skill.ProjectileOffsetXPixels, skill.ProjectileOffsetYPixels };
+                        dirty = actual.Where((value, index) => !expected[index].HasValue || Mathf.Abs(value - expected[index].Value) > 0.00051f).Any();
                     }
                     else if (skill.CombatProfileId_Ref?.DeliveryType == cfg.ESkillDeliveryType.TargetArea)
-                        dirty = !skill.AreaRadiusPixelsMilli.HasValue || SkillCollisionPipeline.AreaValues(shape)[0] != skill.AreaRadiusPixelsMilli.Value;
+                        dirty = !skill.AreaRadiusPixels.HasValue || Mathf.Abs(SkillCollisionPipeline.AreaValues(shape)[0] - skill.AreaRadiusPixels.Value) > 0.00051f;
                     if (dirty) pending.Add(path);
                 }
             }

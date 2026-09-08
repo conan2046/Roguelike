@@ -30,8 +30,8 @@ public sealed partial class CombatRulesConfig : Luban.BeanBase
         SimulationHz = _buf.ReadInt();
         MaxCatchUpSteps = _buf.ReadInt();
         TargetRefreshSecondsMilli = _buf.ReadInt();
-        SpatialCellSizeMilli = _buf.ReadInt();
-        WorldUnitsPerPixelMilli = _buf.ReadInt();
+        SpatialCellSizePixels = _buf.ReadFloat();
+        WorldUnitsPerPixel = _buf.ReadFloat();
     }
 
     public static CombatRulesConfig DeserializeCombatRulesConfig(ByteBuf _buf)
@@ -84,13 +84,13 @@ public sealed partial class CombatRulesConfig : Luban.BeanBase
     /// </summary>
     public readonly int TargetRefreshSecondsMilli;
     /// <summary>
-    /// 空间网格边长，世界单位；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
+    /// 空间网格边长，逻辑像素；直接填写像素值，最多3位小数。
     /// </summary>
-    public readonly int SpatialCellSizeMilli;
+    public readonly float SpatialCellSizePixels;
     /// <summary>
-    /// 资源像素转换为世界单位的比例；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
+    /// 每逻辑像素对应的Unity世界单位；直接填写比例值。
     /// </summary>
-    public readonly int WorldUnitsPerPixelMilli;
+    public readonly float WorldUnitsPerPixel;
    
     public const int __ID__ = -1681609883;
     public override int GetTypeId() => __ID__;
@@ -113,8 +113,8 @@ public sealed partial class CombatRulesConfig : Luban.BeanBase
         + "simulationHz:" + SimulationHz + ","
         + "maxCatchUpSteps:" + MaxCatchUpSteps + ","
         + "targetRefreshSecondsMilli:" + TargetRefreshSecondsMilli + ","
-        + "spatialCellSizeMilli:" + SpatialCellSizeMilli + ","
-        + "worldUnitsPerPixelMilli:" + WorldUnitsPerPixelMilli + ","
+        + "spatialCellSizePixels:" + SpatialCellSizePixels + ","
+        + "worldUnitsPerPixel:" + WorldUnitsPerPixel + ","
         + "}";
     }
 }

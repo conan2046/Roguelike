@@ -17,7 +17,7 @@ using UnityEngine.Rendering;
 namespace Roguelike.Features.Combat.Rendering
 {
     /// <summary>在单位上方绘制 HP 血条与跳字伤害数字；复用同一 DOTS World，不创建 GameObject。</summary>
-    /// <remarks>依赖 TbCharacter/TbMonster 的 damageFloatHeight 字段定位锚点；白闪效果因需要自定义 shader 暂留扩展接口。</remarks>
+    /// <remarks>依赖 TbCharacter/TbMonster 的 damageFloatHeightPixels 字段定位锚点；入局时按战斗规则换算一次世界高度。</remarks>
     public sealed class CombatFeedbackVisuals : IDisposable
     {
         private const int BarFrameResourceId = 960006;
@@ -93,7 +93,7 @@ namespace Roguelike.Features.Combat.Rendering
         {
             if (scenario?.PresentationId_Ref == null || scenario.CombatRulesId_Ref == null || resources == null)
                 throw new ArgumentNullException(nameof(scenario));
-            var lookup = BuildHeightLookup(scenario);
+            var lookup = BuildHeightLookup(scenario, scenario.CombatRulesId_Ref.WorldUnitsPerPixel);
             var (materials, meshes, textures, meshArray) = await LoadResourcesAsync(scenario.PresentationId_Ref,
                 scenario.CombatRulesId_Ref, resources, token);
             return new CombatFeedbackVisuals(world, session, lookup, scenario.CombatRulesId_Ref,
@@ -106,42 +106,64 @@ namespace Roguelike.Features.Combat.Rendering
         {
             if (definition?.Presentation == null || definition.CombatRules == null || resources == null)
                 throw new ArgumentNullException(nameof(definition));
-            var lookup = BuildHeightLookup(definition);
+            var lookup = BuildHeightLookup(definition, definition.CombatRules.WorldUnitsPerPixel);
             var (materials, meshes, textures, meshArray) = await LoadResourcesAsync(definition.Presentation,
                 definition.CombatRules, resources, token);
             return new CombatFeedbackVisuals(world, session, lookup, definition.CombatRules,
                 definition.Presentation, materials, meshes, textures, meshArray);
         }
 
-        private static Dictionary<int, float> BuildHeightLookup(PerformanceScenarioConfig scenario)
+        /// <summary>将测试入口角色与怪物的伤害数字像素锚点统一转换为世界高度。</summary>
+        /// <param name="scenario">已解析角色和怪物引用的 TbPerformanceScenario。</param>
+        /// <param name="worldUnitsPerPixel">TbCombatRules.worldUnitsPerPixel。</param>
+        /// <returns>配置 ID 到世界高度的查找表。</returns>
+        private static Dictionary<int, float> BuildHeightLookup(PerformanceScenarioConfig scenario, float worldUnitsPerPixel)
         {
             var lookup = new Dictionary<int, float>();
-            AddCharacter(scenario.CharacterId_Ref, lookup);
+            AddCharacter(scenario.CharacterId_Ref, lookup, worldUnitsPerPixel);
             foreach (var monster in scenario.MonsterIds_Ref)
-                AddMonster(monster, lookup);
+                AddMonster(monster, lookup, worldUnitsPerPixel);
             return lookup;
         }
 
-        private static Dictionary<int, float> BuildHeightLookup(CombatRunDefinition definition)
+        /// <summary>将正式单局角色、普通怪与 Boss 的伤害数字像素锚点统一转换为世界高度。</summary>
+        /// <param name="definition">已完成跨表解析的正式单局定义。</param>
+        /// <param name="worldUnitsPerPixel">TbCombatRules.worldUnitsPerPixel。</param>
+        /// <returns>配置 ID 到世界高度的查找表。</returns>
+        private static Dictionary<int, float> BuildHeightLookup(CombatRunDefinition definition, float worldUnitsPerPixel)
         {
             var lookup = new Dictionary<int, float>();
-            AddCharacter(definition.Character, lookup);
+            AddCharacter(definition.Character, lookup, worldUnitsPerPixel);
             foreach (var monster in definition.Monsters)
-                AddMonster(monster, lookup);
-            AddMonster(definition.Boss.MonsterId_Ref, lookup);
+                AddMonster(monster, lookup, worldUnitsPerPixel);
+            AddMonster(definition.Boss.MonsterId_Ref, lookup, worldUnitsPerPixel);
             return lookup;
         }
 
-        private static void AddCharacter(CharacterConfig config, Dictionary<int, float> lookup)
+        /// <summary>登记角色伤害数字锚点，并拒绝以代码默认值掩盖缺失配置。</summary>
+        /// <param name="config">TbCharacter 行。</param>
+        /// <param name="lookup">待写入的查找表。</param>
+        /// <param name="worldUnitsPerPixel">TbCombatRules.worldUnitsPerPixel。</param>
+        /// <exception cref="InvalidOperationException">战斗角色未配置像素锚点。</exception>
+        private static void AddCharacter(CharacterConfig config, Dictionary<int, float> lookup, float worldUnitsPerPixel)
         {
             if (config == null) return;
-            lookup[config.Id] = config.DamageFloatHeight ?? 0.35f;
+            if (!config.DamageFloatHeightPixels.HasValue)
+                throw new InvalidOperationException($"TbCharacter {config.Id}: damageFloatHeightPixels is required.");
+            lookup[config.Id] = config.DamageFloatHeightPixels.Value * worldUnitsPerPixel;
         }
 
-        private static void AddMonster(MonsterConfig config, Dictionary<int, float> lookup)
+        /// <summary>登记怪物伤害数字锚点，并拒绝以代码默认值掩盖缺失配置。</summary>
+        /// <param name="config">TbMonster 行。</param>
+        /// <param name="lookup">待写入的查找表。</param>
+        /// <param name="worldUnitsPerPixel">TbCombatRules.worldUnitsPerPixel。</param>
+        /// <exception cref="InvalidOperationException">战斗怪物未配置像素锚点。</exception>
+        private static void AddMonster(MonsterConfig config, Dictionary<int, float> lookup, float worldUnitsPerPixel)
         {
             if (config == null) return;
-            lookup[config.Id] = config.DamageFloatHeight ?? 0.35f;
+            if (!config.DamageFloatHeightPixels.HasValue)
+                throw new InvalidOperationException($"TbMonster {config.Id}: damageFloatHeightPixels is required.");
+            lookup[config.Id] = config.DamageFloatHeightPixels.Value * worldUnitsPerPixel;
         }
 
         private static async Task<(Material[] materials, Mesh[] meshes, Texture2D[] textures, RenderMeshArray meshArray)>

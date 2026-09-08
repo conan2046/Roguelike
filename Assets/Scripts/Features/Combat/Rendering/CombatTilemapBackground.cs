@@ -52,7 +52,7 @@ namespace Roguelike.Features.Combat.Rendering
             if (rules == null) throw new ArgumentNullException(nameof(rules));
             if (resources == null) throw new ArgumentNullException(nameof(resources));
             if (parent == null) throw new ArgumentNullException(nameof(parent));
-            float worldUnitsPerPixel = ConfigNumber.Decode(rules.WorldUnitsPerPixelMilli);
+            float worldUnitsPerPixel = rules.WorldUnitsPerPixel;
             if (!(worldUnitsPerPixel > 0f))
                 throw new InvalidOperationException($"TbCombatRules {rules.Id}: worldUnitsPerPixel must be positive.");
 
@@ -86,7 +86,7 @@ namespace Roguelike.Features.Combat.Rendering
 
         /// <summary>将已加载纹理转换为共享 Tile，并以单次 SetTilesBlock 填充 TbMap 指定的格子范围。</summary>
         /// <param name="definition">确定性地块选择和地图尺寸定义。</param>
-        /// <param name="worldUnitsPerPixel">TbCombatRules.worldUnitsPerPixelMilli 解码值。</param>
+        /// <param name="worldUnitsPerPixel">TbCombatRules.worldUnitsPerPixel 直接比例值。</param>
         /// <param name="parent">本局运行器根节点。</param>
         /// <remarks>只生成两个 GameObject；1024 个逻辑格不生成独立 Transform 或 SpriteRenderer。</remarks>
         private void Build(CombatMapDefinition definition, float worldUnitsPerPixel, Transform parent)

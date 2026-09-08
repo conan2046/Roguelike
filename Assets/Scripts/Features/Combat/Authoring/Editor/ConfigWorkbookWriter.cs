@@ -7,7 +7,7 @@ using System.Xml.Linq;
 
 namespace Roguelike.Features.Combat.Authoring.Editor
 {
-    /// <summary>编辑器配置导出共用的整数单元格写入器，保留 Excel 中无关样式和 ZIP 内容。</summary>
+    /// <summary>编辑器配置导出共用的数值单元格写入器，保留 Excel 中无关样式和 ZIP 内容。</summary>
     public static class ConfigWorkbookWriter
     {
         /// <summary>用户导出时按 ID 和列名更新既有源表，不新增未知 ID 或隐式字段。</summary>
@@ -18,8 +18,19 @@ namespace Roguelike.Features.Combat.Authoring.Editor
         /// <exception cref="InvalidOperationException">源表缺少字段、字段数错误或某个 ID 不存在。</exception>
         public static void Patch(string path, string[] fields, Dictionary<int, int[]> updates)
         {
-            PatchOptional(path, fields, updates.ToDictionary(pair => pair.Key,
-                pair => pair.Value.Select(value => (int?)value).ToArray()));
+            PatchValues(path, fields, updates.ToDictionary(pair => pair.Key,
+                pair => pair.Value.Select(value => value.ToString(CultureInfo.InvariantCulture)).ToArray()));
+        }
+
+        /// <summary>用户导出时按 ID 和列名更新直接像素浮点列。</summary>
+        /// <param name="path">待更新业务 Excel。</param>
+        /// <param name="fields">源表内已有的 float 列。</param>
+        /// <param name="updates">按 ID 索引的浮点数组，与 fields 顺序一致。</param>
+        /// <remarks>像素只量化到三位小数，不再写成乘一千整数。</remarks>
+        public static void Patch(string path, string[] fields, Dictionary<int, float[]> updates)
+        {
+            PatchValues(path, fields, updates.ToDictionary(pair => pair.Key,
+                pair => pair.Value.Select(value => value.ToString("0.###", CultureInfo.InvariantCulture)).ToArray()));
         }
 
         /// <summary>按 ID 更新可空整数列；空值会删除单元格内容，保持资源目录行没有伪造的零配置。</summary>
@@ -29,6 +40,29 @@ namespace Roguelike.Features.Combat.Authoring.Editor
         /// <remarks>直接写文件；调用方必须备份源表并在失败时恢复。</remarks>
         /// <exception cref="InvalidOperationException">源表缺少字段、字段数错误或某个 ID 不存在。</exception>
         public static void PatchOptional(string path, string[] fields, Dictionary<int, int?[]> updates)
+        {
+            PatchValues(path, fields, updates.ToDictionary(pair => pair.Key,
+                pair => pair.Value.Select(value => value?.ToString(CultureInfo.InvariantCulture)).ToArray()));
+        }
+
+        /// <summary>按 ID 更新可空直接像素浮点列；空值会删除单元格内容。</summary>
+        /// <param name="path">待更新业务 Excel。</param>
+        /// <param name="fields">源表内已有的 float? 列。</param>
+        /// <param name="updates">按 ID 索引的可空浮点数组，与 fields 顺序一致。</param>
+        /// <remarks>像素只量化到三位小数，不再写成乘一千整数。</remarks>
+        public static void PatchOptional(string path, string[] fields, Dictionary<int, float?[]> updates)
+        {
+            PatchValues(path, fields, updates.ToDictionary(pair => pair.Key,
+                pair => pair.Value.Select(value => value?.ToString("0.###", CultureInfo.InvariantCulture)).ToArray()));
+        }
+
+        /// <summary>将已格式化的数值写入工作表，供整数协议和直接像素浮点协议共用。</summary>
+        /// <param name="path">待更新业务 Excel。</param>
+        /// <param name="fields">源表字段名。</param>
+        /// <param name="updates">按 ID 索引的可空数值文本。</param>
+        /// <remarks>直接更新 sheet1.xml；不改变其他 ZIP 条目。</remarks>
+        /// <exception cref="InvalidOperationException">源表缺少字段、字段数错误或某个 ID 不存在。</exception>
+        private static void PatchValues(string path, string[] fields, Dictionary<int, string[]> updates)
         {
             XNamespace ns = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
             using var zip = ZipFile.Open(path, ZipArchiveMode.Update);
@@ -57,14 +91,14 @@ namespace Roguelike.Features.Combat.Authoring.Editor
                 {
                     string address = headers[fields[i]] + (string)row.Attribute("r");
                     var cell = cells.FirstOrDefault(c => (string)c.Attribute("r") == address);
-                    if (!values[i].HasValue)
+                    if (values[i] == null)
                     {
                         cell?.Remove();
                         continue;
                     }
                     if (cell == null) { cell = new XElement(ns + "c", new XAttribute("r", address)); row.Add(cell); }
                     cell.Attribute("t")?.Remove(); cell.Elements().Remove();
-                    cell.Add(new XElement(ns + "v", values[i].Value.ToString(CultureInfo.InvariantCulture)));
+                    cell.Add(new XElement(ns + "v", values[i]));
                 }
             }
             if (found.Count != updates.Count) throw new InvalidOperationException("预制体 ID 不存在于源表。");

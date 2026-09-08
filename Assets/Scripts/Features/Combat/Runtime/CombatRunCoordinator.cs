@@ -172,9 +172,9 @@ namespace Roguelike.Features.Combat.Runtime
             while (pendingSpawns.Count > 0)
             {
                 var request = pendingSpawns.Peek();
-                float radius = ConfigNumber.Decode(request.IsBoss
-                    ? model.Definition.Boss.SpawnRadiusPixelsMilli
-                    : model.Definition.Map.SpawnRadiusPixelsMilli);
+                float radius = request.IsBoss
+                    ? model.Definition.Boss.SpawnRadiusPixels
+                    : model.Definition.Map.SpawnRadiusPixels;
                 if (!session.TrySpawnMonster(request.Monster, radius, request.Sequence, request.IsBoss, out _)) return;
                 pendingSpawns.Dequeue();
             }
@@ -186,9 +186,10 @@ namespace Roguelike.Features.Combat.Runtime
         private void AdvanceDrops(double elapsedSeconds)
         {
             if (elapsedSeconds <= 0 || drops.Count == 0) return;
-            float magnetRadius = ConfigNumber.Decode(model.Definition.Drop.MagnetRadiusMilli);
-            float pickupRadius = ConfigNumber.Decode(model.Definition.Drop.PickupRadiusMilli);
-            float speed = ConfigNumber.Decode(model.Definition.Drop.MagnetSpeedMilli);
+            float worldUnitsPerPixel = model.Definition.CombatRules.WorldUnitsPerPixel;
+            float magnetRadius = model.Definition.Drop.MagnetRadiusPixels * worldUnitsPerPixel;
+            float pickupRadius = model.Definition.Drop.PickupRadiusPixels * worldUnitsPerPixel;
+            float speed = model.Definition.Drop.MagnetSpeedPixelsPerSecond * worldUnitsPerPixel;
             float2 player = session.ReadUnit(0).Position;
             foreach (ulong id in drops.Keys.ToArray())
             {
