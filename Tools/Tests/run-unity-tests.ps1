@@ -22,6 +22,10 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+
+if ($PSVersionTable.PSVersion.Major -lt 7) {
+    throw 'PowerShell 7 or newer is required. Run this script with pwsh.'
+}
 $repoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 if (-not (Test-Path -LiteralPath $UnityEditorPath -PathType Leaf)) {
     throw "Unity Editor executable does not exist: $UnityEditorPath"

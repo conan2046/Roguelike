@@ -18,6 +18,10 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+if ($PSVersionTable.PSVersion.Major -lt 7) {
+    throw 'PowerShell 7 or newer is required. Run this script with pwsh.'
+}
+
 $RepoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 $BuildScript = Join-Path $RepoRoot 'Tools\Build\build-windows-offline.ps1'
 $BuildDirectory = Join-Path $RepoRoot "Builds\Windows\$PackageVersion"

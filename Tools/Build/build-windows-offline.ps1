@@ -16,6 +16,10 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+if ($PSVersionTable.PSVersion.Major -lt 7) {
+    throw 'PowerShell 7 or newer is required. Run this script with pwsh.'
+}
+
 $RepoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 $BuildRoot = [System.IO.Path]::GetFullPath((Join-Path $RepoRoot 'Builds'))
 $StagingRoot = [System.IO.Path]::GetFullPath((Join-Path $BuildRoot '.staging'))

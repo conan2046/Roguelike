@@ -14,6 +14,10 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+
+if ($PSVersionTable.PSVersion.Major -lt 7) {
+    throw 'PowerShell 7 or newer is required. Run this script with pwsh.'
+}
 $reportPath = [System.IO.Path]::GetFullPath($ReportDirectory)
 $heartbeatPath = Join-Path $reportPath 'heartbeat.txt'
 $completedPath = Join-Path $reportPath 'completed.txt'
