@@ -62,7 +62,7 @@ namespace Roguelike.Features.Combat.Rendering
             if (config.HitFlashR < 0 || config.HitFlashR > 1 || config.HitFlashG < 0 || config.HitFlashG > 1 ||
                 config.HitFlashB < 0 || config.HitFlashB > 1 || config.HitFlashOpacity < 0 || config.HitFlashOpacity > 1)
                 throw new InvalidOperationException("TbCombatPresentation hit flash RGB and opacity must be within 0..1.");
-            ValidateRenderQueues(config);
+            var renderCatalog = new CombatRenderCatalog(config);
             Color hitFlashColor = new Color(config.HitFlashR, config.HitFlashG, config.HitFlashB, config.HitFlashOpacity);
             FilterMode filter;
             switch (config.TextureFilterMode)
@@ -76,14 +76,14 @@ namespace Roguelike.Features.Combat.Rendering
             {
                 await result.LoadVisualAsync(scenario.CharacterId_Ref.VisualSetId_Ref, false, scenario.CombatRulesId_Ref,
                     scenario.PresentationId_Ref, resources, shader, hitFlashShader, hitFlashColor, filter,
-                    config.UnitRenderQueue, token);
+                    renderCatalog, token);
                 foreach (var monster in scenario.MonsterIds_Ref)
                     await result.LoadVisualAsync(monster.VisualSetId_Ref, true, scenario.CombatRulesId_Ref,
                         scenario.PresentationId_Ref, resources, shader, hitFlashShader, hitFlashColor, filter,
-                        config.UnitRenderQueue, token);
+                        renderCatalog, token);
                 await result.LoadSkillAsync(scenario.CharacterId_Ref.DefaultSkillId_Ref, scenario.CombatRulesId_Ref,
                     scenario.PresentationId_Ref, resources, shader, hitFlashShader, hitFlashColor, filter,
-                    config.SkillRenderQueue, token);
+                    renderCatalog, token);
                 token.ThrowIfCancellationRequested();
                 result.Materials = result.materials.ToArray(); result.Meshes = result.meshes.ToArray();
                 return result;
@@ -118,7 +118,7 @@ namespace Roguelike.Features.Combat.Rendering
             if (presentation.HitFlashR < 0 || presentation.HitFlashR > 1 || presentation.HitFlashG < 0 || presentation.HitFlashG > 1 ||
                 presentation.HitFlashB < 0 || presentation.HitFlashB > 1 || presentation.HitFlashOpacity < 0 || presentation.HitFlashOpacity > 1)
                 throw new InvalidOperationException("TbCombatPresentation hit flash RGB and opacity must be within 0..1.");
-            ValidateRenderQueues(presentation);
+            var renderCatalog = new CombatRenderCatalog(presentation);
             Color hitFlashColor = new Color(presentation.HitFlashR, presentation.HitFlashG,
                 presentation.HitFlashB, presentation.HitFlashOpacity);
             FilterMode filter;
@@ -134,14 +134,14 @@ namespace Roguelike.Features.Combat.Rendering
             {
                 await result.LoadVisualAsync(definition.Character.VisualSetId_Ref, false, definition.CombatRules,
                     presentation, resources, shader, hitFlashShader, hitFlashColor, filter,
-                    presentation.UnitRenderQueue, token);
+                    renderCatalog, token);
                 foreach (var monster in definition.Monsters.Concat(new[] { definition.Boss.MonsterId_Ref }).GroupBy(item => item.Id).Select(group => group.First()))
                     await result.LoadVisualAsync(monster.VisualSetId_Ref, true, definition.CombatRules,
                         presentation, resources, shader, hitFlashShader, hitFlashColor, filter,
-                        presentation.UnitRenderQueue, token);
+                        renderCatalog, token);
                 foreach (var skill in definition.AvailableSkills)
                     await result.LoadSkillAsync(skill, definition.CombatRules, presentation, resources, shader,
-                        hitFlashShader, hitFlashColor, filter, presentation.SkillRenderQueue, token);
+                        hitFlashShader, hitFlashColor, filter, renderCatalog, token);
                 token.ThrowIfCancellationRequested();
                 result.Materials = result.materials.ToArray();
                 result.Meshes = result.meshes.ToArray();
@@ -160,17 +160,18 @@ namespace Roguelike.Features.Combat.Rendering
         /// <param name="hitFlashShader">TbCombatPresentation.hitFlashShaderName 指定的白闪 Shader。</param>
         /// <param name="hitFlashColor">TbCombatPresentation 的 hitFlash RGB 与 opacity 字段还原的叠加色。</param>
         /// <param name="filter">配置解析的过滤方式。</param>
-        /// <param name="renderQueue">TbCombatPresentation.unitRenderQueue。</param>
+        /// <param name="renderCatalog">TbCombatPresentation.renderConfigIds 构造的逐模型层级索引。</param>
         /// <param name="token">取消令牌。</param>
         /// <returns>全部必需片段准备任务。</returns>
         /// <remarks>创建共享 Unity 对象，所有权归本资源集合。</remarks>
         /// <exception cref="InvalidOperationException">缺少显式片段或缩放非法。</exception>
         private async Task LoadVisualAsync(VisualSetConfig visual, bool monster, CombatRulesConfig rules, CombatPresentationConfig presentation,
             IResourceService resources, Shader shader, Shader hitFlashShader, Color hitFlashColor, FilterMode filter,
-            int renderQueue, CancellationToken token)
+            CombatRenderCatalog renderCatalog, CancellationToken token)
         {
             if (visual?.StandClipId_Ref == null || visual.MoveClipId_Ref == null || (monster && visual.AttackClipId_Ref == null))
                 throw new InvalidOperationException("Visual requires explicit idle/move and monster attack clips.");
+            int renderQueue = renderCatalog.ReadModel(visual.Id);
             float scale = rules.WorldUnitsPerPixel * visual.ScalePermille / 1000f;
             CombatMath.Positive(scale);
             await LoadClipAsync(visual.Id, visual.StandClipId_Ref, scale, presentation, resources, shader,
@@ -190,13 +191,13 @@ namespace Roguelike.Features.Combat.Rendering
         /// <param name="hitFlashShader">TbCombatPresentation.hitFlashShaderName 指定的白闪 Shader。</param>
         /// <param name="hitFlashColor">TbCombatPresentation 的 hitFlash RGB 与 opacity 字段还原的叠加色。</param>
         /// <param name="filter">配置解析的纹理过滤方式。</param>
-        /// <param name="renderQueue">TbCombatPresentation.skillRenderQueue。</param>
+        /// <param name="renderCatalog">TbCombatRender 按技能及片段独立配置的层级索引。</param>
         /// <param name="token">取消令牌。</param>
         /// <returns>该技能全部显式片段完成加载的任务。</returns>
         /// <exception cref="InvalidOperationException">技能投递类型或片段角色不符合协议。</exception>
         private async Task LoadSkillAsync(SkillConfig skill, CombatRulesConfig rules, CombatPresentationConfig presentation,
             IResourceService resources, Shader shader, Shader hitFlashShader, Color hitFlashColor, FilterMode filter,
-            int renderQueue, CancellationToken token)
+            CombatRenderCatalog renderCatalog, CancellationToken token)
         {
             if (skill?.CombatProfileId_Ref == null) throw new InvalidOperationException("TbSkill: missing combat profile.");
             // 与角色/怪物保持同一来源：TbVisualSet.scalePermille 同时缩放技能视觉与 TbSkill 判定半径，
@@ -209,10 +210,10 @@ namespace Roguelike.Features.Combat.Rendering
                     (skill.ImpactClipId_Ref != null && skill.ImpactClipId_Ref.Action != EAnimationAction.Impact))
                     throw new InvalidOperationException($"TbSkill {skill.Id}: invalid projectile visual roles.");
                 await LoadClipAsync(skill.Id, skill.ProjectileClipId_Ref, scale, presentation, resources, shader,
-                    hitFlashShader, hitFlashColor, filter, renderQueue, token);
+                    hitFlashShader, hitFlashColor, filter, renderCatalog.ReadSkill(skill.Id, skill.ProjectileClipId.Value), token);
                 if (skill.ImpactClipId_Ref != null)
                     await LoadClipAsync(skill.Id, skill.ImpactClipId_Ref, scale, presentation, resources, shader,
-                        hitFlashShader, hitFlashColor, filter, renderQueue, token);
+                        hitFlashShader, hitFlashColor, filter, renderCatalog.ReadSkill(skill.Id, skill.ImpactClipId.Value), token);
                 return;
             }
             if (skill.CombatProfileId_Ref.DeliveryType != ESkillDeliveryType.TargetArea || skill.AreaClipIds_Ref == null ||
@@ -220,7 +221,7 @@ namespace Roguelike.Features.Combat.Rendering
                 throw new InvalidOperationException($"TbSkill {skill.Id}: invalid target-area visual roles.");
             foreach (var clip in skill.AreaClipIds_Ref)
                 await LoadClipAsync(skill.Id, clip, scale, presentation, resources, shader, hitFlashShader,
-                    hitFlashColor, filter, renderQueue, token);
+                    hitFlashColor, filter, renderCatalog.ReadSkill(skill.Id, clip.Id), token);
         }
 
         /// <summary>按 TbAnimationClip 的 ANI/PNG ID 加载，验证图集边界并预建普通与镜像网格。</summary>
@@ -233,7 +234,7 @@ namespace Roguelike.Features.Combat.Rendering
         /// <param name="hitFlashShader">配置的白闪 Shader。</param>
         /// <param name="hitFlashColor">配置的白闪 RGB 与叠加不透明度。</param>
         /// <param name="filter">配置过滤方式。</param>
-        /// <param name="renderQueue">该片段类别在 TbCombatPresentation 中配置的透明渲染队列。</param>
+        /// <param name="renderQueue">该模型或技能片段在 TbCombatRender 中显式配置的透明渲染队列。</param>
         /// <param name="token">取消令牌。</param>
         /// <returns>片段准备任务。</returns>
         /// <remarks>临时原始句柄离开作用域即释放；对象创建后立即登记，确保异常可回收。</remarks>
@@ -295,19 +296,6 @@ namespace Roguelike.Features.Combat.Rendering
                     clip.MeshIndices[global * 2 + 1] = meshes.Count; meshes.Add(AniMeshFactory.CreateFrame(quads, scale));
                 }
             clips.Add(key, clip);
-        }
-
-        /// <summary>验证单位、技能与战斗反馈的透明绘制层级严格递增。</summary>
-        /// <param name="presentation">TbCombatPresentation 当前行。</param>
-        /// <exception cref="InvalidOperationException">任一队列不在 Unity 透明范围，或层级顺序错误。</exception>
-        private static void ValidateRenderQueues(CombatPresentationConfig presentation)
-        {
-            if (presentation.UnitRenderQueue < (int)RenderQueue.Transparent ||
-                presentation.FeedbackRenderQueue > 5000 ||
-                presentation.UnitRenderQueue >= presentation.SkillRenderQueue ||
-                presentation.SkillRenderQueue >= presentation.FeedbackRenderQueue)
-                throw new InvalidOperationException(
-                    "TbCombatPresentation render queues must satisfy Transparent <= unit < skill < feedback <= 5000.");
         }
 
         /// <summary>播放更新时读取预加载片段，不加载资源或创建对象。</summary>

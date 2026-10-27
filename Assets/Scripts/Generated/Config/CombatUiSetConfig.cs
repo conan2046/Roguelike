@@ -45,6 +45,13 @@ public sealed partial class CombatUiSetConfig : Luban.BeanBase
         BossHealthFormat = _buf.ReadString();
         SettlementStatsFormat = _buf.ReadString();
         RankFormat = _buf.ReadString();
+        ChestPanelPrefabResourceId = _buf.ReadInt();
+        ChestPanelPrefabResourceId_Ref = null;
+        EventHudPrefabResourceId = _buf.ReadInt();
+        EventHudPrefabResourceId_Ref = null;
+        EliteStatusFormat = _buf.ReadString();
+        EvolutionReadyFormat = _buf.ReadString();
+        ChestStatusFormat = _buf.ReadString();
     }
 
     public static CombatUiSetConfig DeserializeCombatUiSetConfig(ByteBuf _buf)
@@ -138,6 +145,28 @@ public sealed partial class CombatUiSetConfig : Luban.BeanBase
     /// 升级卡等级格式
     /// </summary>
     public readonly string RankFormat;
+    /// <summary>
+    /// 宝箱奖励面板
+    /// </summary>
+    public readonly int ChestPanelPrefabResourceId;
+    public ResourceConfig ChestPanelPrefabResourceId_Ref;
+    /// <summary>
+    /// 事件状态HUD
+    /// </summary>
+    public readonly int EventHudPrefabResourceId;
+    public ResourceConfig EventHudPrefabResourceId_Ref;
+    /// <summary>
+    /// 精英名称及相对距离
+    /// </summary>
+    public readonly string EliteStatusFormat;
+    /// <summary>
+    /// 可进化状态
+    /// </summary>
+    public readonly string EvolutionReadyFormat;
+    /// <summary>
+    /// 场上未领取箱数
+    /// </summary>
+    public readonly string ChestStatusFormat;
    
     public const int __ID__ = -1590109604;
     public override int GetTypeId() => __ID__;
@@ -150,6 +179,8 @@ public sealed partial class CombatUiSetConfig : Luban.BeanBase
         SettlementPrefabResourceId_Ref = tables.TbResource.GetOrDefault(SettlementPrefabResourceId);
         UpgradeCardPrefabResourceId_Ref = tables.TbResource.GetOrDefault(UpgradeCardPrefabResourceId);
         FontResourceId_Ref = tables.TbResource.GetOrDefault(FontResourceId);
+        ChestPanelPrefabResourceId_Ref = tables.TbResource.GetOrDefault(ChestPanelPrefabResourceId);
+        EventHudPrefabResourceId_Ref = tables.TbResource.GetOrDefault(EventHudPrefabResourceId);
     }
 
     public override string ToString()
@@ -175,6 +206,11 @@ public sealed partial class CombatUiSetConfig : Luban.BeanBase
         + "bossHealthFormat:" + BossHealthFormat + ","
         + "settlementStatsFormat:" + SettlementStatsFormat + ","
         + "rankFormat:" + RankFormat + ","
+        + "chestPanelPrefabResourceId:" + ChestPanelPrefabResourceId + ","
+        + "eventHudPrefabResourceId:" + EventHudPrefabResourceId + ","
+        + "eliteStatusFormat:" + EliteStatusFormat + ","
+        + "evolutionReadyFormat:" + EvolutionReadyFormat + ","
+        + "chestStatusFormat:" + ChestStatusFormat + ","
         + "}";
     }
 }

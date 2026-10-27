@@ -6,7 +6,7 @@ using cfg;
 namespace Roguelike.Features.Combat.Run
 {
     /// <summary>从 TbStage 聚合并验证的正式单局只读定义；运行时代码只消费这里保留的 Luban 引用。</summary>
-    public sealed class CombatRunDefinition
+    public sealed partial class CombatRunDefinition
     {
         /// <summary>获取正式关卡入口。</summary>
         public StageConfig Stage { get; private set; }
@@ -30,18 +30,22 @@ namespace Roguelike.Features.Combat.Run
         public IReadOnlyList<SkillConfig> AvailableSkills { get; private set; }
         /// <summary>获取按时间连续排序的普通怪刷新阶段。</summary>
         public IReadOnlyList<SpawnPhaseConfig> SpawnPhases { get; private set; }
-        /// <summary>获取本关可能生成的全部普通怪。</summary>
+        /// <summary>获取本关可能生成的全部普通怪与事件精英，供预加载和生命周期查询。</summary>
         public IReadOnlyList<MonsterConfig> Monsters { get; private set; }
         /// <summary>获取连续的逐级经验表。</summary>
         public IReadOnlyList<ExperienceLevelConfig> ExperienceLevels { get; private set; }
         /// <summary>获取普通怪经验掉落规则。</summary>
         public DropProfileConfig Drop { get; private set; }
-        /// <summary>获取三选一池。</summary>
+        /// <summary>获取关卡入口升级池。</summary>
         public UpgradePoolConfig UpgradePool { get; private set; }
-        /// <summary>获取池中按表顺序排列的升级选项。</summary>
+        /// <summary>获取入口池及其后备链，按实际切换顺序排列。</summary>
+        public IReadOnlyList<UpgradePoolConfig> UpgradePools { get; private set; }
+        /// <summary>获取入口池及后备链中全部不重复升级选项。</summary>
         public IReadOnlyList<UpgradeOptionConfig> UpgradeOptions { get; private set; }
         /// <summary>获取最终 Boss 遭遇。</summary>
         public BossEncounterConfig Boss { get; private set; }
+        /// <summary>本关 TbStage.runBuildId；旧兼容入口可以显式不配置构筑。</summary>
+        public RunBuildConfig BuildConfig { get; private set; }
 
         /// <summary>隐藏构造入口，确保调用方不能绕过真实表引用校验。</summary>
         private CombatRunDefinition()
@@ -74,32 +78,58 @@ namespace Roguelike.Features.Combat.Run
                 Character = stage.InitialCharacterId_Ref,
                 Drop = stage.StageRuleId_Ref.DropProfileId_Ref,
                 UpgradePool = stage.StageRuleId_Ref.UpgradePoolId_Ref,
-                Boss = stage.StageRuleId_Ref.BossEncounterId_Ref
+                Boss = stage.StageRuleId_Ref.BossEncounterId_Ref,
+                BuildConfig = stage.RunBuildId_Ref
             };
             definition.MapLayout = CombatMapDefinition.Create(definition.Map);
             definition.ValidateStage();
+            Require(!stage.RunBuildId.HasValue || definition.BuildConfig != null, $"TbStage {stage.Id}: unresolved run build.");
+            if (definition.BuildConfig != null) CombatBuildState.Validate(definition.BuildConfig, definition.Character.Id);
 
             definition.SpawnPhases = definition.Rule.SpawnPhaseIds_Ref.ToArray();
             definition.ValidatePhases();
+            definition.Events = definition.Rule.RunEventIds_Ref.ToArray();
             definition.Monsters = definition.SpawnPhases.SelectMany(item => item.MonsterWeights)
-                .Select(item => item.MonsterId_Ref).Distinct().OrderBy(item => item.Id).ToArray();
+                .Select(item => item.MonsterId_Ref)
+                .Concat(definition.Events.Where(item => item?.MonsterId_Ref != null).Select(item => item.MonsterId_Ref))
+                .Distinct().OrderBy(item => item.Id).ToArray();
+            definition.ChestProfiles = definition.Events.Where(item => item?.ChestProfileId_Ref != null).Select(item => item.ChestProfileId_Ref)
+                .Concat(definition.Monsters.Where(item => item.DeathChestProfileId_Ref != null).Select(item => item.DeathChestProfileId_Ref))
+                .Distinct().OrderBy(item => item.Id).ToArray();
+            definition.ValidateEvents();
 
             definition.ExperienceLevels = tables.TbExperienceLevel.DataList
                 .Where(item => item.GroupId == definition.Rule.ExperienceLevelGroupId)
                 .OrderBy(item => item.Level).ToArray();
             definition.ValidateExperience();
 
-            Require(definition.UpgradePool != null && definition.UpgradePool.OptionIds_Ref != null,
-                $"TbStageRule {definition.Rule.Id}: unresolved upgrade pool.");
-            definition.UpgradeOptions = definition.UpgradePool.OptionIds_Ref.ToArray();
+            Require(definition.UpgradePool != null, $"TbStageRule {definition.Rule.Id}: unresolved upgrade pool.");
+            definition.UpgradePools = definition.CollectUpgradePools();
+            definition.UpgradeOptions = definition.UpgradePools
+                .SelectMany(pool => pool.Entries)
+                .Where(entry => entry?.OptionId_Ref != null)
+                .Select(entry => entry.OptionId_Ref)
+                .GroupBy(option => option.Id)
+                .Select(group => group.First())
+                .OrderBy(option => option.Id)
+                .ToArray();
             definition.ValidateUpgrades();
 
             Require(stage.InitialSkillIds_Ref != null && stage.InitialSkillIds_Ref.Count > 0 &&
                     stage.InitialSkillIds_Ref.All(item => item != null), $"TbStage {stage.Id}: unresolved initial skill.");
             definition.InitialSkills = stage.InitialSkillIds_Ref.ToArray();
-            definition.AvailableSkills = definition.InitialSkills
+            definition.InitializeTribulation();
+            definition.AvailableSkills = definition.InitialSkills.Concat(definition.TribulationSkills)
                 .Concat(definition.UpgradeOptions.Where(item => item.TargetSkillId_Ref != null).Select(item => item.TargetSkillId_Ref))
+                .Concat(definition.BuildConfig == null ? Enumerable.Empty<SkillConfig>() :
+                    definition.BuildConfig.WeaponIds_Ref.SelectMany(weapon => weapon.Ranks).Select(rank => rank.SkillId_Ref))
+                .Concat(definition.BuildConfig == null ? Enumerable.Empty<SkillConfig>() :
+                    definition.BuildConfig.WeaponIds_Ref.Select(weapon => weapon.EvolutionId_Ref.ResultSkillId_Ref))
                 .GroupBy(item => item.Id).Select(group => group.First()).OrderBy(item => item.Id).ToArray();
+            if (definition.BuildConfig != null)
+                Require(definition.InitialSkills.Select(skill => skill.Id).OrderBy(id => id).SequenceEqual(
+                    definition.BuildConfig.InitialWeaponIds_Ref.Select(weapon => weapon.Ranks[0].SkillId).OrderBy(id => id)),
+                    $"TbStage {stage.Id}: initial skills differ from TbRunBuild initial weapons.");
             foreach (var skill in definition.AvailableSkills) definition.ValidatePlayerSkill(skill);
             foreach (var monster in definition.Monsters) ValidateMonster(monster, "spawn phase");
             definition.ValidateBoss();
@@ -116,6 +146,13 @@ namespace Roguelike.Features.Combat.Run
             RequirePrefab(UiSet.UpgradePanelPrefabResourceId_Ref, "upgrade panel");
             RequirePrefab(UiSet.UpgradeCardPrefabResourceId_Ref, "upgrade card");
             RequirePrefab(UiSet.SettlementPrefabResourceId_Ref, "settlement panel");
+            RequirePrefab(UiSet.ChestPanelPrefabResourceId_Ref, "chest panel");
+            RequirePrefab(UiSet.EventHudPrefabResourceId_Ref, "event HUD");
+            Require(!string.IsNullOrWhiteSpace(UiSet.EliteStatusFormat) && !string.IsNullOrWhiteSpace(UiSet.EvolutionReadyFormat) &&
+                    !string.IsNullOrWhiteSpace(UiSet.ChestStatusFormat), "TbCombatUiSet: missing event display formats.");
+            _ = string.Format(UiSet.EliteStatusFormat, string.Empty, 0);
+            _ = string.Format(UiSet.EvolutionReadyFormat, 0);
+            _ = string.Format(UiSet.ChestStatusFormat, 0);
             Require(UiSet.FontResourceId_Ref != null && UiSet.FontResourceId_Ref.Type == EResourceType.UnityAsset &&
                     !string.IsNullOrWhiteSpace(UiSet.FontResourceId_Ref.Path),
                 $"TbCombatUiSet {UiSet.Id}: invalid font asset resource.");
@@ -202,24 +239,79 @@ namespace Roguelike.Features.Combat.Run
             }
         }
 
-        /// <summary>验证升级池、选项类型、资格字段和属性修改协议。</summary>
-        /// <exception cref="InvalidOperationException">候选数量、权重、引用或类型组合非法。</exception>
+        /// <summary>沿升级入口及 TbChestProfile 普通奖励入口的后备链收集全部可达升级池。</summary>
+        /// <returns>从入口池开始、按后备切换顺序排列的只读集合。</returns>
+        /// <exception cref="InvalidOperationException">后备引用悬空或后备链存在循环。</exception>
+        private IReadOnlyList<UpgradePoolConfig> CollectUpgradePools()
+        {
+            var pools = new List<UpgradePoolConfig>();
+            var added = new HashSet<int>();
+            foreach (UpgradePoolConfig root in new[] { UpgradePool }.Concat(ChestProfiles.Select(item => item.NormalRewardPoolId_Ref)))
+            {
+                var visited = new HashSet<int>();
+                UpgradePoolConfig current = root;
+                while (current != null)
+                {
+                    Require(visited.Add(current.Id), $"TbUpgradePool {current.Id}: fallback cycle detected.");
+                    if (added.Add(current.Id)) pools.Add(current);
+                    if (current.ExhaustionPolicy != EUpgradeExhaustionPolicy.FallbackPool) break;
+                    Require(current.FallbackPoolId.HasValue && current.FallbackPoolId_Ref != null,
+                        $"TbUpgradePool {current.Id}: unresolved fallback pool.");
+                    current = current.FallbackPoolId_Ref;
+                }
+            }
+            return pools;
+        }
+
+        /// <summary>验证升级池后备协议、池内权重、选项类型、资格字段和属性修改协议。</summary>
+        /// <exception cref="InvalidOperationException">池策略、权重、引用或选项类型组合非法。</exception>
         private void ValidateUpgrades()
         {
-            Require(UpgradePool.DrawCount > 0 && UpgradeOptions.Count >= UpgradePool.DrawCount &&
-                    UpgradeOptions.All(item => item != null), $"TbUpgradePool {UpgradePool.Id}: invalid draw set.");
-            Require(UpgradeOptions.Select(item => item.Id).Distinct().Count() == UpgradeOptions.Count,
-                $"TbUpgradePool {UpgradePool.Id}: duplicate option.");
+            foreach (var pool in UpgradePools)
+            {
+                Require(pool.DrawCount > 0 && Enum.IsDefined(typeof(EUpgradeExhaustionPolicy), pool.ExhaustionPolicy) &&
+                        pool.Entries != null && pool.Entries.Count > 0,
+                    $"TbUpgradePool {pool.Id}: invalid draw count, policy or entry set.");
+                Require(pool.Entries.All(entry => entry?.OptionId_Ref != null && entry.Weight > 0),
+                    $"TbUpgradePool {pool.Id}: unresolved option or invalid weight.");
+                Require(pool.Entries.Select(entry => entry.OptionId).Distinct().Count() == pool.Entries.Count,
+                    $"TbUpgradePool {pool.Id}: duplicate option.");
+                bool requiresFallback = pool.ExhaustionPolicy == EUpgradeExhaustionPolicy.FallbackPool;
+                Require(requiresFallback == pool.FallbackPoolId.HasValue &&
+                        (!requiresFallback || pool.FallbackPoolId_Ref != null),
+                    $"TbUpgradePool {pool.Id}: fallback fields do not match exhaustion policy.");
+            }
+            Require(UpgradeOptions.Count > 0 && UpgradeOptions.All(item => item != null),
+                $"TbUpgradePool {UpgradePool.Id}: no resolved upgrade options.");
             foreach (var option in UpgradeOptions)
             {
-                Require(Enum.IsDefined(typeof(EUpgradeOptionType), option.Type) && option.MaxRank > 0 && option.Weight > 0,
-                    $"TbUpgradeOption {option.Id}: invalid type, rank or weight.");
+                Require(BuildConfig == null || option.Type != EUpgradeOptionType.SkillUnlock && option.Type != EUpgradeOptionType.Attribute,
+                    $"TbUpgradeOption {option.Id}: legacy skill/attribute option bypasses the formal build slots.");
+                Require(Enum.IsDefined(typeof(EUpgradeOptionType), option.Type) && option.MaxRank > 0,
+                    $"TbUpgradeOption {option.Id}: invalid type or rank.");
+                Require((option.Type == EUpgradeOptionType.RunWeapon || !option.RunWeaponId.HasValue) &&
+                        (option.Type == EUpgradeOptionType.RunPassive || !option.RunPassiveId.HasValue),
+                    $"TbUpgradeOption {option.Id}: build payload belongs to a different option type.");
                 foreach (var modifier in option.Modifiers)
                     Require(modifier?.AttributeId_Ref != null && Enum.IsDefined(typeof(EAttributeModifyOperation), modifier.Operation) &&
                             (modifier.Operation != EAttributeModifyOperation.Multiply || modifier.ValueMilli > 0),
                         $"TbUpgradeOption {option.Id}: invalid attribute modifier.");
                 switch (option.Type)
                 {
+                    case EUpgradeOptionType.RunWeapon:
+                        Require(BuildConfig != null && option.RunWeaponId_Ref != null &&
+                                BuildConfig.WeaponIds.Contains(option.RunWeaponId.Value) &&
+                                option.MaxRank == option.RunWeaponId_Ref.Ranks.Count && !option.RunPassiveId.HasValue &&
+                                !option.TargetSkillId.HasValue && option.Modifiers.Count == 0 && !option.HealMilli.HasValue,
+                            $"TbUpgradeOption {option.Id}: invalid run weapon payload.");
+                        break;
+                    case EUpgradeOptionType.RunPassive:
+                        Require(BuildConfig != null && option.RunPassiveId_Ref != null &&
+                                BuildConfig.PassiveIds.Contains(option.RunPassiveId.Value) &&
+                                option.MaxRank == option.RunPassiveId_Ref.Ranks.Count && !option.RunWeaponId.HasValue &&
+                                !option.TargetSkillId.HasValue && option.Modifiers.Count == 0 && !option.HealMilli.HasValue,
+                            $"TbUpgradeOption {option.Id}: invalid run passive payload.");
+                        break;
                     case EUpgradeOptionType.SkillUnlock:
                         Require(option.TargetSkillId_Ref != null && option.Modifiers.Count == 0 && !option.HealMilli.HasValue,
                             $"TbUpgradeOption {option.Id}: invalid skill unlock fields.");
@@ -244,6 +336,7 @@ namespace Roguelike.Features.Combat.Run
             Require(skill?.VisualSetId_Ref != null && skill.CombatProfileId_Ref != null,
                 "TbSkill: unresolved player skill.");
             var combat = skill.CombatProfileId_Ref;
+            CombatSkillRules.Validate(combat);
             Require(combat.BaseIntervalMilli > 0 && combat.RangePixels >= 0,
                 $"TbSkillCombat {combat.Id}: invalid common fields.");
             if (combat.DeliveryType == ESkillDeliveryType.Projectile)
@@ -271,6 +364,7 @@ namespace Roguelike.Features.Combat.Run
         /// <exception cref="InvalidOperationException">怪物无法进入正式战斗。</exception>
         private static void ValidateMonster(MonsterConfig monster, string source)
         {
+            CombatSkillRules.Validate(monster?.DefaultSkillId_Ref?.CombatProfileId_Ref);
             Require(monster?.AttributeProfileId_Ref != null && monster.DefaultSkillId_Ref?.CombatProfileId_Ref != null &&
                     monster.VisualSetId_Ref?.StandClipId_Ref != null && monster.VisualSetId_Ref.MoveClipId_Ref != null &&
                     monster.VisualSetId_Ref.AttackClipId_Ref != null && monster.BodyRadiusPixels > 0 &&

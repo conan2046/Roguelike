@@ -66,7 +66,8 @@ namespace Roguelike.Tests
             Assert.Throws<InvalidOperationException>(() => CombatCylinder.FromConfig(null, 1, 0, 0, 0, 1));
         }
 
-        /// <summary>隔离 Job 中玩家高速冲向多个怪物，必须停在外缘且高度分离后允许通过。</summary>
+        /// <summary>隔离Job使用同槽状态缓冲，高速玩家必须停在怪物外缘且高度分离后允许通过。</summary>
+        /// <remarks>测试拥有并释放全部原生容器与World；连续两Tick验证外部ECS写入能被重新采集。</remarks>
         [Test]
         public void PlayerCannotTunnelThroughMonsterCylinder()
         {
@@ -75,12 +76,14 @@ namespace Roguelike.Tests
             using var units = new NativeArray<Entity>(2, Allocator.TempJob);
             using var projectiles = new NativeArray<Entity>(0, Allocator.TempJob);
             using var templates = new NativeArray<CombatUnit>(2, Allocator.TempJob);
+            using var states = new NativeArray<CombatUnit>(2, Allocator.TempJob);
             using var options = new NativeArray<Roguelike.Features.Combat.CombatAttackOption>(0, Allocator.TempJob);
             using var counters = new NativeArray<CombatCounters>(1, Allocator.TempJob);
             using var grid = new NativeParallelMultiHashMap<int2,int>(2, Allocator.TempJob);
             using var requests = new NativeList<CombatDamageRequest>(Allocator.TempJob);
             using var impacts = new NativeList<CombatImpactEvent>(Allocator.TempJob);
             using var areas = new NativeList<CombatAreaEvent>(Allocator.TempJob);
+            using var persistentAreas = new NativeList<CombatPersistentArea>(Allocator.TempJob);
             using var deaths = new NativeList<CombatDeathEvent>(Allocator.TempJob);
             using var weapons = new NativeArray<CombatWeaponState>(0, Allocator.TempJob);
             var unitSlots = units;
@@ -92,8 +95,8 @@ namespace Roguelike.Tests
                 u.Target.Health = 100; u.Target.Lifetime = (ulong)(slot + 1); u.Target.Faction = slot;
                 manager.SetComponentData(units[slot], u);
             }
-            var job = new CombatTickJob { Units=units, Projectiles=projectiles, Templates=templates, AttackOptions=options,
-                Counters=counters, Grid=grid, Requests=requests, Impacts=impacts, Areas=areas, Deaths=deaths,
+            var job = new CombatTickJob { Units=units, UnitStates=states, Projectiles=projectiles, Templates=templates, AttackOptions=options,
+                Counters=counters, Grid=grid, Requests=requests, Impacts=impacts, Areas=areas, PersistentAreas=persistentAreas, Deaths=deaths,
                 PlayerWeapons=weapons, Arena=new float2(10), Input=new float2(1,0), Delta=1f/60,
                 CellSize=1, MaximumRadius=0.2f, MaximumMotion=4, TargetRefresh=1 };
             var system = world.GetOrCreateSystemManaged<CombatTickSystem>();

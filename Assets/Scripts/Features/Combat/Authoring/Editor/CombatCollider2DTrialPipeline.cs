@@ -26,7 +26,7 @@ namespace Roguelike.Features.Combat.Authoring.Editor
                 .Append(stage.StageRuleId_Ref.BossEncounterId_Ref.MonsterId)
                 .ToHashSet();
             var skillIds = stage.InitialSkillIds.ToHashSet();
-            foreach (UpgradeOptionConfig option in stage.StageRuleId_Ref.UpgradePoolId_Ref.OptionIds_Ref)
+            foreach (UpgradeOptionConfig option in EnumerateUpgradeOptions(stage.StageRuleId_Ref.UpgradePoolId_Ref))
                 if (option.TargetSkillId.HasValue) skillIds.Add(option.TargetSkillId.Value);
             foreach (int monsterId in monsterIds)
             {
@@ -82,6 +82,31 @@ namespace Roguelike.Features.Combat.Authoring.Editor
 
         /// <summary>供指定 projectPath 的 Unity BatchMode 执行全量迁移与同一导出校验。</summary>
         public static void MigrateAllFromCommandLine() => MigrateAll();
+
+        /// <summary>枚举入口升级池及 TbUpgradePool 后备链中可能解锁技能的全部选项。</summary>
+        /// <param name="root">当前关卡引用的入口升级池。</param>
+        /// <returns>按池链和池内配置顺序返回的升级选项。</returns>
+        /// <exception cref="InvalidOperationException">选项引用悬空、后备引用悬空或后备链循环。</exception>
+        private static IEnumerable<UpgradeOptionConfig> EnumerateUpgradeOptions(UpgradePoolConfig root)
+        {
+            var visited = new HashSet<int>();
+            UpgradePoolConfig current = root;
+            while (current != null)
+            {
+                if (!visited.Add(current.Id))
+                    throw new InvalidOperationException($"升级池后备链循环：{current.Id}。");
+                foreach (UpgradePoolEntry entry in current.Entries)
+                {
+                    if (entry?.OptionId_Ref == null)
+                        throw new InvalidOperationException($"升级池 {current.Id} 存在未解析选项。");
+                    yield return entry.OptionId_Ref;
+                }
+                if (current.ExhaustionPolicy != EUpgradeExhaustionPolicy.FallbackPool) yield break;
+                if (current.FallbackPoolId_Ref == null)
+                    throw new InvalidOperationException($"升级池 {current.Id} 缺少已解析后备池。");
+                current = current.FallbackPoolId_Ref;
+            }
+        }
 
         /// <summary>把一个单位的两个旧范围合并为纵向 CapsuleCollider2D。</summary>
         /// <param name="configId">角色或怪物表 ID。</param>

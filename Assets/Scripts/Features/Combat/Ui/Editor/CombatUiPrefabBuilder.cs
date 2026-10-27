@@ -8,7 +8,7 @@ using UnityEngine.UI;
 namespace Roguelike.Features.Combat.Ui.Editor
 {
     /// <summary>首次创建正式战斗 UI Prefab 与动态中文字体；已有资产保持不变，避免覆盖人工微调。</summary>
-    public static class CombatUiPrefabBuilder
+    public static partial class CombatUiPrefabBuilder
     {
         private const string Folder = "Assets/GameContent/UI/Combat";
         private const string FontSourcePath = "Assets/Art/Kapai/Fonts/MicrosoftArial.ttf";
@@ -104,7 +104,59 @@ namespace Roguelike.Features.Combat.Ui.Editor
             Bind(view, "healthText", health, "timerText", timer, "levelText", level,
                 "experienceText", experienceText, "killsText", kills, "waveText", wave,
                 "experienceBar", experience);
+            EnsureBuildSlots(root, view, font);
             return root;
+        }
+
+        /// <summary>已确认构筑阶段由菜单或 MCP 调用，为现有 HUD 仅补缺失的构筑节点和绑定。</summary>
+        /// <remarks>不重建原 HUD，不调整已有节点；只保存该正式 Prefab，内存编辑根在 finally 中卸载。</remarks>
+        /// <exception cref="InvalidOperationException">正式 HUD 或字体绑定缺失。</exception>
+        [MenuItem("Roguelike/Combat/补齐构筑HUD绑定")]
+        public static void UpgradeBuildHudBindings()
+        {
+            string path = Folder + "/CombatHud.prefab";
+            GameObject root = PrefabUtility.LoadPrefabContents(path);
+            try
+            {
+                CombatHudView view = root.GetComponent<CombatHudView>();
+                if (view == null || view.HealthText == null || view.HealthText.font == null)
+                    throw new InvalidOperationException("CombatHud is missing its authored font binding.");
+                EnsureBuildSlots(root, view, view.HealthText.font);
+                PrefabUtility.SaveAsPrefabAsset(root, path);
+            }
+            finally { PrefabUtility.UnloadPrefabContents(root); }
+        }
+
+        /// <summary>正式 HUD 生成或升级时补充序列化构筑文本；布局只在编辑器创建新节点时写入 Prefab。</summary>
+        /// <param name="root">正式 HUD 的内存编辑根。</param>
+        /// <param name="view">需要绑定的 HUD 组件。</param>
+        /// <param name="font">已有正式字体。</param>
+        /// <remarks>保留已存在的构筑节点 Transform 和字体；不创建纹理、网格或材质副本。</remarks>
+        private static void EnsureBuildSlots(GameObject root, CombatHudView view, Font font)
+        {
+            Transform existing = root.transform.Find("BuildSlots");
+            RectTransform panel;
+            if (existing == null)
+            {
+                panel = CreatePanel(root.transform, "BuildSlots", new Color32(8, 15, 30, 210));
+                SetRect(panel, new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(1800, 96), new Vector2(0, 150));
+            }
+            else panel = (RectTransform)existing;
+            Text weapons = panel.Find("WeaponSlotsText")?.GetComponent<Text>();
+            if (weapons == null)
+            {
+                weapons = CreateText(panel, "WeaponSlotsText", font, 24, TextAnchor.MiddleLeft);
+                SetRect(weapons.rectTransform, new Vector2(0, 0.5f), new Vector2(1, 0.5f), new Vector2(-40, 40), new Vector2(0, 22));
+                weapons.raycastTarget = false;
+            }
+            Text passives = panel.Find("PassiveSlotsText")?.GetComponent<Text>();
+            if (passives == null)
+            {
+                passives = CreateText(panel, "PassiveSlotsText", font, 24, TextAnchor.MiddleLeft);
+                SetRect(passives.rectTransform, new Vector2(0, 0.5f), new Vector2(1, 0.5f), new Vector2(-40, 40), new Vector2(0, -22));
+                passives.raycastTarget = false;
+            }
+            Bind(view, "weaponSlotsText", weapons, "passiveSlotsText", passives);
         }
 
         /// <summary>创建顶部居中的 Boss 名称、血量文本与进度条。</summary>
@@ -170,12 +222,31 @@ namespace Roguelike.Features.Combat.Ui.Editor
             Text name = CreateText(root.transform, "NameText", font, 30, TextAnchor.MiddleCenter);
             SetRect(name.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(-30, 58), new Vector2(0, -185));
             Text description = CreateText(root.transform, "DescriptionText", font, 23, TextAnchor.UpperCenter);
-            SetRect(description.rectTransform, new Vector2(0, 0), new Vector2(1, 1), new Vector2(-44, -250), new Vector2(0, 10));
+            SetRect(description.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(-44, 128), new Vector2(0, -286));
             Text rank = CreateText(root.transform, "RankText", font, 21, TextAnchor.MiddleCenter);
             SetRect(rank.rectTransform, new Vector2(0, 0), new Vector2(1, 0), new Vector2(-30, 44), new Vector2(0, 34));
             Bind(view, "selectButton", button, "iconImage", icon, "nameText", name,
                 "descriptionText", description, "rankText", rank);
             return root;
+        }
+
+        /// <summary>构筑卡片加入多行规则说明后，仅修正正式卡片说明区域，避免覆盖名称与星级。</summary>
+        /// <remarks>只改 DescriptionText 的 RectTransform；保留原字体、名称、图标和其他节点，保存后卸载内存编辑根。</remarks>
+        /// <exception cref="InvalidOperationException">卡片或序列化说明文本缺失。</exception>
+        public static void UpgradeBuildCardDescriptionLayout()
+        {
+            string path = Folder + "/UpgradeCard.prefab";
+            GameObject root = PrefabUtility.LoadPrefabContents(path);
+            try
+            {
+                UpgradeCardView view = root.GetComponent<UpgradeCardView>();
+                if (view == null || view.DescriptionText == null)
+                    throw new InvalidOperationException("UpgradeCard lacks its authored description binding.");
+                SetRect(view.DescriptionText.rectTransform, new Vector2(0, 1), new Vector2(1, 1),
+                    new Vector2(-44, 128), new Vector2(0, -286));
+                PrefabUtility.SaveAsPrefabAsset(root, path);
+            }
+            finally { PrefabUtility.UnloadPrefabContents(root); }
         }
 
         /// <summary>创建胜负标题、单局统计与重开按钮的全屏结算遮罩。</summary>

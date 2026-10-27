@@ -19,10 +19,38 @@ namespace Roguelike.Tests
             var definition = CreateDefinition();
             Assert.That(definition.Stage.Id, Is.EqualTo(1));
             Assert.That(definition.SpawnPhases.Count, Is.EqualTo(4));
-            Assert.That(definition.Monsters.Select(item => item.Id), Is.EquivalentTo(new[] { 10010, 10011, 10012, 10013 }));
+            Assert.That(definition.Monsters.Select(item => item.Id), Is.EquivalentTo(new[] { 10010, 10011, 10012, 10013,10014,10015,10016,10017,10018,10026 }));
             Assert.That(definition.Boss.MonsterId, Is.EqualTo(10032));
             Assert.That(definition.InitialSkills.Select(item => item.Id), Is.EqualTo(new[] { 20001 }));
-            Assert.That(definition.AvailableSkills.Select(item => item.Id), Is.EquivalentTo(new[] { 20001, 20014, 20028, 20032, 20043 }));
+            Assert.That(definition.AvailableSkills.Select(item => item.Id), Is.EquivalentTo(new[] {
+                20001, 20014, 20016, 20028, 20033, 20043, 20044, 20027, 20050, 20007, 20037, 20030 }));
+        }
+
+        /// <summary>验证候选充足、降量、后备池和直接结束四类耗尽决策均严格读取表策略。</summary>
+        /// <param name="policy">待验证的 TbUpgradePool.exhaustionPolicy。</param>
+        /// <param name="eligibleCount">筛选后的合法候选数。</param>
+        /// <param name="hasFallback">后备池引用是否已解析。</param>
+        /// <param name="expected">预期运行时动作的枚举整数值。</param>
+        [TestCase(EUpgradeExhaustionPolicy.ReduceOfferCount, 3, false, (int)UpgradeOfferAction.DrawConfiguredCount)]
+        [TestCase(EUpgradeExhaustionPolicy.ReduceOfferCount, 2, false, (int)UpgradeOfferAction.DrawRemaining)]
+        [TestCase(EUpgradeExhaustionPolicy.ReduceOfferCount, 0, false, (int)UpgradeOfferAction.EndSelection)]
+        [TestCase(EUpgradeExhaustionPolicy.FallbackPool, 2, true, (int)UpgradeOfferAction.UseFallbackPool)]
+        [TestCase(EUpgradeExhaustionPolicy.EndUpgradeSelection, 2, false, (int)UpgradeOfferAction.EndSelection)]
+        public void UpgradeExhaustionPolicyResolvesExpectedAction(EUpgradeExhaustionPolicy policy,
+            int eligibleCount, bool hasFallback, int expected)
+        {
+            Assert.That(UpgradeOfferPolicy.Resolve(policy, 3, eligibleCount, hasFallback),
+                Is.EqualTo((UpgradeOfferAction)expected));
+        }
+
+        /// <summary>验证后备策略没有已解析后备池时不会静默吞掉升级事件。</summary>
+        [Test]
+        public void FallbackPolicyRequiresResolvedPool()
+        {
+            Assert.Throws<InvalidOperationException>(() =>
+                UpgradeOfferPolicy.Resolve(EUpgradeExhaustionPolicy.FallbackPool, 3, 2, false));
+            Assert.Throws<InvalidOperationException>(() =>
+                UpgradeOfferPolicy.Resolve((EUpgradeExhaustionPolicy)999, 3, 3, false));
         }
 
         /// <summary>验证第一波等待、阶段边界取消和新阶段独立等待均读取 TbSpawnPhase。</summary>
@@ -66,8 +94,8 @@ namespace Roguelike.Tests
                 steppedRequests.AddRange(stepped.Advance(delta));
             }
 
-            var directNormal = directRequests.Where(item => !item.IsBoss).ToArray();
-            var steppedNormal = steppedRequests.Where(item => !item.IsBoss).ToArray();
+            var directNormal = directRequests.Where(item => !item.IsBoss && item.RunEvent == null).ToArray();
+            var steppedNormal = steppedRequests.Where(item => !item.IsBoss && item.RunEvent == null).ToArray();
             Assert.That(direct.CompletedWaves, Is.EqualTo(expectedWaves.Sum()));
             Assert.That(stepped.CompletedWaves, Is.EqualTo(expectedWaves.Sum()));
             Assert.That(directNormal.Length, Is.EqualTo(expectedMonsters.Sum()));
@@ -156,7 +184,7 @@ namespace Roguelike.Tests
             Assert.That(model.PendingLevelUps, Is.Zero);
         }
 
-        /// <summary>验证相同种子产生相同的无放回候选，选中的一次性技能不会再次进入池。</summary>
+        /// <summary>验证相同种子产生相同的无放回构筑候选，获得武器后活动技能与槽位同步。</summary>
         [Test]
         public void UpgradeChoicesAreDeterministicDistinctAndFilterUnlockedSkills()
         {
@@ -167,17 +195,17 @@ namespace Roguelike.Tests
             Assert.That(left.CurrentChoices.Select(item => item.Id), Is.EqualTo(right.CurrentChoices.Select(item => item.Id)));
             Assert.That(left.CurrentChoices.Select(item => item.Id).Distinct().Count(), Is.EqualTo(left.Definition.UpgradePool.DrawCount));
 
-            var skill = left.CurrentChoices.FirstOrDefault(item => item.Type == EUpgradeOptionType.SkillUnlock);
+            var skill = left.CurrentChoices.FirstOrDefault(item => item.Type == EUpgradeOptionType.RunWeapon);
             if (skill == null)
             {
                 Assert.That(left.ChooseUpgrade(left.UpgradePanelGeneration, left.CurrentChoices[0].Id), Is.True);
                 GrantNextLevel(left);
-                skill = left.CurrentChoices.First(item => item.Type == EUpgradeOptionType.SkillUnlock);
+                skill = left.CurrentChoices.First(item => item.Type == EUpgradeOptionType.RunWeapon);
             }
             Assert.That(left.ChooseUpgrade(left.UpgradePanelGeneration, skill.Id), Is.True);
-            Assert.That(left.ActiveSkills.ContainsKey(skill.TargetSkillId.Value), Is.True);
+            Assert.That(left.ActiveSkills.ContainsKey(skill.RunWeaponId_Ref.Ranks[0].SkillId), Is.True);
             GrantNextLevel(left);
-            Assert.That(left.CurrentChoices.Any(item => item.Id == skill.Id), Is.False);
+            Assert.That(left.Build.WeaponRanks.Count, Is.LessThanOrEqualTo(left.Build.Config.WeaponSlotCount));
         }
 
         /// <summary>验证结算只产生一次，重开恢复时间、实体状态、统计、技能和随机候选。</summary>

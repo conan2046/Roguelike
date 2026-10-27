@@ -23,7 +23,7 @@ namespace Roguelike.Tests
     /// <summary>真实 YooAsset 与独立 ECS 世界的可操作入口验收，不以离线选帧代替相机画面。</summary>
     [PrebuildSetup(typeof(CombatRuntimeTests))]
     [PostBuildCleanup(typeof(CombatRuntimeTests))]
-    public sealed class CombatRuntimeTests : IPrebuildSetup, IPostBuildCleanup
+    public sealed partial class CombatRuntimeTests : IPrebuildSetup, IPostBuildCleanup
     {
         /// <summary>Unity Test Runner 进入运行模式前标记隔离资源环境，避免命令行战斗入口与测试同时拥有 YooAsset。</summary>
         /// <remarks>只设置编辑器会话标记，不写配置、场景或项目设置；测试完成后清除。</remarks>
@@ -114,7 +114,8 @@ namespace Roguelike.Tests
                     yield return Wait(runner.InitializeAsync(scenario, resources, input, CancellationToken.None));
                     Assert.That(runner.Ready, Is.True); Assert.That(runner.ViewCamera, Is.Not.Null);
                     Assert.That(runner.MapBackground, Is.Not.Null);
-                    Assert.That(runner.MapBackground.TileCount, Is.EqualTo(1024));
+                    Assert.That(runner.MapBackground.TileCount,
+                        Is.EqualTo(CombatMapDefinition.Create(scenario.MapId_Ref).FitViewport(runner.ViewCamera.aspect).TileCount));
                     Assert.That(runner.MapBackground.Tilemap.GetComponent<UnityEngine.Tilemaps.TilemapRenderer>().mode,
                         Is.EqualTo(UnityEngine.Tilemaps.TilemapRenderer.Mode.Chunk));
                     float expectedOrthographicSize = scenario.MapId_Ref.CameraViewportHeightPixels *
@@ -140,6 +141,35 @@ namespace Roguelike.Tests
                     ulong tick = runner.Session.Statistics.Tick;
                     for (int frame = 0; frame < 5; frame++) yield return null;
                     Assert.That(runner.Session.Statistics.Tick, Is.EqualTo(tick));
+                    // 暂停时改变相机比例，验证 LateUpdate 仍同步地面，并在四角保持完整视野。
+                    float originalAspect = runner.ViewCamera.aspect;
+                    foreach (float aspect in new[] { 9f / 16f, 32f / 9f })
+                    {
+                        runner.ViewCamera.aspect = aspect;
+                        foreach (int cornerX in new[] { -1, 1 })
+                            foreach (int cornerY in new[] { -1, 1 })
+                            {
+                                var cornerPlayer = runner.Session.ReadUnit(0);
+                                cornerPlayer.Position = new float2(cornerX * scenario.MapId_Ref.ArenaHalfWidthPixels,
+                                    cornerY * scenario.MapId_Ref.ArenaHalfHeightPixels) * scenario.CombatRulesId_Ref.WorldUnitsPerPixel;
+                                inputWorld.EntityManager.SetComponentData(runner.Session.UnitEntity(0), cornerPlayer);
+                                yield return null;
+                                Vector3 cameraPosition = runner.ViewCamera.transform.localPosition;
+                                Assert.That(cameraPosition.x, Is.EqualTo(cornerPlayer.Position.x).Within(0.001f));
+                                Assert.That(cameraPosition.y, Is.EqualTo(cornerPlayer.Position.y).Within(0.001f));
+                                Bounds ground = runner.MapBackground.Tilemap.localBounds;
+                                Vector3 groundMin = runner.MapBackground.Tilemap.transform.TransformPoint(ground.min);
+                                Vector3 groundMax = runner.MapBackground.Tilemap.transform.TransformPoint(ground.max);
+                                foreach (float viewportX in new[] { 0f, 1f })
+                                    foreach (float viewportY in new[] { 0f, 1f })
+                                    {
+                                        Vector3 point = runner.ViewCamera.ViewportToWorldPoint(new Vector3(viewportX, viewportY, -cameraPosition.z));
+                                        Assert.That(point.x, Is.InRange(groundMin.x - 0.001f, groundMax.x + 0.001f));
+                                        Assert.That(point.y, Is.InRange(groundMin.y - 0.001f, groundMax.y + 0.001f));
+                                    }
+                            }
+                    }
+                    runner.ViewCamera.aspect = originalAspect;
                     ulong lifetime = runner.Session.ReadUnit(0).Target.Lifetime;
                     input.Frame = new CombatInputFrame { RestartPressed = true };
                     yield return null;
@@ -206,7 +236,8 @@ namespace Roguelike.Tests
                     new UnityCombatInput(definition.Presentation), CancellationToken.None));
                 Assert.That(runner.Ready, Is.True);
                 Assert.That(runner.MapBackground, Is.Not.Null);
-                Assert.That(runner.MapBackground.TileCount, Is.EqualTo(1024));
+                Assert.That(runner.MapBackground.TileCount,
+                    Is.EqualTo(definition.MapLayout.FitViewport(runner.ViewCamera.aspect).TileCount));
                 Assert.That(runner.FormalUiRoot, Is.Not.Null);
                 Assert.That(runner.FormalUiRoot.GetComponent<CombatHudView>(), Is.Not.Null);
                 Canvas formalCanvas = runner.FormalUiRoot.GetComponent<Canvas>();
@@ -250,8 +281,17 @@ namespace Roguelike.Tests
                     definition.CombatRules.WorldUnitsPerPixel;
                 float feedbackBarHeight = definition.Presentation.HealthBarHeightPixels *
                     definition.CombatRules.WorldUnitsPerPixel;
-                float feedbackDigitWidth = definition.CombatRules.WorldUnitsPerPixel * 29f * 1.25f;
-                float feedbackDigitHeight = definition.CombatRules.WorldUnitsPerPixel * 30f * 1.25f;
+                Task<IResourceHandle<Texture2D>> digitTextureTask = resources.LoadAssetAsync<Texture2D>(
+                    definition.Presentation.DamageNumberAtlasResourceId, CancellationToken.None);
+                yield return Wait(digitTextureTask);
+                using IResourceHandle<Texture2D> digitTextureHandle = digitTextureTask.GetAwaiter().GetResult();
+                Assert.That(digitTextureHandle.Asset.width % definition.Presentation.DamageNumberGlyphs.Length,
+                    Is.Zero);
+                float feedbackDigitWidth = definition.CombatRules.WorldUnitsPerPixel *
+                    (digitTextureHandle.Asset.width / definition.Presentation.DamageNumberGlyphs.Length) *
+                    definition.Presentation.DamageNumberGlyphScale;
+                float feedbackDigitHeight = definition.CombatRules.WorldUnitsPerPixel *
+                    digitTextureHandle.Asset.height * definition.Presentation.DamageNumberGlyphScale;
                 yield return CaptureFeedbackCamera(runner.ViewCamera,
                     new Vector3(feedbackMonster.Position.x, feedbackMonster.Position.y + feedbackHeight, 0f),
                     feedbackBarWidth, feedbackBarHeight, feedbackDigitWidth, feedbackDigitHeight,
@@ -478,7 +518,7 @@ namespace Roguelike.Tests
                 }
             }
 
-            var normal = requests.Where(item => !item.IsBoss).ToArray();
+            var normal = requests.Where(item => !item.IsBoss && item.RunEvent == null).ToArray();
             Assert.That(model.CompletedWaves, Is.EqualTo(215));
             Assert.That(normal.Length, Is.EqualTo(2395));
             Assert.That(requests.Count(item => item.IsBoss), Is.EqualTo(1));

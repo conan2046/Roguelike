@@ -13,7 +13,7 @@ using YooAsset.Editor;
 namespace Roguelike.Infrastructure.Editor
 {
     /// <summary>
-    /// Builds the complete YooAsset package into StreamingAssets before producing a Windows offline player.
+    /// Builds the complete YooAsset Raw and GameAsset packages into StreamingAssets before producing a Windows offline player.
     /// </summary>
     public static class OfflineWindowsBuild
     {
@@ -58,7 +58,7 @@ namespace Roguelike.Infrastructure.Editor
         /// <param name="packageVersion">Release identifier stored in the YooAsset local manifest.</param>
         /// <param name="outputPath">Absolute or project-relative path of the Windows executable.</param>
         /// <exception cref="BuildFailedException">Thrown when any required input or build operation fails.</exception>
-        /// <remarks>Replaces only the generated DefaultPackage directory below Assets/StreamingAssets/yoo.</remarks>
+        /// <remarks>Replaces the generated Raw and GameAsset package directories below Assets/StreamingAssets/yoo.</remarks>
         private static void Build(string packageVersion, string outputPath)
         {
             ValidatePackageVersion(packageVersion);
@@ -74,26 +74,24 @@ namespace Roguelike.Infrastructure.Editor
             Directory.CreateDirectory(outputDirectory);
             ProjectRenderPipelineSetup.Configure();
             ProjectYooAssetSetup.Configure();
-            ValidateRawOnlyPackageContent();
-            BuildResourcePackage(packageVersion);
+            BuildRawResourcePackage(packageVersion);
+            BuildGameAssetPackage(packageVersion);
 
-            string editorPackageDirectory = Path.Combine(
-                AssetBundleBuilderHelper.GetStreamingAssetsRoot(),
-                YooAssetProjectConstants.PackageName);
-            ValidatePackageFiles(editorPackageDirectory, packageVersion);
+            ValidateBuiltInPackage(YooAssetProjectConstants.RawPackageName, packageVersion);
+            ValidateBuiltInPackage(YooAssetProjectConstants.GameAssetPackageName, packageVersion);
             BuildPlayer(scenes, absoluteOutputPath);
-            ValidatePlayerPackage(absoluteOutputPath, packageVersion);
+            ValidatePlayerPackages(absoluteOutputPath, packageVersion);
 
             Debug.Log($"[Roguelike.Build] WINDOWS_PLAYER_BUILD_SUCCEEDED path={absoluteOutputPath}");
         }
 
         /// <summary>
-        /// Builds every collected resource and copies the complete package into the default built-in file system.
+        /// Builds Luban and legacy byte resources and copies the Raw package into the built-in file system.
         /// </summary>
         /// <param name="packageVersion">Release identifier written to the YooAsset manifest files.</param>
         /// <exception cref="BuildFailedException">Thrown when YooAsset reports a failed build result.</exception>
         /// <remarks>Clears the previous built-in DefaultPackage before copying the new manifest, catalog, and bundles.</remarks>
-        private static void BuildResourcePackage(string packageVersion)
+        private static void BuildRawResourcePackage(string packageVersion)
         {
             var parameters = new RawFileBuildParameters
             {
@@ -102,7 +100,7 @@ namespace Roguelike.Infrastructure.Editor
                 BuildPipeline = EBuildPipeline.RawFileBuildPipeline.ToString(),
                 BuildBundleType = (int)EBuildBundleType.RawBundle,
                 BuildTarget = BuildTarget.StandaloneWindows64,
-                PackageName = YooAssetProjectConstants.PackageName,
+                PackageName = YooAssetProjectConstants.RawPackageName,
                 PackageVersion = packageVersion,
                 PackageNote = $"Windows offline player {packageVersion}",
                 ClearBuildCacheFiles = true,
@@ -128,31 +126,44 @@ namespace Roguelike.Infrastructure.Editor
         }
 
         /// <summary>
-        /// Ensures the current raw-file package does not silently collect imported Unity assets it cannot deserialize.
+        /// Builds imported Unity assets as AssetBundles without changing legacy Raw-file semantics.
         /// </summary>
-        /// <exception cref="BuildFailedException">Thrown when GameContent contains a non-meta file requiring an AssetBundle package.</exception>
-        private static void ValidateRawOnlyPackageContent()
+        /// <param name="packageVersion">Release identifier written to the GameAsset package manifest.</param>
+        /// <exception cref="BuildFailedException">Thrown when YooAsset reports a failed AssetBundle build.</exception>
+        /// <remarks>Copies the complete package into its package-scoped built-in directory with LZ4 compression.</remarks>
+        private static void BuildGameAssetPackage(string packageVersion)
         {
-            string gameContentDirectory = Path.GetFullPath("Assets/GameContent");
-            if (!Directory.Exists(gameContentDirectory))
+            var parameters = new BuiltinBuildParameters
             {
-                return;
-            }
+                BuildOutputRoot = AssetBundleBuilderHelper.GetDefaultBuildOutputRoot(),
+                BuildinFileRoot = AssetBundleBuilderHelper.GetStreamingAssetsRoot(),
+                BuildPipeline = EBuildPipeline.BuiltinBuildPipeline.ToString(),
+                BuildBundleType = (int)EBuildBundleType.AssetBundle,
+                BuildTarget = BuildTarget.StandaloneWindows64,
+                PackageName = YooAssetProjectConstants.GameAssetPackageName,
+                PackageVersion = packageVersion,
+                PackageNote = $"Windows offline imported assets {packageVersion}",
+                ClearBuildCacheFiles = true,
+                UseAssetDependencyDB = true,
+                EnableSharePackRule = true,
+                VerifyBuildingResult = true,
+                FileNameStyle = EFileNameStyle.HashName,
+                BuildinFileCopyOption = EBuildinFileCopyOption.ClearAndCopyAll,
+                BuildinFileCopyParams = string.Empty,
+                CompressOption = ECompressOption.LZ4
+            };
 
-            bool containsAsset = Directory.EnumerateFiles(
-                    gameContentDirectory,
-                    "*",
-                    SearchOption.AllDirectories)
-                .Any(path => !string.Equals(
-                    Path.GetExtension(path),
-                    ".meta",
-                    StringComparison.OrdinalIgnoreCase));
-            if (containsAsset)
+            var pipeline = new BuiltinBuildPipeline();
+            YooAsset.Editor.BuildResult result = pipeline.Run(parameters, true);
+            if (!result.Success)
             {
                 throw new BuildFailedException(
-                    "Assets/GameContent contains imported Unity assets. " +
-                    "Add a dedicated AssetBundle package before building the raw-only offline package.");
+                    $"YooAsset GameAsset package build failed: {result.ErrorInfo}");
             }
+
+            Debug.Log(
+                $"[Roguelike.Build] GAME_ASSET_RESOURCE_BUILD_SUCCEEDED version={packageVersion} " +
+                $"directory={result.OutputPackageDirectory}");
         }
 
         /// <summary>
@@ -246,12 +257,15 @@ namespace Roguelike.Infrastructure.Editor
         /// <summary>
         /// Confirms that the package directory contains the local version, hash, manifest, and built-in catalog.
         /// </summary>
-        /// <param name="packageDirectory">DefaultPackage directory to inspect.</param>
+        /// <param name="packageDirectory">Package directory to inspect.</param>
+        /// <param name="packageName">Package name used to derive its generated filenames.</param>
         /// <param name="packageVersion">Expected manifest version.</param>
         /// <exception cref="BuildFailedException">Thrown when any mandatory built-in file is absent.</exception>
-        private static void ValidatePackageFiles(string packageDirectory, string packageVersion)
+        private static void ValidatePackageFiles(
+            string packageDirectory,
+            string packageName,
+            string packageVersion)
         {
-            string packageName = YooAssetProjectConstants.PackageName;
             string[] requiredFiles =
             {
                 YooAssetSettingsData.GetPackageVersionFileName(packageName),
@@ -271,12 +285,26 @@ namespace Roguelike.Infrastructure.Editor
         }
 
         /// <summary>
-        /// Confirms that Unity copied the complete validated package into the finished player data directory.
+        /// Confirms that one generated package has been copied into its package-scoped built-in directory.
+        /// </summary>
+        /// <param name="packageName">Package whose local manifest and catalog must exist.</param>
+        /// <param name="packageVersion">Expected package version.</param>
+        /// <exception cref="BuildFailedException">Thrown when any mandatory built-in file is absent.</exception>
+        private static void ValidateBuiltInPackage(string packageName, string packageVersion)
+        {
+            string packageDirectory = Path.Combine(
+                AssetBundleBuilderHelper.GetStreamingAssetsRoot(),
+                packageName);
+            ValidatePackageFiles(packageDirectory, packageName, packageVersion);
+        }
+
+        /// <summary>
+        /// Confirms that Unity copied both validated packages into the finished player data directory.
         /// </summary>
         /// <param name="absoluteOutputPath">Absolute executable path returned to the build caller.</param>
         /// <param name="packageVersion">Expected YooAsset package version.</param>
         /// <exception cref="BuildFailedException">Thrown when the executable or its built-in package is missing.</exception>
-        private static void ValidatePlayerPackage(string absoluteOutputPath, string packageVersion)
+        private static void ValidatePlayerPackages(string absoluteOutputPath, string packageVersion)
         {
             if (!File.Exists(absoluteOutputPath))
             {
@@ -286,12 +314,18 @@ namespace Roguelike.Infrastructure.Editor
             string playerDataDirectory = Path.Combine(
                 Path.GetDirectoryName(absoluteOutputPath) ?? string.Empty,
                 Path.GetFileNameWithoutExtension(absoluteOutputPath) + "_Data");
-            string packageDirectory = Path.Combine(
+            string packageRoot = Path.Combine(
                 playerDataDirectory,
                 "StreamingAssets",
-                YooAssetSettingsData.GetDefaultYooFolderName(),
-                YooAssetProjectConstants.PackageName);
-            ValidatePackageFiles(packageDirectory, packageVersion);
+                YooAssetSettingsData.GetDefaultYooFolderName());
+            ValidatePackageFiles(
+                Path.Combine(packageRoot, YooAssetProjectConstants.RawPackageName),
+                YooAssetProjectConstants.RawPackageName,
+                packageVersion);
+            ValidatePackageFiles(
+                Path.Combine(packageRoot, YooAssetProjectConstants.GameAssetPackageName),
+                YooAssetProjectConstants.GameAssetPackageName,
+                packageVersion);
         }
 
         /// <summary>

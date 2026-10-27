@@ -21,7 +21,10 @@ public sealed partial class UpgradePoolConfig : Luban.BeanBase
     {
         Id = _buf.ReadInt();
         DrawCount = _buf.ReadInt();
-        {int n0 = _buf.ReadSize(); OptionIds = new System.Collections.Generic.List<int>(n0);for(var i0 = 0 ; i0 < n0 ; i0++) { int _e0;  _e0 = _buf.ReadInt(); OptionIds.Add(_e0);}}
+        ExhaustionPolicy = (EUpgradeExhaustionPolicy)_buf.ReadInt();
+        if(_buf.ReadBool()){ FallbackPoolId = _buf.ReadInt(); } else { FallbackPoolId = null; }
+        FallbackPoolId_Ref = null;
+        {int n0 = _buf.ReadSize(); Entries = new System.Collections.Generic.List<UpgradePoolEntry>(n0);for(var i0 = 0 ; i0 < n0 ; i0++) { UpgradePoolEntry _e0;  _e0 = global::cfg.UpgradePoolEntry.DeserializeUpgradePoolEntry(_buf); Entries.Add(_e0);}}
     }
 
     public static UpgradePoolConfig DeserializeUpgradePoolConfig(ByteBuf _buf)
@@ -34,23 +37,30 @@ public sealed partial class UpgradePoolConfig : Luban.BeanBase
     /// </summary>
     public readonly int Id;
     /// <summary>
-    /// 每次无放回候选数量
+    /// 每次最多展示数量
     /// </summary>
     public readonly int DrawCount;
     /// <summary>
-    /// 可用升级选项
+    /// 候选不足时的处理策略
     /// </summary>
-    public readonly System.Collections.Generic.List<int> OptionIds;
-    public System.Collections.Generic.List<UpgradeOptionConfig> OptionIds_Ref;
+    public readonly EUpgradeExhaustionPolicy ExhaustionPolicy;
+    /// <summary>
+    /// 后备池；仅FallbackPool填写
+    /// </summary>
+    public readonly int? FallbackPoolId;
+    public UpgradePoolConfig FallbackPoolId_Ref;
+    /// <summary>
+    /// 选项ID:池内权重
+    /// </summary>
+    public readonly System.Collections.Generic.List<UpgradePoolEntry> Entries;
    
     public const int __ID__ = -930134630;
     public override int GetTypeId() => __ID__;
 
     public  void ResolveRef(Tables tables)
     {
-        OptionIds_Ref = new System.Collections.Generic.List<UpgradeOptionConfig>();
-        foreach (var _v in OptionIds) { OptionIds_Ref.Add(tables.TbUpgradeOption.GetOrDefault(_v)); }
-
+        FallbackPoolId_Ref = FallbackPoolId!= null ? tables.TbUpgradePool.GetOrDefault(FallbackPoolId.Value) : null;
+        foreach (var _e in Entries) { _e?.ResolveRef(tables); }
     }
 
     public override string ToString()
@@ -58,7 +68,9 @@ public sealed partial class UpgradePoolConfig : Luban.BeanBase
         return "{ "
         + "id:" + Id + ","
         + "drawCount:" + DrawCount + ","
-        + "optionIds:" + Luban.StringUtil.CollectionToString(OptionIds) + ","
+        + "exhaustionPolicy:" + ExhaustionPolicy + ","
+        + "fallbackPoolId:" + FallbackPoolId + ","
+        + "entries:" + Luban.StringUtil.CollectionToString(Entries) + ","
         + "}";
     }
 }

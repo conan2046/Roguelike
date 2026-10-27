@@ -3,6 +3,10 @@ param()
 
 $ErrorActionPreference = 'Stop'
 
+if ($PSVersionTable.PSVersion.Major -lt 7) {
+    throw 'PowerShell 7 or later is required. Run this script with pwsh.'
+}
+
 $RepoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 $LubanDll = Join-Path $RepoRoot 'Tools\Luban\Luban.dll'
 $ConfigFile = Join-Path $RepoRoot 'Config\luban.conf'

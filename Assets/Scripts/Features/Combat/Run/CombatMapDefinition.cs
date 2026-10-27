@@ -21,6 +21,12 @@ namespace Roguelike.Features.Combat.Run
         /// <summary>获取纵向格子数量。</summary>
         public int Rows { get; }
 
+        /// <summary>当前布局补齐完整地块后的实际逻辑像素宽度；交互入口使用 FitViewport 派生布局。</summary>
+        public int WidthPixels => checked(Columns * Map.TileSizePixels);
+
+        /// <summary>当前布局补齐完整地块后的实际逻辑像素高度。</summary>
+        public int HeightPixels => checked(Rows * Map.TileSizePixels);
+
         /// <summary>获取需要通过统一资源服务加载的地块纹理。</summary>
         public IReadOnlyList<ResourceConfig> TileResources => tileResources;
 
@@ -84,6 +90,28 @@ namespace Roguelike.Features.Combat.Run
             return new CombatMapDefinition(map, columns, rows, resources, cumulative, (int)sum);
         }
 
+        /// <summary>入局或视野改变时，以行走范围外各半个视野推导背景布局，两侧对称向外补齐完整地块。</summary>
+        /// <param name="viewportAspect">当前摄像机可见范围的宽高比；不是设备物理像素与逻辑像素直接相加。</param>
+        /// <returns>格子数不变时返回当前实例；否则返回复用纹理目录、种子和权重的只读布局。</returns>
+        /// <remarks>尺寸仅消费 TbMap.arenaHalfWidthPixels、arenaHalfHeightPixels、cameraViewportHeightPixels、tileSizePixels，不修改配置或加载资源。</remarks>
+        /// <exception cref="InvalidOperationException">视野比例、场地或派生尺寸非法，或超出可索引地块数量。</exception>
+        public CombatMapDefinition FitViewport(double viewportAspect)
+        {
+            Require(!double.IsNaN(viewportAspect) && !double.IsInfinity(viewportAspect) && viewportAspect > 0,
+                "Combat map viewport aspect must be finite and positive.");
+            Require(Map.ArenaHalfWidthPixels > 0 && Map.ArenaHalfHeightPixels > 0,
+                $"TbMap {Map.Id}: walkable arena half sizes must be positive.");
+            double halfColumns = Math.Ceiling((Map.ArenaHalfWidthPixels + Map.CameraViewportHeightPixels * viewportAspect * 0.5) / Map.TileSizePixels);
+            double halfRows = Math.Ceiling((Map.ArenaHalfHeightPixels + Map.CameraViewportHeightPixels * 0.5) / Map.TileSizePixels);
+            Require(halfColumns > 0 && halfRows > 0 &&
+                    halfColumns * Map.TileSizePixels * 2 <= int.MaxValue &&
+                    halfRows * Map.TileSizePixels * 2 <= int.MaxValue && halfColumns * halfRows * 4 <= int.MaxValue,
+                $"TbMap {Map.Id}: viewport-derived map dimensions exceed supported integer ranges.");
+            int columns = checked((int)halfColumns * 2), rows = checked((int)halfRows * 2);
+            return columns == Columns && rows == Rows ? this :
+                new CombatMapDefinition(Map, columns, rows, tileResources, cumulativeWeights, totalWeight);
+        }
+
         /// <summary>按 TbMap.generationSeed、格子坐标和 tileWeights 返回稳定的纹理索引。</summary>
         /// <param name="x">从零开始的横向格子坐标。</param>
         /// <param name="y">从零开始的纵向格子坐标。</param>
@@ -93,6 +121,16 @@ namespace Roguelike.Features.Combat.Run
         {
             if ((uint)x >= (uint)Columns) throw new ArgumentOutOfRangeException(nameof(x));
             if ((uint)y >= (uint)Rows) throw new ArgumentOutOfRangeException(nameof(y));
+            return SelectTileIndexAtCell(x, y);
+        }
+
+        /// <summary>按地图中心锚定的世界地块坐标取样，使视野改变时同一世界格子保持相同纹理。</summary>
+        /// <param name="x">相对地图中心的横向地块坐标，允许负数。</param>
+        /// <param name="y">相对地图中心的纵向地块坐标，允许负数。</param>
+        /// <returns>由 TbMap.generationSeed 与 tileWeights 决定的纹理目录索引。</returns>
+        /// <exception cref="InvalidOperationException">已验证的累计权重无法得到有效纹理。</exception>
+        public int SelectTileIndexAtCell(int x, int y)
+        {
             int roll = (int)(Hash(Map.GenerationSeed, x, y) % (uint)totalWeight);
             for (int index = 0; index < cumulativeWeights.Length; index++)
             {

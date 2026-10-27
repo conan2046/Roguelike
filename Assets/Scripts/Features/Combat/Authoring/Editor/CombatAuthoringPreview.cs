@@ -56,7 +56,7 @@ namespace Roguelike.Features.Combat.Authoring.Editor
             Cache.Clear(); Failures.Clear(); tables = null;
         }
 
-        /// <summary>按 TbVisualSet、TbCombatRules 与 TbCombatPresentation 生成首帧；同一配置共享资源。</summary>
+        /// <summary>按 TbVisualSet、TbCombatRules 与 TbCombatRender 生成首帧及模型层级；同一配置共享内存资源。</summary>
         /// <param name="visual">外观表的片段引用及缩放。</param>
         /// <param name="rules">世界单位换算来源。</param>
         /// <param name="shaderName">表现表指定的 Shader。</param>
@@ -80,7 +80,10 @@ namespace Roguelike.Features.Combat.Authoring.Editor
                 value.Mesh.hideFlags = HideFlags.HideAndDontSave;
                 var shader = Shader.Find(shaderName);
                 if (shader == null) throw new InvalidOperationException("编辑预览 Shader 缺失：" + shaderName);
-                value.Material = new Material(shader) { hideFlags = HideFlags.HideAndDontSave, renderQueue = (int)RenderQueue.Transparent };
+                tables = tables ?? CombatCylinderPipeline.ReadTables();
+                var presentation = tables.TbCombatPresentation.DataList.Single(item => item.ShaderName == shaderName);
+                int queue = new CombatRenderCatalog(presentation).ReadModel(visual.Id);
+                value.Material = new Material(shader) { hideFlags = HideFlags.HideAndDontSave, renderQueue = queue };
                 value.Material.SetTexture("_BaseMap", value.Texture); value.Material.SetColor("_BaseColor", Color.white);
                 value.Material.SetFloat("_Surface", 1); value.Material.SetFloat("_SrcBlend", (float)BlendMode.SrcAlpha);
                 value.Material.SetFloat("_DstBlend", (float)BlendMode.OneMinusSrcAlpha); value.Material.SetFloat("_ZWrite", 0);

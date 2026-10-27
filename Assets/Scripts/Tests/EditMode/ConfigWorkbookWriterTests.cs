@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using NUnit.Framework;
 using Roguelike.Features.Combat.Authoring;
@@ -45,6 +46,106 @@ namespace Roguelike.Tests
             finally
             {
                 if (File.Exists(temporary)) File.Delete(temporary);
+            }
+        }
+
+        /// <summary>首次受保护导出在 Excel 与 Prefab 一致时只建立基线，不重写工作簿字节。</summary>
+        [Test]
+        public void GuardedExportInitializesBaselineWithoutRewritingUnchangedWorkbook()
+        {
+            string workbook = CopyMonsterWorkbook();
+            string manifest = Path.Combine(Path.GetTempPath(), $"rougelike-authoring-{Guid.NewGuid():N}.json");
+            string report = manifest + ".log";
+            try
+            {
+                const int id = 10001;
+                string[] fields = { "moveRadiusPixels" };
+                float current = float.Parse(ConfigWorkbookWriter.ReadValues(workbook, fields, new[] { id })[id][0],
+                    CultureInfo.InvariantCulture);
+                byte[] before = File.ReadAllBytes(workbook);
+                var transaction = new AuthoringExportTransaction("test-initialize", false, manifest, report);
+
+                ConfigWorkbookWriter.Patch(workbook, fields,
+                    new Dictionary<int, float[]> { [id] = new[] { current } }, transaction);
+                transaction.Complete();
+                transaction.Commit();
+
+                CollectionAssert.AreEqual(before, File.ReadAllBytes(workbook));
+                Assert.That(File.Exists(manifest), Is.True);
+                Assert.That(File.ReadAllText(manifest), Does.Contain("moveRadiusPixels"));
+                Assert.That(File.ReadAllText(report), Does.Contain("NO_CHANGE"));
+            }
+            finally
+            {
+                DeleteIfExists(workbook, manifest, report, manifest + ".tmp");
+            }
+        }
+
+        /// <summary>字段基线建立后，Excel 人工改值不得被 Prefab 导出静默覆盖。</summary>
+        [Test]
+        public void GuardedDryRunRejectsManualExcelEditAndReportsFieldConflict()
+        {
+            string workbook = CopyMonsterWorkbook();
+            string manifest = Path.Combine(Path.GetTempPath(), $"rougelike-authoring-{Guid.NewGuid():N}.json");
+            string report = manifest + ".log";
+            try
+            {
+                const int id = 10001;
+                string[] fields = { "moveRadiusPixels" };
+                float prefabValue = float.Parse(
+                    ConfigWorkbookWriter.ReadValues(workbook, fields, new[] { id })[id][0],
+                    CultureInfo.InvariantCulture);
+                var initialize = new AuthoringExportTransaction("test-initialize", false, manifest, report);
+                ConfigWorkbookWriter.Patch(workbook, fields,
+                    new Dictionary<int, float[]> { [id] = new[] { prefabValue } }, initialize);
+                initialize.Complete();
+                initialize.Commit();
+
+                float manualValue = prefabValue + 1f;
+                ConfigWorkbookWriter.Patch(workbook, fields,
+                    new Dictionary<int, float[]> { [id] = new[] { manualValue } });
+                var preview = new AuthoringExportTransaction("test-conflict", true, manifest, report);
+                ConfigWorkbookWriter.Patch(workbook, fields,
+                    new Dictionary<int, float[]> { [id] = new[] { prefabValue } }, preview);
+
+                Assert.Throws<InvalidOperationException>(() => preview.Complete());
+                Assert.That(float.Parse(
+                        ConfigWorkbookWriter.ReadValues(workbook, fields, new[] { id })[id][0],
+                        CultureInfo.InvariantCulture),
+                    Is.EqualTo(manualValue));
+                string log = File.ReadAllText(report);
+                Assert.That(log, Does.Contain("CONFLICT"));
+                Assert.That(log, Does.Contain("id=10001"));
+                Assert.That(log, Does.Contain("field=moveRadiusPixels"));
+                Assert.That(log, Does.Contain($"old={manualValue.ToString("0.###", CultureInfo.InvariantCulture)}"));
+                Assert.That(log, Does.Contain($"new={prefabValue.ToString("0.###", CultureInfo.InvariantCulture)}"));
+                Assert.That(log, Does.Contain($"baseline={prefabValue.ToString("0.###", CultureInfo.InvariantCulture)}"));
+            }
+            finally
+            {
+                DeleteIfExists(workbook, manifest, report, manifest + ".tmp");
+            }
+        }
+
+        /// <summary>Dry Run 也必须拒绝无法写入 Excel 的 NaN，不能等到正式写表才失败。</summary>
+        [Test]
+        public void GuardedDryRunRejectsNonFiniteProposal()
+        {
+            string workbook = CopyMonsterWorkbook();
+            string manifest = Path.Combine(Path.GetTempPath(), $"rougelike-authoring-{Guid.NewGuid():N}.json");
+            string report = manifest + ".log";
+            try
+            {
+                var transaction = new AuthoringExportTransaction("test-invalid", true, manifest, report);
+                Assert.Throws<InvalidOperationException>(() => ConfigWorkbookWriter.Patch(
+                    workbook,
+                    new[] { "moveRadiusPixels" },
+                    new Dictionary<int, float[]> { [10001] = new[] { float.NaN } },
+                    transaction));
+            }
+            finally
+            {
+                DeleteIfExists(workbook, manifest, report, manifest + ".tmp");
             }
         }
 
@@ -201,6 +302,30 @@ namespace Roguelike.Tests
             {
                 UnityEngine.Object.DestroyImmediate(root);
             }
+        }
+
+        /// <summary>复制正式怪物表到系统临时目录，确保测试不接触项目源表。</summary>
+        /// <returns>独立临时工作簿的绝对路径。</returns>
+        private static string CopyMonsterWorkbook()
+        {
+            string source = Path.GetFullPath(Path.Combine(
+                Application.dataPath,
+                "..",
+                "Config",
+                "Datas",
+                "Tables",
+                "g_怪物_MonsterConfig.xlsx"));
+            string temporary = Path.Combine(Path.GetTempPath(), $"rougelike-monster-config-{Guid.NewGuid():N}.xlsx");
+            File.Copy(source, temporary, true);
+            return temporary;
+        }
+
+        /// <summary>删除本测试拥有的临时文件；不存在的路径直接忽略。</summary>
+        /// <param name="paths">仅包含本测试生成的明确临时路径。</param>
+        private static void DeleteIfExists(params string[] paths)
+        {
+            foreach (string path in paths)
+                if (File.Exists(path)) File.Delete(path);
         }
 
     }

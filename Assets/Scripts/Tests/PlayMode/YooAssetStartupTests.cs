@@ -12,17 +12,17 @@ using YooAsset;
 namespace Roguelike.Tests
 {
     /// <summary>
-    /// Exercises the real editor-simulation package, Luban bootstrap, and ID-only raw resource path end to end.
+    /// Exercises both real editor-simulation packages, Luban bootstrap, and ID-only resource paths end to end.
     /// </summary>
     public sealed class YooAssetStartupTests
     {
         /// <summary>
-        /// Initializes the local package, validates the generated performance scenario, then requests the first configured resource by TbResource.id.
+        /// Initializes both local packages, validates Luban, then loads representative Raw and imported assets by TbResource.id.
         /// </summary>
         /// <returns>Unity coroutine that yields while the real YooAsset operations complete.</returns>
         /// <remarks>Destroys the automatic composition root first so this isolated test owns YooAsset global state.</remarks>
         [UnityTest]
-        public IEnumerator EditorSimulationLoadsLubanAndRawResourceById()
+        public IEnumerator EditorSimulationLoadsLubanRawAndUnityAssetPackages()
         {
             GameApplicationBootstrap automaticBootstrap = Object.FindObjectOfType<GameApplicationBootstrap>();
             if (automaticBootstrap != null)
@@ -63,6 +63,17 @@ namespace Roguelike.Tests
                 {
                     Assert.IsNotNull(handle.Data);
                     Assert.IsNotEmpty(handle.Data);
+                }
+
+                Task<Roguelike.Core.Resources.IResourceHandle<GameObject>> loadPrefab =
+                    resources.LoadAssetAsync<GameObject>(960001, CancellationToken.None);
+                yield return WaitForTask(loadPrefab);
+                RethrowTaskFailure(loadPrefab);
+
+                using (Roguelike.Core.Resources.IResourceHandle<GameObject> handle = loadPrefab.Result)
+                {
+                    Assert.IsNotNull(handle.Asset);
+                    Assert.AreEqual("CombatHud", handle.Asset.name);
                 }
             }
         }

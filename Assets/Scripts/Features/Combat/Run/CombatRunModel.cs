@@ -11,6 +11,7 @@ namespace Roguelike.Features.Combat.Run
         Playing,
         UpgradeChoice,
         Boss,
+        ChestReward,
         VictorySettlement,
         DefeatSettlement
     }
@@ -22,6 +23,50 @@ namespace Roguelike.Features.Combat.Run
         Magnetized
     }
 
+    /// <summary>候选筛选完成后，由 TbUpgradePool.exhaustionPolicy 决定的运行时动作。</summary>
+    internal enum UpgradeOfferAction
+    {
+        DrawConfiguredCount,
+        DrawRemaining,
+        UseFallbackPool,
+        EndSelection
+    }
+
+    /// <summary>把候选数量与表内耗尽策略转换为不依赖 Unity 或配置构造器的确定性动作。</summary>
+    internal static class UpgradeOfferPolicy
+    {
+        /// <summary>解析当前升级池应展示、降量、切池还是结束本次选择。</summary>
+        /// <param name="policy">TbUpgradePool.exhaustionPolicy。</param>
+        /// <param name="drawCount">TbUpgradePool.drawCount。</param>
+        /// <param name="eligibleCount">当前筛选后的合法候选数。</param>
+        /// <param name="hasFallback">FallbackPoolId 是否已解析为有效后备池。</param>
+        /// <returns>调用方下一步应执行的候选动作。</returns>
+        /// <exception cref="ArgumentOutOfRangeException">展示数或合法候选数超出协议范围。</exception>
+        /// <exception cref="InvalidOperationException">策略非法，或后备策略缺少已解析后备池。</exception>
+        internal static UpgradeOfferAction Resolve(EUpgradeExhaustionPolicy policy, int drawCount,
+            int eligibleCount, bool hasFallback)
+        {
+            if (drawCount <= 0) throw new ArgumentOutOfRangeException(nameof(drawCount));
+            if (eligibleCount < 0) throw new ArgumentOutOfRangeException(nameof(eligibleCount));
+            if (!Enum.IsDefined(typeof(EUpgradeExhaustionPolicy), policy))
+                throw new InvalidOperationException("Unknown upgrade exhaustion policy: " + policy + ".");
+            if (eligibleCount >= drawCount) return UpgradeOfferAction.DrawConfiguredCount;
+            switch (policy)
+            {
+                case EUpgradeExhaustionPolicy.ReduceOfferCount:
+                    return eligibleCount > 0 ? UpgradeOfferAction.DrawRemaining : UpgradeOfferAction.EndSelection;
+                case EUpgradeExhaustionPolicy.FallbackPool:
+                    if (!hasFallback)
+                        throw new InvalidOperationException("FallbackPool policy requires a resolved fallback pool.");
+                    return UpgradeOfferAction.UseFallbackPool;
+                case EUpgradeExhaustionPolicy.EndUpgradeSelection:
+                    return UpgradeOfferAction.EndSelection;
+                default:
+                    throw new InvalidOperationException("Unknown upgrade exhaustion policy: " + policy + ".");
+            }
+        }
+    }
+
     /// <summary>由单局调度器发给 ECS 的确定性生成请求。</summary>
     public readonly struct CombatSpawnRequest
     {
@@ -31,13 +76,15 @@ namespace Roguelike.Features.Combat.Run
         /// <param name="scheduledTimeMilli">按 TbSpawnPhase 或 TbStageRule 计算的计划时间。</param>
         /// <param name="monster">TbMonster 引用。</param>
         /// <param name="isBoss">是否来自 TbBossEncounter。</param>
-        public CombatSpawnRequest(ulong runGeneration, ulong sequence, long scheduledTimeMilli, MonsterConfig monster, bool isBoss)
+        /// <param name="runEvent">独立精英事件；普通刷新与最终 Boss 留空。</param>
+        public CombatSpawnRequest(ulong runGeneration, ulong sequence, long scheduledTimeMilli, MonsterConfig monster, bool isBoss, RunEventConfig runEvent = null)
         {
             RunGeneration = runGeneration;
             Sequence = sequence;
             ScheduledTimeMilli = scheduledTimeMilli;
             Monster = monster;
             IsBoss = isBoss;
+            RunEvent = runEvent;
         }
 
         public ulong RunGeneration { get; }
@@ -45,10 +92,11 @@ namespace Roguelike.Features.Combat.Run
         public long ScheduledTimeMilli { get; }
         public MonsterConfig Monster { get; }
         public bool IsBoss { get; }
+        public RunEventConfig RunEvent { get; }
     }
 
     /// <summary>不依赖 Unity 对象的正式单局状态机，负责表驱动的刷怪、经验、升级、Boss、结算与重开。</summary>
-    public sealed class CombatRunModel
+    public sealed partial class CombatRunModel
     {
         private static readonly IReadOnlyList<CombatSpawnRequest> NoSpawns = Array.Empty<CombatSpawnRequest>();
         private readonly CombatRunDefinition definition;
@@ -97,6 +145,8 @@ namespace Roguelike.Features.Combat.Run
         public IReadOnlyDictionary<int, int> UpgradeRanks => upgradeRanks;
         public IReadOnlyDictionary<int, SkillConfig> ActiveSkills => activeSkills;
         public IReadOnlyDictionary<ulong, ExperienceDropState> Drops => drops;
+        /// <summary>本代次独占的 TbRunBuild 构筑；旧入口未配置构筑时为空。</summary>
+        public CombatBuildState Build { get; private set; }
 
         /// <summary>在 Playing 或 Boss 状态推进表驱动时钟，并返回本次跨过的全部生成事件。</summary>
         /// <param name="deltaMilli">本次固定步进的毫秒数，必须非负。</param>
@@ -105,6 +155,7 @@ namespace Roguelike.Features.Combat.Run
         /// <remarks>UpgradeChoice 和结算状态直接返回空集合，确保战斗与计时完全冻结。</remarks>
         public IReadOnlyList<CombatSpawnRequest> Advance(int deltaMilli)
         {
+            firedEvents.Clear();
             if (deltaMilli < 0) throw new ArgumentOutOfRangeException(nameof(deltaMilli));
             if (deltaMilli == 0 || !IsSimulationActive(State)) return NoSpawns;
 
@@ -117,7 +168,7 @@ namespace Roguelike.Features.Combat.Run
 
             var requests = new List<CombatSpawnRequest>();
             long playingTarget = Math.Min(target, definition.Rule.BossTimeMilli);
-            ScheduleNormalSpawns(playingTarget, requests);
+            ScheduleEventsAndSpawns(playingTarget, requests);
             ElapsedMilli = playingTarget;
             if (target >= definition.Rule.BossTimeMilli && !BossSpawned)
             {
@@ -182,7 +233,7 @@ namespace Roguelike.Features.Combat.Run
         /// <param name="amount">来自 TbDropProfile 或受控测试入口的正经验值。</param>
         /// <exception cref="ArgumentOutOfRangeException">经验值非正。</exception>
         /// <exception cref="InvalidOperationException">在暂停选择或结算状态尝试结算经验。</exception>
-        /// <remarks>首次产生待选等级时保存当前 Playing/Boss 状态，并立刻打开一代候选面板。</remarks>
+        /// <remarks>首次产生待选等级时保存当前 Playing/Boss 状态；候选耗尽时按 TbUpgradePool.exhaustionPolicy 消费队列且不打开空面板。</remarks>
         public void GrantExperience(int amount)
         {
             if (amount <= 0) throw new ArgumentOutOfRangeException(nameof(amount));
@@ -199,8 +250,7 @@ namespace Roguelike.Features.Combat.Run
             if (PendingLevelUps > 0)
             {
                 resumeAfterUpgrade = State;
-                State = CombatRunState.UpgradeChoice;
-                BuildUpgradeChoices();
+                ContinueUpgradeQueue();
             }
         }
 
@@ -220,8 +270,8 @@ namespace Roguelike.Features.Combat.Run
             upgradeRanks[option.Id] = rank;
             PendingLevelUps--;
             currentChoices = Array.Empty<UpgradeOptionConfig>();
-            if (PendingLevelUps > 0) BuildUpgradeChoices();
-            else State = resumeAfterUpgrade;
+            if (PendingLevelUps > 0) ContinueUpgradeQueue();
+            else { State = resumeAfterUpgrade; OpenNextChest(); }
             return true;
         }
 
@@ -303,32 +353,72 @@ namespace Roguelike.Features.Combat.Run
             throw new InvalidOperationException($"TbSpawnPhase {phase.Id}: weight selection failed.");
         }
 
-        /// <summary>过滤满阶、已解锁技能和当前不可恢复的选项，再按权重无放回生成一代候选。</summary>
-        /// <exception cref="InvalidOperationException">合法候选不足 TbUpgradePool.drawCount。</exception>
-        private void BuildUpgradeChoices()
+        /// <summary>继续消费待升级队列，直到生成一个真实候选面板或所有选择均按耗尽策略结束。</summary>
+        /// <remarks>结束选择仍保留已经获得的等级；只有实际展示候选时才递增面板代次并冻结战斗。</remarks>
+        private void ContinueUpgradeQueue()
         {
-            var remaining = definition.UpgradeOptions.Where(IsUpgradeEligible).OrderBy(item => item.Id).ToList();
-            if (remaining.Count < definition.UpgradePool.DrawCount)
-                throw new InvalidOperationException($"TbUpgradePool {definition.UpgradePool.Id}: insufficient eligible options.");
-
-            choiceSequence++;
-            var selected = new List<UpgradeOptionConfig>(definition.UpgradePool.DrawCount);
-            for (int index = 0; index < definition.UpgradePool.DrawCount; index++)
+            while (PendingLevelUps > 0)
             {
-                int total = checked(remaining.Sum(item => item.Weight));
-                int sample = CombatRandom.Inclusive(unchecked((ulong)(uint)definition.Rule.RandomSeed), choiceSequence,
-                    (ulong)index, CombatRandomPurpose.UpgradeChoice, 1, total);
-                int selectedIndex = 0;
-                for (; selectedIndex < remaining.Count; selectedIndex++)
+                if (TryBuildUpgradeChoices())
                 {
-                    sample -= remaining[selectedIndex].Weight;
-                    if (sample <= 0) break;
+                    State = CombatRunState.UpgradeChoice;
+                    return;
                 }
-                selected.Add(remaining[selectedIndex]);
-                remaining.RemoveAt(selectedIndex);
+                PendingLevelUps--;
             }
-            panelGeneration++;
-            currentChoices = selected;
+            currentChoices = Array.Empty<UpgradeOptionConfig>();
+            State = resumeAfterUpgrade;
+            OpenNextChest();
+        }
+
+        /// <summary>从入口池开始筛选候选，并按池内耗尽策略降量、切换后备池或结束本次选择。</summary>
+        /// <returns>成功生成至少一个候选时返回 true；结束本次选择且不打开面板时返回 false。</returns>
+        /// <param name="rootPool">TbChestProfile 指定的奖励池；省略时使用关卡的正式升级入口池。</param>
+        /// <exception cref="InvalidOperationException">运行时遇到未验证的后备链循环或非法权重。</exception>
+        private bool TryBuildUpgradeChoices(UpgradePoolConfig rootPool = null)
+        {
+            var visited = new HashSet<int>();
+            UpgradePoolConfig pool = rootPool ?? definition.UpgradePool;
+            while (pool != null)
+            {
+                if (!visited.Add(pool.Id))
+                    throw new InvalidOperationException($"TbUpgradePool {pool.Id}: fallback cycle detected at runtime.");
+                var remaining = pool.Entries
+                    .Where(entry => entry?.OptionId_Ref != null && IsUpgradeEligible(entry.OptionId_Ref))
+                    .OrderBy(entry => entry.OptionId)
+                    .ToList();
+                UpgradeOfferAction action = UpgradeOfferPolicy.Resolve(pool.ExhaustionPolicy, pool.DrawCount,
+                    remaining.Count, pool.FallbackPoolId_Ref != null);
+                if (action == UpgradeOfferAction.UseFallbackPool)
+                {
+                    pool = pool.FallbackPoolId_Ref;
+                    continue;
+                }
+                if (action == UpgradeOfferAction.EndSelection) return false;
+
+                int offerCount = action == UpgradeOfferAction.DrawRemaining ? remaining.Count : pool.DrawCount;
+                choiceSequence++;
+                var selected = new List<UpgradeOptionConfig>(offerCount);
+                for (int index = 0; index < offerCount; index++)
+                {
+                    int total = checked(remaining.Sum(entry => entry.Weight));
+                    int sample = CombatRandom.Inclusive(unchecked((ulong)(uint)definition.Rule.RandomSeed), choiceSequence,
+                        (ulong)index, CombatRandomPurpose.UpgradeChoice, 1, total);
+                    int selectedIndex = 0;
+                    for (; selectedIndex < remaining.Count; selectedIndex++)
+                    {
+                        sample -= remaining[selectedIndex].Weight;
+                        if (sample <= 0) break;
+                    }
+                    selected.Add(remaining[selectedIndex].OptionId_Ref);
+                    remaining.RemoveAt(selectedIndex);
+                }
+                panelGeneration++;
+                currentChoices = selected;
+                return true;
+            }
+
+            return false;
         }
 
         /// <summary>判断 TbUpgradeOption 在当前生命、技能和阶数下是否可进入候选。</summary>
@@ -336,6 +426,8 @@ namespace Roguelike.Features.Combat.Run
         /// <returns>当前面板可以选择时返回 true。</returns>
         private bool IsUpgradeEligible(UpgradeOptionConfig option)
         {
+            if (option.Type == EUpgradeOptionType.RunWeapon) return Build != null && Build.CanUpgrade(option.RunWeaponId_Ref);
+            if (option.Type == EUpgradeOptionType.RunPassive) return Build != null && Build.CanUpgrade(option.RunPassiveId_Ref);
             if (GetUpgradeRank(option.Id) >= option.MaxRank) return false;
             if (option.Type == EUpgradeOptionType.SkillUnlock)
                 return option.TargetSkillId_Ref != null && !activeSkills.ContainsKey(option.TargetSkillId_Ref.Id);
@@ -343,12 +435,32 @@ namespace Roguelike.Features.Combat.Run
             return option.Type == EUpgradeOptionType.Attribute;
         }
 
-        /// <summary>按配置类型应用单次技能解锁、属性来源或立即恢复。</summary>
+        /// <summary>按配置类型应用构筑升级、技能解锁、属性来源或立即恢复。</summary>
         /// <param name="option">当前面板已验证的选项。</param>
         /// <param name="rank">应用后的新阶数。</param>
-        /// <remarks>属性修改读取 TbUpgradeOption.modifiers，并按 Add、AddPercent、Multiply 进入聚合器固定乘区。</remarks>
+        /// <remarks>武器读取 TbRunWeapon.ranks；被动读取 TbRunPassive.ranks 并替换同源效果；旧属性卡读取 TbUpgradeOption.modifiers，均按配置操作进入聚合器。</remarks>
         private void ApplyUpgrade(UpgradeOptionConfig option, int rank)
         {
+            if (option.Type == EUpgradeOptionType.RunWeapon)
+            {
+                Build.Upgrade(option.RunWeaponId_Ref);
+                SynchronizeBuildSkills();
+                return;
+            }
+            if (option.Type == EUpgradeOptionType.RunPassive)
+            {
+                RunPassiveRank effect = Build.Upgrade(option.RunPassiveId_Ref);
+                double previousMaximum = MaxHealth;
+                // 高位只区分来源类型，防止同 ID 的被动来源与旧升级次数来源碰撞。
+                ulong passiveSource = (1UL << 63) | unchecked((uint)option.RunPassiveId.Value);
+                var modifier = new AttributeModifier { Attribute = effect.AttributeId_Ref.AttributeType };
+                if (effect.Operation == EAttributeModifyOperation.Add) modifier.Flat = effect.ValueMilli / 1000d;
+                else if (effect.Operation == EAttributeModifyOperation.AddPercent) modifier.PercentBp = checked((int)(effect.ValueMilli * 10));
+                else modifier.Multiplier = effect.ValueMilli / 1000d;
+                attributes.Replace(passiveSource, new[] { modifier });
+                if (MaxHealth < previousMaximum) CurrentHealth = Math.Min(CurrentHealth, MaxHealth);
+                return;
+            }
             if (option.Type == EUpgradeOptionType.SkillUnlock)
             {
                 activeSkills.Add(option.TargetSkillId_Ref.Id, option.TargetSkillId_Ref);
@@ -411,10 +523,11 @@ namespace Roguelike.Features.Combat.Run
             State = result == ERunResultType.Victory ? CombatRunState.VictorySettlement : CombatRunState.DefeatSettlement;
             PendingLevelUps = 0;
             currentChoices = Array.Empty<UpgradeOptionConfig>();
+            ClearChestInteractions();
         }
 
         /// <summary>为构造或重开恢复表内初始角色、技能、波次和全部统计。</summary>
-        /// <remarks>重建 CombatAttributes 并重置随机调用序列；panelGeneration 保持递增以拒绝旧 UI 回调。</remarks>
+        /// <remarks>重建 CombatAttributes 和 TbRunBuild 初始构筑，清除上局被动来源与武器星级；重置随机序列，panelGeneration 保持递增以拒绝旧 UI 回调。</remarks>
         private void ResetRunState()
         {
             State = CombatRunState.Playing;
@@ -430,6 +543,7 @@ namespace Roguelike.Features.Combat.Run
             unitsInWave = 0;
             spawnSequence = 0;
             dropSequence = 0;
+            ResetEventsForRun();
             choiceSequence = 0;
             upgradeRanks.Clear();
             activeSkills.Clear();
@@ -437,10 +551,36 @@ namespace Roguelike.Features.Combat.Run
             drops.Clear();
             currentChoices = Array.Empty<UpgradeOptionConfig>();
             attributes = new CombatAttributes(definition.Character.AttributeProfileId_Ref);
+            Build = definition.BuildConfig == null ? null : new CombatBuildState(definition.BuildConfig);
             CurrentHealth = MaxHealth;
             foreach (var skill in definition.InitialSkills) activeSkills.Add(skill.Id, skill);
+            if (Build != null) SynchronizeBuildSkills();
             var first = definition.SpawnPhases[0];
             nextSpawnTimeMilli = (long)first.BeginTimeMilli + first.WaveIntervalMilli;
+        }
+
+        /// <summary>构筑改变后刷新武器所属技能，保留旧兼容入口中不属于构筑目录的技能。</summary>
+        /// <remarks>数据来自TbRunWeapon.ranks、进化和TbTribulationRefinement；清除旧形态后按当前构筑重建活动技能，不创建或销毁Unity对象。</remarks>
+        private void SynchronizeBuildSkills()
+        {
+            foreach (int id in Build.Config.WeaponIds_Ref.SelectMany(weapon => weapon.Ranks).Select(item => item.SkillId)
+                .Concat(Build.Config.WeaponIds_Ref.Select(weapon => weapon.EvolutionId_Ref.ResultSkillId))
+                .Concat(definition.TribulationSkills.Select(skill => skill.Id)).Distinct())
+                activeSkills.Remove(id);
+            foreach (CombatWeaponUpgrade weapon in Build.CaptureWeapons())
+                activeSkills[weapon.SkillId] = definition.AvailableSkills.First(skill => skill.Id == weapon.SkillId);
+        }
+
+        /// <summary>构建卡片时返回实际对象当前等级，开局自带武器不会被误显示为零星。</summary>
+        /// <param name="option">当前面板候选。</param>
+        /// <returns>构筑当前等级或旧选项已选择次数。</returns>
+        public int GetOptionRank(UpgradeOptionConfig option)
+        {
+            if (option.Type == EUpgradeOptionType.RunWeapon && Build != null)
+                return Build.WeaponRanks.TryGetValue(option.RunWeaponId.Value, out int star) ? star : 0;
+            if (option.Type == EUpgradeOptionType.RunPassive && Build != null)
+                return Build.PassiveRanks.TryGetValue(option.RunPassiveId.Value, out int rank) ? rank : 0;
+            return GetUpgradeRank(option.Id);
         }
 
         /// <summary>判断当前状态是否允许固定步进、伤害、掉落和经验结算。</summary>

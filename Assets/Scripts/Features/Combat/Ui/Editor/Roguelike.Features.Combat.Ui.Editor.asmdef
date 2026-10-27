@@ -1,6 +1,6 @@
 {
   "name": "Roguelike.Features.Combat.Ui.Editor",
-  "references": ["Roguelike.Features.Combat.Runtime", "Unity.ugui"],
+  "references": ["Roguelike.Features.Combat.Runtime", "Roguelike.Generated", "Luban.Runtime", "Unity.ugui"],
   "includePlatforms": ["Editor"],
   "autoReferenced": true
 }

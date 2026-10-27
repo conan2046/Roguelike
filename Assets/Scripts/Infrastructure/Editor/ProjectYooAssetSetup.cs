@@ -46,7 +46,7 @@ namespace Roguelike.Infrastructure.Editor
         private const string GameContentPath = "Assets/GameContent";
 
         /// <summary>
-        /// Rebuilds YooAsset collector settings with one local package and no CDN, download, or hot-update configuration.
+        /// Rebuilds separate Raw and imported-asset packages with no CDN, download, or hot-update configuration.
         /// </summary>
         /// <remarks>Overwrites only YooAsset's generated collector settings asset and never modifies scenes or prefabs.</remarks>
         [MenuItem("Roguelike/Resources/Rebuild YooAsset Settings")]
@@ -55,28 +55,51 @@ namespace Roguelike.Infrastructure.Editor
             EnsureAssetFolder(GameContentPath);
             AssetBundleCollectorSettingData.ClearAll();
 
-            AssetBundleCollectorPackage package =
-                AssetBundleCollectorSettingData.CreatePackage(YooAssetProjectConstants.PackageName);
-            package.EnableAddressable = true;
-            package.SupportExtensionless = false;
-            package.LocationToLower = false;
-            package.IncludeAssetGUID = false;
-            package.AutoCollectShaders = true;
-            package.IgnoreRuleName = nameof(RawFileIgnoreRule);
+            AssetBundleCollectorPackage rawPackage = CreatePackage(
+                YooAssetProjectConstants.RawPackageName,
+                nameof(RawFileIgnoreRule),
+                false);
+            AssetBundleCollectorPackage gameAssetPackage = CreatePackage(
+                YooAssetProjectConstants.GameAssetPackageName,
+                nameof(NormalIgnoreRule),
+                true);
 
             AddCollector(
-                package,
+                rawPackage,
                 "LubanConfig",
                 ConfigPath,
                 nameof(PackRawFile),
                 YooAssetProjectConstants.LubanConfigTag);
-            AddCollector(package, "LegacyRawContent", LegacyContentPath, nameof(PackRawFile), string.Empty);
-            AddCollector(package, "GameContent", GameContentPath, nameof(PackDirectory), string.Empty);
+            AddCollector(rawPackage, "LegacyRawContent", LegacyContentPath, nameof(PackRawFile), string.Empty);
+            AddCollector(gameAssetPackage, "GameContent", GameContentPath, nameof(PackDirectory), string.Empty);
 
             AssetBundleCollectorSettingData.FixFile();
             AssetBundleCollectorSettingData.SaveFile();
             AssetDatabase.SaveAssets();
-            Debug.Log("[Roguelike] YooAsset collector settings rebuilt for EditorSimulate and Offline modes.");
+            Debug.Log("[Roguelike] YooAsset Raw and GameAsset collector settings rebuilt.");
+        }
+
+        /// <summary>
+        /// Creates one addressable collector package with an explicit source-file policy.
+        /// </summary>
+        /// <param name="packageName">Stable package name shared by build and runtime initialization.</param>
+        /// <param name="ignoreRuleName">YooAsset ignore rule compatible with the package build pipeline.</param>
+        /// <param name="autoCollectShaders">Whether imported Unity shader dependencies are collected automatically.</param>
+        /// <returns>The package to which source collectors can be attached.</returns>
+        /// <remarks>Mutates only the in-memory collector settings rebuilt by <see cref="Configure"/>.</remarks>
+        private static AssetBundleCollectorPackage CreatePackage(
+            string packageName,
+            string ignoreRuleName,
+            bool autoCollectShaders)
+        {
+            AssetBundleCollectorPackage package = AssetBundleCollectorSettingData.CreatePackage(packageName);
+            package.EnableAddressable = true;
+            package.SupportExtensionless = false;
+            package.LocationToLower = false;
+            package.IncludeAssetGUID = false;
+            package.AutoCollectShaders = autoCollectShaders;
+            package.IgnoreRuleName = ignoreRuleName;
+            return package;
         }
 
         /// <summary>

@@ -26,6 +26,20 @@ public sealed partial class SkillCombatConfig : Luban.BeanBase
         if(_buf.ReadBool()){ ProjectileSpeedPixelsPerSecond = _buf.ReadFloat(); } else { ProjectileSpeedPixelsPerSecond = null; }
         if(_buf.ReadBool()){ ProjectileLifetimeMilli = _buf.ReadInt(); } else { ProjectileLifetimeMilli = null; }
         if(_buf.ReadBool()){ AttackWindupSecondsMilli = _buf.ReadInt(); } else { AttackWindupSecondsMilli = null; }
+        DamagePermille = _buf.ReadInt();
+        if(_buf.ReadBool()){ ProjectilePattern = (EProjectilePattern)_buf.ReadInt(); } else { ProjectilePattern = null; }
+        ProjectileCount = _buf.ReadInt();
+        SpreadDegrees = _buf.ReadFloat();
+        PierceCount = _buf.ReadInt();
+        ChainCount = _buf.ReadInt();
+        ChainRangePixels = _buf.ReadFloat();
+        AreaDurationMilli = _buf.ReadInt();
+        AreaPulseIntervalMilli = _buf.ReadInt();
+        AreaFollowsOwner = _buf.ReadBool();
+        ImpactRadiusPixels = _buf.ReadFloat();
+        AreaRetargets = _buf.ReadBool();
+        AreaRingCount = _buf.ReadInt();
+        AreaRingWidthPixels = _buf.ReadFloat();
     }
 
     public static SkillCombatConfig DeserializeSkillCombatConfig(ByteBuf _buf)
@@ -61,6 +75,62 @@ public sealed partial class SkillCombatConfig : Luban.BeanBase
     /// 普通近战 zd→gj 前摇秒数；弹丸留空；原单位&#215;1000存整数，实际值=表值/1000，最多3位小数。
     /// </summary>
     public readonly int? AttackWindupSecondsMilli;
+    /// <summary>
+    /// 技能伤害千分比
+    /// </summary>
+    public readonly int DamagePermille;
+    /// <summary>
+    /// 弹丸阵型；非弹丸空
+    /// </summary>
+    public readonly EProjectilePattern? ProjectilePattern;
+    /// <summary>
+    /// 单次弹丸数；非弹丸0
+    /// </summary>
+    public readonly int ProjectileCount;
+    /// <summary>
+    /// 扇形总夹角；其他阵型0
+    /// </summary>
+    public readonly float SpreadDegrees;
+    /// <summary>
+    /// 额外穿透数；同生命周期仅命中一次
+    /// </summary>
+    public readonly int PierceCount;
+    /// <summary>
+    /// 额外跳转次数；与穿透互斥
+    /// </summary>
+    public readonly int ChainCount;
+    /// <summary>
+    /// 连锁寻找未命中目标的范围
+    /// </summary>
+    public readonly float ChainRangePixels;
+    /// <summary>
+    /// 持续范围寿命毫秒；瞬时范围0
+    /// </summary>
+    public readonly int AreaDurationMilli;
+    /// <summary>
+    /// 持续范围脉冲间隔毫秒；瞬时0
+    /// </summary>
+    public readonly int AreaPulseIntervalMilli;
+    /// <summary>
+    /// 范围以施法者为中心并跟随；否则固定目标位置
+    /// </summary>
+    public readonly bool AreaFollowsOwner;
+    /// <summary>
+    /// 弹丸命中时爆发半径；0无爆发，与穿透连锁互斥
+    /// </summary>
+    public readonly float ImpactRadiusPixels;
+    /// <summary>
+    /// 每次脉冲重新选取范围内未选过的目标落点
+    /// </summary>
+    public readonly bool AreaRetargets;
+    /// <summary>
+    /// 0为实心区域，正数为等距同心环数量
+    /// </summary>
+    public readonly int AreaRingCount;
+    /// <summary>
+    /// 环带宽度；实心区域填0
+    /// </summary>
+    public readonly float AreaRingWidthPixels;
    
     public const int __ID__ = 1481233447;
     public override int GetTypeId() => __ID__;
@@ -79,6 +149,20 @@ public sealed partial class SkillCombatConfig : Luban.BeanBase
         + "projectileSpeedPixelsPerSecond:" + ProjectileSpeedPixelsPerSecond + ","
         + "projectileLifetimeMilli:" + ProjectileLifetimeMilli + ","
         + "attackWindupSecondsMilli:" + AttackWindupSecondsMilli + ","
+        + "damagePermille:" + DamagePermille + ","
+        + "projectilePattern:" + ProjectilePattern + ","
+        + "projectileCount:" + ProjectileCount + ","
+        + "spreadDegrees:" + SpreadDegrees + ","
+        + "pierceCount:" + PierceCount + ","
+        + "chainCount:" + ChainCount + ","
+        + "chainRangePixels:" + ChainRangePixels + ","
+        + "areaDurationMilli:" + AreaDurationMilli + ","
+        + "areaPulseIntervalMilli:" + AreaPulseIntervalMilli + ","
+        + "areaFollowsOwner:" + AreaFollowsOwner + ","
+        + "impactRadiusPixels:" + ImpactRadiusPixels + ","
+        + "areaRetargets:" + AreaRetargets + ","
+        + "areaRingCount:" + AreaRingCount + ","
+        + "areaRingWidthPixels:" + AreaRingWidthPixels + ","
         + "}";
     }
 }

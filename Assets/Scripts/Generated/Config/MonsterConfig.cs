@@ -40,6 +40,9 @@ public sealed partial class MonsterConfig : Luban.BeanBase
         if(_buf.ReadBool()){ CollisionShape = (EUnitCollisionShape)_buf.ReadInt(); } else { CollisionShape = null; }
         if(_buf.ReadBool()){ HitEffectOffsetXPixels = _buf.ReadFloat(); } else { HitEffectOffsetXPixels = null; }
         if(_buf.ReadBool()){ HitEffectOffsetYPixels = _buf.ReadFloat(); } else { HitEffectOffsetYPixels = null; }
+        IsElite = _buf.ReadBool();
+        if(_buf.ReadBool()){ DeathChestProfileId = _buf.ReadInt(); } else { DeathChestProfileId = null; }
+        DeathChestProfileId_Ref = null;
     }
 
     public static MonsterConfig DeserializeMonsterConfig(ByteBuf _buf)
@@ -122,6 +125,15 @@ public sealed partial class MonsterConfig : Luban.BeanBase
     /// 命中特效挂点纵向偏移；由怪物预制体“命中特效挂点”节点导出，逻辑像素；直接填写像素值，最多3位小数。
     /// </summary>
     public readonly float? HitEffectOffsetYPixels;
+    /// <summary>
+    /// 独立精英身份，不触发最终Boss胜利
+    /// </summary>
+    public readonly bool IsElite;
+    /// <summary>
+    /// 首次死亡在尸体位置掉箱
+    /// </summary>
+    public readonly int? DeathChestProfileId;
+    public ChestProfileConfig DeathChestProfileId_Ref;
    
     public const int __ID__ = -55174244;
     public override int GetTypeId() => __ID__;
@@ -131,6 +143,7 @@ public sealed partial class MonsterConfig : Luban.BeanBase
         VisualSetId_Ref = tables.TbVisualSet.GetOrDefault(VisualSetId);
         AttributeProfileId_Ref = AttributeProfileId!= null ? tables.TbAttributeProfile.GetOrDefault(AttributeProfileId.Value) : null;
         DefaultSkillId_Ref = DefaultSkillId!= null ? tables.TbSkill.GetOrDefault(DefaultSkillId.Value) : null;
+        DeathChestProfileId_Ref = DeathChestProfileId!= null ? tables.TbChestProfile.GetOrDefault(DeathChestProfileId.Value) : null;
     }
 
     public override string ToString()
@@ -154,6 +167,8 @@ public sealed partial class MonsterConfig : Luban.BeanBase
         + "collisionShape:" + CollisionShape + ","
         + "hitEffectOffsetXPixels:" + HitEffectOffsetXPixels + ","
         + "hitEffectOffsetYPixels:" + HitEffectOffsetYPixels + ","
+        + "isElite:" + IsElite + ","
+        + "deathChestProfileId:" + DeathChestProfileId + ","
         + "}";
     }
 }

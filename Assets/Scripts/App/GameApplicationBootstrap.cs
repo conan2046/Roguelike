@@ -22,7 +22,7 @@ namespace Roguelike.App
     /// <summary>
     /// Acts as the sole composition root and runs the instance-owned startup pipeline before scene logic consumes services.
     /// </summary>
-    public sealed class GameApplicationBootstrap : MonoBehaviour
+    public sealed partial class GameApplicationBootstrap : MonoBehaviour
     {
         private static bool installed;
         private readonly CancellationTokenSource shutdown = new CancellationTokenSource();
@@ -82,7 +82,7 @@ namespace Roguelike.App
             DontDestroyOnLoad(root);
             var bootstrap = root.AddComponent<GameApplicationBootstrap>();
             bootstrap.launch = launch;
-            if (launch.Mode == ApplicationMode.Combat || launch.Mode == ApplicationMode.Stage)
+            if (launch.Mode == ApplicationMode.Combat || launch.Mode == ApplicationMode.Stage || launch.Mode == ApplicationMode.Tribulation)
                 bootstrap.sceneIsolation = new CombatSceneIsolation(root);
         }
 
@@ -105,6 +105,7 @@ namespace Roguelike.App
             var features = new List<IGameFeature>();
             switch (launch.Mode)
             {
+                case ApplicationMode.Tribulation: features.Add(new TribulationStartupFeature(this)); break;
                 case ApplicationMode.Stage:
                     features.Add(new StageStartupFeature(this, launch.ScenarioId.Value));
                     break;
@@ -156,10 +157,11 @@ namespace Roguelike.App
         /// <summary>
         /// Called by Unity when the persistent root is destroyed to cancel startup and release YooAsset-owned Unity resources.
         /// </summary>
-        /// <remarks>Closes combat before package disposal. During a normal object teardown, waits for cancelled IO continuations to release their handles before destroying YooAsset; process exit may terminate this final continuation.</remarks>
+        /// <remarks>Closes combat and cancels the optional Tribulation entry before package disposal. Drains startup and role transitions before releasing YooAsset; process exit may terminate this final continuation.</remarks>
         private async void OnDestroy()
         {
             shutdown.Cancel();
+            tribulationEntry?.Close();
             combatRunner?.Close();
             sceneIsolation?.Dispose(); sceneIsolation = null;
             try
@@ -172,7 +174,8 @@ namespace Roguelike.App
             }
             finally
             {
-                packageInitializer?.Dispose();
+                try { if (!ReferenceEquals(tribulationEntry, null)) await tribulationEntry.ShutdownAsync(); }
+                finally { packageInitializer?.Dispose(); }
                 shutdown.Dispose();
             }
         }

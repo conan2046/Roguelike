@@ -53,6 +53,7 @@ internal static class Program
         {
             Require(args.Length == 1, "Pass the Luban bytes directory.");
             var tables = new Tables(name => new ByteBuf(File.ReadAllBytes(Path.Combine(args[0], name + ".bytes"))));
+            ValidateResourcePackages(tables, args[0]);
             Validate(tables);
             CheckFormulaFixtures(tables.TbCombatRules.Get(1));
             checks += RuntimeChecks.Run(tables);
@@ -82,13 +83,81 @@ internal static class Program
         }
     }
 
+    /// <summary>Validates every TbResource path against its Luban-declared YooAsset package and source file.</summary>
+    /// <param name="tables">Resolved generated tables containing all resource rows.</param>
+    /// <param name="dataDirectory">Generated Luban bytes directory used to locate the repository root.</param>
+    /// <exception cref="InvalidOperationException">A package value, path prefix, traversal boundary or source file is invalid.</exception>
+    private static void ValidateResourcePackages(Tables tables, string dataDirectory)
+    {
+        string repositoryRoot = Path.GetFullPath(Path.Combine(dataDirectory, "..", "..", "..", ".."));
+        string assetsRoot = Path.Combine(repositoryRoot, "Assets");
+        string streamingAssetsRoot = Path.Combine(assetsRoot, "StreamingAssets");
+        bool hasRaw = false;
+        bool hasGameAsset = false;
+
+        foreach (ResourceConfig resource in tables.TbResource.DataList)
+        {
+            Require(Enum.IsDefined(resource.Package),
+                $"TbResource {resource.Id}: unknown package '{resource.Package}'.");
+            string expectedPrefix;
+            string sourceRoot;
+            switch (resource.Package)
+            {
+                case EResourcePackage.Raw:
+                    hasRaw = true;
+                    expectedPrefix = "ProjectX/";
+                    sourceRoot = streamingAssetsRoot;
+                    break;
+                case EResourcePackage.GameAsset:
+                    hasGameAsset = true;
+                    expectedPrefix = "GameContent/";
+                    sourceRoot = assetsRoot;
+                    break;
+                default:
+                    throw new InvalidOperationException(
+                        $"TbResource {resource.Id}: unsupported package '{resource.Package}'.");
+            }
+
+            Require(resource.Path.StartsWith(expectedPrefix, StringComparison.Ordinal),
+                $"TbResource {resource.Id}: path '{resource.Path}' does not match package '{resource.Package}'.");
+            string fullPath = Path.GetFullPath(Path.Combine(sourceRoot, resource.Path.Replace('/', Path.DirectorySeparatorChar)));
+            string sourcePrefix = Path.TrimEndingDirectorySeparator(sourceRoot) + Path.DirectorySeparatorChar;
+            Require(fullPath.StartsWith(sourcePrefix, StringComparison.OrdinalIgnoreCase),
+                $"TbResource {resource.Id}: path escapes package source root.");
+            Require(File.Exists(fullPath),
+                $"TbResource {resource.Id}: source file does not exist: {resource.Path}");
+        }
+
+        Require(hasRaw && hasGameAsset, "TbResource must contain both Raw and GameAsset package rows.");
+    }
+
     /// <summary>Verifies semantic ranges and cross-table contracts after generated reference resolution.</summary>
     /// <param name="tables">Luban Tables loaded from the files being validated.</param>
     /// <exception cref="InvalidOperationException">A required schema, range or reference is invalid.</exception>
     private static void Validate(Tables tables)
     {
-        Require(tables.TbAttribute.DataList.Count == 14, "Expected the approved 14 non-element attributes.");
-        Require(tables.TbAttribute.DataList.Select(x => x.AttributeType).Distinct().Count() == 14, "Attribute semantic duplicates.");
+        foreach (var layerPresentation in tables.TbCombatPresentation.DataList)
+        {
+            var layers = new Roguelike.Features.Combat.CombatRenderCatalog(layerPresentation);
+            foreach (var visual in tables.TbVisualSet.DataList.Where(visual =>
+                         visual.Category == EVisualCategory.Character || visual.Category == EVisualCategory.Monster))
+                Require(layers.ReadModel(visual.Id) < layerPresentation.FeedbackRenderQueue,
+                    $"TbVisualSet {visual.Id}: missing or invalid explicit model render binding.");
+            foreach (var skill in tables.TbSkill.DataList.Where(skill => skill.CombatProfileId.HasValue))
+            {
+                if (skill.ProjectileClipId.HasValue)
+                    Require(layers.ReadSkill(skill.Id, skill.ProjectileClipId.Value) < layerPresentation.FeedbackRenderQueue,
+                        $"TbSkill {skill.Id}: missing projectile render binding.");
+                if (skill.ImpactClipId.HasValue)
+                    Require(layers.ReadSkill(skill.Id, skill.ImpactClipId.Value) < layerPresentation.FeedbackRenderQueue,
+                        $"TbSkill {skill.Id}: missing impact render binding.");
+                foreach (int clipId in skill.AreaClipIds)
+                    Require(layers.ReadSkill(skill.Id, clipId) < layerPresentation.FeedbackRenderQueue,
+                        $"TbSkill {skill.Id}, clip {clipId}: missing area render binding.");
+            }
+        }
+        Require(tables.TbAttribute.DataList.Count == Enum.GetValues<EAttributeType>().Length, "Attribute definitions do not cover the generated semantic enum.");
+        Require(tables.TbAttribute.DataList.Select(x => x.AttributeType).Distinct().Count() == tables.TbAttribute.DataList.Count, "Attribute semantic duplicates.");
         foreach (var attribute in tables.TbAttribute.DataList)
         {
             Require(Enum.IsDefined(attribute.AttributeType), $"TbAttribute {attribute.Id}: unknown semantic.");
@@ -148,6 +217,7 @@ internal static class Program
         }
         foreach (var skill in tables.TbSkillCombat.DataList)
         {
+            Roguelike.Features.Combat.CombatSkillRules.Validate(skill);
             Require(float.IsFinite(skill.BaseInterval) && skill.BaseInterval > 0 && float.IsFinite(skill.RangePixels) && skill.RangePixels >= 0, $"TbSkillCombat {skill.Id}: invalid interval/range.");
             switch (skill.DeliveryType)
             {
@@ -185,9 +255,29 @@ internal static class Program
             "TbStage 1: run-loop references must resolve.");
         Require(stage.UiSetId == 1 && stage.UiSetId_Ref != null && tables.TbCombatUiSet.DataList.Count == 1,
             "TbStage 1: approved formal UI set must resolve.");
-        Require(stage.PresentationId_Ref.HealthBarWidthPixels > 0f &&
+        Require(float.IsFinite(stage.PresentationId_Ref.HealthBarWidthPixels) &&
+            stage.PresentationId_Ref.HealthBarWidthPixels > 0f &&
+            float.IsFinite(stage.PresentationId_Ref.HealthBarHeightPixels) &&
             stage.PresentationId_Ref.HealthBarHeightPixels > 0f,
             "TbCombatPresentation: health bar pixel width and height must be positive.");
+        var presentation = stage.PresentationId_Ref;
+        Require(new[] { presentation.HealthBarFrameResourceId_Ref, presentation.HealthBarFillResourceId_Ref,
+                presentation.DamageNumberAtlasResourceId_Ref }
+                .All(x => x?.Type == EResourceType.Texture && !string.IsNullOrWhiteSpace(x.Path)),
+            "TbCombatPresentation: combat feedback resources must resolve to non-empty Texture paths.");
+        Require(!string.IsNullOrEmpty(presentation.DamageNumberGlyphs) &&
+                presentation.DamageNumberGlyphs.Distinct().Count() == presentation.DamageNumberGlyphs.Length &&
+                Enumerable.Range(0, 10).All(value => presentation.DamageNumberGlyphs.Contains((char)('0' + value))),
+            "TbCombatPresentation: damage-number glyphs must be unique and contain digits 0-9.");
+        Require(float.IsFinite(presentation.DamageNumberRiseDurationSeconds) &&
+                presentation.DamageNumberRiseDurationSeconds > 0f &&
+                float.IsFinite(presentation.DamageNumberRiseHeightPixels) &&
+                presentation.DamageNumberRiseHeightPixels >= 0f &&
+                float.IsFinite(presentation.DamageNumberScaleStart) && presentation.DamageNumberScaleStart > 0f &&
+                float.IsFinite(presentation.DamageNumberScaleEnd) && presentation.DamageNumberScaleEnd > 0f &&
+                float.IsFinite(presentation.DamageNumberKerning) && presentation.DamageNumberKerning > 0f &&
+                float.IsFinite(presentation.DamageNumberGlyphScale) && presentation.DamageNumberGlyphScale > 0f,
+            "TbCombatPresentation: damage-number animation values must be finite and valid.");
         var ui = stage.UiSetId_Ref;
         Require(new[] { ui.HudPrefabResourceId_Ref, ui.BossBarPrefabResourceId_Ref,
                 ui.UpgradePanelPrefabResourceId_Ref, ui.UpgradeCardPrefabResourceId_Ref,
@@ -213,9 +303,9 @@ internal static class Program
         (int MonsterId, int Weight)[][] approvedWeights =
         {
             new[] { (10010, 60), (10012, 40) },
-            new[] { (10010, 35), (10011, 20), (10012, 25), (10013, 20) },
-            new[] { (10010, 25), (10011, 25), (10012, 25), (10013, 25) },
-            new[] { (10010, 20), (10011, 30), (10012, 20), (10013, 30) }
+            new[] { (10010,25),(10011,10),(10012,15),(10013,10),(10014,15),(10015,10),(10016,10),(10017,5) },
+            new[] { (10010,15),(10011,10),(10012,10),(10013,15),(10014,10),(10015,15),(10016,15),(10017,10) },
+            new[] { (10010,10),(10011,10),(10012,10),(10013,15),(10014,10),(10015,15),(10016,15),(10017,15) }
         };
         for (var index = 0; index < phases.Count; index++)
         {
@@ -245,7 +335,7 @@ internal static class Program
             "TbStageRule 1: approved 215-wave and 2395-monster cadence changed.");
 
         var normalMonsterIds = phases.SelectMany(x => x.MonsterWeights).Select(x => x.MonsterId).Distinct().OrderBy(x => x).ToArray();
-        Require(normalMonsterIds.SequenceEqual(new[] { 10010, 10011, 10012, 10013 }),
+        Require(normalMonsterIds.SequenceEqual(new[] { 10010, 10011, 10012, 10013, 10014, 10015, 10016, 10017 }),
             "TbStageRule 1: approved normal-monster roster changed.");
         Require(tables.TbMonster.Get(10011).MovementType == EMovementType.Flying &&
             new[] { 10010, 10012, 10013 }.All(id => tables.TbMonster.Get(id).MovementType == EMovementType.Ground),
@@ -253,6 +343,10 @@ internal static class Program
         Require(new[] { 10010, 10011, 10012, 10013 }.Select((id, index) =>
                 tables.TbMonster.Get(id).AttributeProfileId == index + 5 && tables.TbMonster.Get(id).DefaultSkillId == 20002).All(x => x),
             "M1 normal-monster combat profiles changed.");
+        var formalDefinition = Roguelike.Features.Combat.Run.CombatRunDefinition.Create(tables, stage.Id);
+        formalDefinition.RequireUiReady();
+        Require(formalDefinition.Monsters.Count(monster => monster.IsElite) == 2 && formalDefinition.Events.Count == 12 &&
+                formalDefinition.ChestProfiles.Count == 2, "Core event, elite or chest content scope is incomplete.");
 
         foreach (var character in tables.TbCharacter.DataList)
         {
@@ -287,19 +381,43 @@ internal static class Program
             drop.PickupRadiusPixels > 0 && drop.PickupRadiusPixels <= drop.MagnetRadiusPixels && drop.MagnetSpeedPixelsPerSecond > 0,
             "TbDropProfile 1: invalid experience pickup contract.");
 
-        var pool = stageRule.UpgradePoolId_Ref;
-        Require(pool.DrawCount == 3 && pool.OptionIds_Ref.Count == 9 && pool.OptionIds_Ref.All(x => x != null) &&
-            pool.OptionIds.Distinct().Count() == pool.OptionIds.Count,
+        var pool = tables.TbUpgradePool.Get(1);
+        Require(pool.DrawCount == 3 && pool.ExhaustionPolicy == EUpgradeExhaustionPolicy.ReduceOfferCount &&
+            !pool.FallbackPoolId.HasValue && pool.Entries.Count == 9,
             "TbUpgradePool 1: invalid three-choice pool.");
-        foreach (var option in pool.OptionIds_Ref)
+        Require(pool.Entries.Select(entry => entry.OptionId).SequenceEqual(
+                new[] { 40001, 40002, 40003, 40004, 40005, 40006, 40007, 40008, 40009 }) &&
+            pool.Entries.Select(entry => entry.Weight).SequenceEqual(
+                new[] { 100, 100, 100, 100, 100, 100, 100, 100, 80 }),
+            "TbUpgradePool 1: approved option membership or weights changed.");
+        foreach (var candidatePool in tables.TbUpgradePool.DataList)
+            ValidateUpgradePool(candidatePool);
+        foreach (var rootPool in tables.TbUpgradePool.DataList)
+            ValidateUpgradeFallbackChain(rootPool);
+        foreach (var build in tables.TbRunBuild.DataList)
+            Roguelike.Features.Combat.Run.CombatBuildState.Validate(build, build.CharacterId ?? stage.InitialCharacterId);
+        Require(stage.RunBuildId_Ref != null && stageRule.UpgradePoolId_Ref.Entries.All(entry =>
+                entry.OptionId_Ref.Type == EUpgradeOptionType.RunWeapon || entry.OptionId_Ref.Type == EUpgradeOptionType.RunPassive ||
+                entry.OptionId_Ref.Type == EUpgradeOptionType.Heal), "Formal build pool contains a slot-bypassing legacy option.");
+        foreach (var option in tables.TbUpgradeOption.DataList)
         {
-            Require(Enum.IsDefined(option.Type) && option.MaxRank > 0 && option.Weight > 0 &&
+            Require(Enum.IsDefined(option.Type) && option.MaxRank > 0 &&
                 (!option.IconResourceId.HasValue || option.IconResourceId_Ref != null),
                 $"TbUpgradeOption {option.Id}: invalid common fields.");
             Require(option.Modifiers.All(x => x.AttributeId_Ref != null && Enum.IsDefined(x.Operation) && x.ValueMilli != 0),
                 $"TbUpgradeOption {option.Id}: invalid attribute modifier.");
             switch (option.Type)
             {
+                case EUpgradeOptionType.RunWeapon:
+                    Require(option.RunWeaponId_Ref != null && option.MaxRank == option.RunWeaponId_Ref.Ranks.Count &&
+                            !option.RunPassiveId.HasValue && !option.TargetSkillId.HasValue && option.Modifiers.Count == 0 && !option.HealMilli.HasValue,
+                        $"TbUpgradeOption {option.Id}: invalid build weapon.");
+                    break;
+                case EUpgradeOptionType.RunPassive:
+                    Require(option.RunPassiveId_Ref != null && option.MaxRank == option.RunPassiveId_Ref.Ranks.Count &&
+                            !option.RunWeaponId.HasValue && !option.TargetSkillId.HasValue && option.Modifiers.Count == 0 && !option.HealMilli.HasValue,
+                        $"TbUpgradeOption {option.Id}: invalid build passive.");
+                    break;
                 case EUpgradeOptionType.SkillUnlock:
                     Require(option.TargetSkillId_Ref?.CombatProfileId_Ref != null && option.Modifiers.Count == 0 && !option.HealMilli.HasValue,
                         $"TbUpgradeOption {option.Id}: invalid skill unlock.");
@@ -386,6 +504,38 @@ internal static class Program
     {
         bool any = profileId.HasValue || skillId.HasValue;
         Require(!any || (profile != null && skill?.CombatProfileId_Ref != null), label + ": partial combat configuration.");
+    }
+
+    /// <summary>Checks one TbUpgradePool row independently from candidate eligibility at runtime.</summary>
+    /// <param name="pool">Generated pool row whose entry weights and exhaustion fields must be complete.</param>
+    /// <exception cref="InvalidOperationException">The pool contains invalid weights, duplicate options or inconsistent fallback fields.</exception>
+    private static void ValidateUpgradePool(UpgradePoolConfig pool)
+    {
+        Require(pool.DrawCount > 0 && Enum.IsDefined(pool.ExhaustionPolicy) && pool.Entries.Count > 0,
+            $"TbUpgradePool {pool.Id}: invalid draw count, policy or entries.");
+        Require(pool.Entries.All(entry => entry?.OptionId_Ref != null && entry.Weight > 0) &&
+            pool.Entries.Select(entry => entry.OptionId).Distinct().Count() == pool.Entries.Count,
+            $"TbUpgradePool {pool.Id}: unresolved, duplicate or non-positive weighted option.");
+        bool requiresFallback = pool.ExhaustionPolicy == EUpgradeExhaustionPolicy.FallbackPool;
+        Require(requiresFallback == pool.FallbackPoolId.HasValue && (!requiresFallback || pool.FallbackPoolId_Ref != null),
+            $"TbUpgradePool {pool.Id}: fallback fields do not match exhaustion policy.");
+    }
+
+    /// <summary>Checks that following TbUpgradePool fallback references always terminates without a cycle.</summary>
+    /// <param name="root">Pool row used as a graph traversal root.</param>
+    /// <exception cref="InvalidOperationException">A fallback reference is unresolved or a pool ID repeats in the chain.</exception>
+    private static void ValidateUpgradeFallbackChain(UpgradePoolConfig root)
+    {
+        var visited = new HashSet<int>();
+        UpgradePoolConfig current = root;
+        while (current != null)
+        {
+            Require(visited.Add(current.Id), $"TbUpgradePool {current.Id}: fallback cycle.");
+            if (current.ExhaustionPolicy != EUpgradeExhaustionPolicy.FallbackPool) return;
+            Require(current.FallbackPoolId_Ref != null,
+                $"TbUpgradePool {current.Id}: unresolved fallback pool.");
+            current = current.FallbackPoolId_Ref;
+        }
     }
 
     /// <summary>Checks that a Prefab-exported body circle is either fully absent or has a positive pixel radius and finite offsets.</summary>

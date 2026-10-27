@@ -31,6 +31,7 @@ public sealed partial class StageRuleConfig : Luban.BeanBase
         BossEncounterId = _buf.ReadInt();
         BossEncounterId_Ref = null;
         RandomSeed = _buf.ReadInt();
+        {int n0 = _buf.ReadSize(); RunEventIds = new System.Collections.Generic.List<int>(n0);for(var i0 = 0 ; i0 < n0 ; i0++) { int _e0;  _e0 = _buf.ReadInt(); RunEventIds.Add(_e0);}}
     }
 
     public static StageRuleConfig DeserializeStageRuleConfig(ByteBuf _buf)
@@ -78,6 +79,11 @@ public sealed partial class StageRuleConfig : Luban.BeanBase
     /// 确定性随机种子
     /// </summary>
     public readonly int RandomSeed;
+    /// <summary>
+    /// 按计划顺序的局内事件
+    /// </summary>
+    public readonly System.Collections.Generic.List<int> RunEventIds;
+    public System.Collections.Generic.List<RunEventConfig> RunEventIds_Ref;
    
     public const int __ID__ = -566097188;
     public override int GetTypeId() => __ID__;
@@ -90,6 +96,9 @@ public sealed partial class StageRuleConfig : Luban.BeanBase
         DropProfileId_Ref = tables.TbDropProfile.GetOrDefault(DropProfileId);
         UpgradePoolId_Ref = tables.TbUpgradePool.GetOrDefault(UpgradePoolId);
         BossEncounterId_Ref = tables.TbBossEncounter.GetOrDefault(BossEncounterId);
+        RunEventIds_Ref = new System.Collections.Generic.List<RunEventConfig>();
+        foreach (var _v in RunEventIds) { RunEventIds_Ref.Add(tables.TbRunEvent.GetOrDefault(_v)); }
+
     }
 
     public override string ToString()
@@ -104,6 +113,7 @@ public sealed partial class StageRuleConfig : Luban.BeanBase
         + "upgradePoolId:" + UpgradePoolId + ","
         + "bossEncounterId:" + BossEncounterId + ","
         + "randomSeed:" + RandomSeed + ","
+        + "runEventIds:" + Luban.StringUtil.CollectionToString(RunEventIds) + ","
         + "}";
     }
 }

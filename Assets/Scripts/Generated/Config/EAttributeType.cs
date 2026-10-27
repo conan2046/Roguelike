@@ -69,6 +69,10 @@ namespace cfg
         /// 抗暴参数
         /// </summary>
         CriticalResistanceParameter = 14,
+        /// <summary>
+        /// 技能范围倍率
+        /// </summary>
+        SkillRangeMultiplier = 15,
     }
 
 } 

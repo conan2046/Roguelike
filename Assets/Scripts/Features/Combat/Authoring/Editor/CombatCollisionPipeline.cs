@@ -27,41 +27,90 @@ namespace Roguelike.Features.Combat.Authoring.Editor
             AssetDatabase.Refresh();
             tables = CombatCylinderPipeline.ReadTables();
 
-            string characterPath = Directory.GetFiles("Config/Datas/Tables", "*_CharacterConfig.xlsx").Single();
-            string monsterPath = Directory.GetFiles("Config/Datas/Tables", "*_MonsterConfig.xlsx").Single();
-            string skillPath = Directory.GetFiles("Config/Datas/Tables", "*_SkillConfig.xlsx").Single();
-            string visualPath = Directory.GetFiles("Config/Datas/Tables", "*_VisualSetConfig.xlsx").Single();
+            ResolvePaths(out string characterPath, out string monsterPath, out string skillPath, out string visualPath);
+            RunExport(tables, characterPath, monsterPath, skillPath, visualPath, true).Complete();
             string[] paths = { characterPath, monsterPath, skillPath, visualPath };
             var backups = paths.ToDictionary(path => path, File.ReadAllBytes);
             try
             {
-                ExportUnits(tables, characterPath, monsterPath, out Dictionary<int, int[]> visualUpdates);
-                ExportSkills(tables, skillPath, visualUpdates);
-                ConfigWorkbookWriter.Patch(visualPath, CombatCylinderPipeline.VisualFields, visualUpdates);
+                AuthoringExportTransaction transaction = RunExport(
+                    tables, characterPath, monsterPath, skillPath, visualPath, false);
+                transaction.Complete();
                 RunLuban();
+                AssetDatabase.Refresh();
+                CombatCylinderPipeline.ValidateSaved();
+                SkillCollisionPipeline.ValidateSaved();
+                transaction.Commit();
             }
             catch
             {
                 foreach (var pair in backups) File.WriteAllBytes(pair.Key, pair.Value);
                 throw;
             }
-            AssetDatabase.Refresh();
-            CombatCylinderPipeline.ValidateSaved();
-            SkillCollisionPipeline.ValidateSaved();
-            Debug.Log("碰撞配置导出完成：Prefab 是编辑源，Luban 表已更新；运行时只读取生成配置。");
+            Debug.Log("碰撞配置导出完成：Dry Run 无冲突；Prefab 拥有字段和基线已更新，运行时只读取 Luban。");
+        }
+
+        /// <summary>读取全部碰撞 Prefab 并生成字段级 Dry Run 报告，不修改 Excel、Prefab 或生成物。</summary>
+        /// <exception cref="InvalidOperationException">Prefab 非法、字段基线缺失且值不一致，或 Excel 被人工修改。</exception>
+        [MenuItem("Roguelike/战斗/碰撞配置/预览全部导出变更（不写表）")]
+        public static void PreviewAll()
+        {
+            SkillCollisionPipeline.EnsureEditable();
+            Tables tables = CombatCylinderPipeline.ReadTables();
+            ResolvePaths(out string characterPath, out string monsterPath, out string skillPath, out string visualPath);
+            RunExport(tables, characterPath, monsterPath, skillPath, visualPath, true).Complete();
+            Debug.Log("碰撞配置 Dry Run 完成：未写入源表。查看 Library/CombatAuthoringDryRun.log。");
         }
 
         /// <summary>命令行自动化入口；行为与 Unity 菜单的一键导出完全一致。</summary>
         /// <remarks>供指定 projectPath 的 Unity BatchMode 验证调用。</remarks>
         public static void ExportAllFromCommandLine() => ExportAll();
 
+        /// <summary>命令行 Dry Run 入口；不迁移或保存 Prefab，不写 Excel 和 Luban。</summary>
+        /// <remarks>供指定 projectPath 的 Unity BatchMode 冲突检查调用。</remarks>
+        public static void PreviewAllFromCommandLine() => PreviewAll();
+
+        /// <summary>解析本导出链允许写入的四张源表，拒绝模糊或重复匹配。</summary>
+        /// <param name="characterPath">角色表唯一路径。</param>
+        /// <param name="monsterPath">怪物表唯一路径。</param>
+        /// <param name="skillPath">技能表唯一路径。</param>
+        /// <param name="visualPath">表现集合表唯一路径。</param>
+        private static void ResolvePaths(out string characterPath, out string monsterPath,
+            out string skillPath, out string visualPath)
+        {
+            characterPath = Directory.GetFiles("Config/Datas/Tables", "*_CharacterConfig.xlsx").Single();
+            monsterPath = Directory.GetFiles("Config/Datas/Tables", "*_MonsterConfig.xlsx").Single();
+            skillPath = Directory.GetFiles("Config/Datas/Tables", "*_SkillConfig.xlsx").Single();
+            visualPath = Directory.GetFiles("Config/Datas/Tables", "*_VisualSetConfig.xlsx").Single();
+        }
+
+        /// <summary>收集 Prefab 拥有字段，并按事务模式执行 Dry Run 或受保护写入。</summary>
+        /// <param name="tables">当前 Luban 快照，提供配置引用和像素换算规则。</param>
+        /// <param name="characterPath">角色源表。</param>
+        /// <param name="monsterPath">怪物源表。</param>
+        /// <param name="skillPath">技能源表。</param>
+        /// <param name="visualPath">表现集合源表。</param>
+        /// <param name="dryRun">为真时禁止工作簿写入。</param>
+        /// <returns>包含全部观察字段、变更和冲突的事务。</returns>
+        private static AuthoringExportTransaction RunExport(Tables tables, string characterPath,
+            string monsterPath, string skillPath, string visualPath, bool dryRun)
+        {
+            var transaction = new AuthoringExportTransaction("combat-collision", dryRun);
+            ExportUnits(tables, characterPath, monsterPath, transaction,
+                out Dictionary<int, int[]> visualUpdates);
+            ExportSkills(tables, skillPath, visualUpdates, transaction);
+            ConfigWorkbookWriter.Patch(visualPath, CombatCylinderPipeline.VisualFields, visualUpdates, transaction);
+            return transaction;
+        }
+
         /// <summary>导出角色和怪物的移动阻挡、受击范围，并收集视觉根缩放。</summary>
         /// <param name="tables">迁移前当前 Luban 配置。</param>
         /// <param name="characterPath">角色源表路径。</param>
         /// <param name="monsterPath">怪物源表路径。</param>
+        /// <param name="transaction">Dry Run 或正式作者事务。</param>
         /// <param name="visualUpdates">输出按表现编号索引的根缩放。</param>
         private static void ExportUnits(Tables tables, string characterPath, string monsterPath,
-            out Dictionary<int, int[]> visualUpdates)
+            AuthoringExportTransaction transaction, out Dictionary<int, int[]> visualUpdates)
         {
             visualUpdates = new Dictionary<int, int[]>();
             foreach (IGrouping<bool, CombatCylinderAuthoring> group in CombatCylinderPipeline.Shapes().GroupBy(shape => shape.IsHero))
@@ -76,21 +125,23 @@ namespace Roguelike.Features.Combat.Authoring.Editor
                         : new float?[] { null, null, null };
                 });
                 string path = group.Key ? characterPath : monsterPath;
-                ConfigWorkbookWriter.Patch(path, CombatCylinderPipeline.MovementFields, movement);
-                ConfigWorkbookWriter.PatchOptional(path, CombatCylinderPipeline.BodyFields, body);
+                ConfigWorkbookWriter.Patch(path, CombatCylinderPipeline.MovementFields, movement, transaction);
+                ConfigWorkbookWriter.PatchOptional(path, CombatCylinderPipeline.BodyFields, body, transaction);
                 var collisionShape = group.ToDictionary(shape => shape.ConfigId, shape => new int?[]
                 {
                     shape.GetComponent<CapsuleCollider2D>() != null
                         ? (int)EUnitCollisionShape.VerticalCapsule
                         : (int?)null
                 });
-                ConfigWorkbookWriter.PatchOptional(path, CombatCylinderPipeline.CollisionShapeFields, collisionShape);
+                ConfigWorkbookWriter.PatchOptional(path, CombatCylinderPipeline.CollisionShapeFields, collisionShape,
+                    transaction);
                 var hitEffect = group.Select(shape => new { shape.ConfigId, Values = CombatCylinderPipeline.HitEffectValues(shape, tables) })
                     .Where(item => item.Values.Length > 0)
                     .ToDictionary(item => item.ConfigId,
                         item => item.Values.Select(value => (float?)Quantize(value)).ToArray());
                 if (hitEffect.Count > 0)
-                    ConfigWorkbookWriter.PatchOptional(path, CombatCylinderPipeline.HitEffectFields, hitEffect);
+                    ConfigWorkbookWriter.PatchOptional(path, CombatCylinderPipeline.HitEffectFields, hitEffect,
+                        transaction);
                 foreach (CombatCylinderAuthoring shape in group)
                 {
                     int visualId = group.Key ? tables.TbCharacter.Get(shape.ConfigId).VisualSetId : tables.TbMonster.Get(shape.ConfigId).VisualSetId;
@@ -103,7 +154,9 @@ namespace Roguelike.Features.Combat.Authoring.Editor
         /// <param name="tables">当前 Luban 配置。</param>
         /// <param name="skillPath">技能源表路径。</param>
         /// <param name="visualUpdates">与单位共用的表现缩放更新集合。</param>
-        private static void ExportSkills(Tables tables, string skillPath, Dictionary<int, int[]> visualUpdates)
+        /// <param name="transaction">Dry Run 或正式作者事务。</param>
+        private static void ExportSkills(Tables tables, string skillPath, Dictionary<int, int[]> visualUpdates,
+            AuthoringExportTransaction transaction)
         {
             var projectile = new Dictionary<int, float[]>();
             var area = new Dictionary<int, float[]>();
@@ -126,10 +179,13 @@ namespace Roguelike.Features.Combat.Authoring.Editor
                 if (skill.CombatProfileId_Ref?.DeliveryType == ESkillDeliveryType.TargetArea && !area.ContainsKey(skill.Id))
                     throw new InvalidOperationException("缺少范围技能预制体: " + skill.Id);
             }
-            if (projectile.Count > 0) ConfigWorkbookWriter.Patch(skillPath, SkillCollisionPipeline.ProjectileFields, projectile);
-            if (area.Count > 0) ConfigWorkbookWriter.Patch(skillPath, SkillCollisionPipeline.AreaFields, area);
+            if (projectile.Count > 0)
+                ConfigWorkbookWriter.Patch(skillPath, SkillCollisionPipeline.ProjectileFields, projectile, transaction);
+            if (area.Count > 0)
+                ConfigWorkbookWriter.Patch(skillPath, SkillCollisionPipeline.AreaFields, area, transaction);
             if (visualPlacement.Count > 0)
-                ConfigWorkbookWriter.PatchOptional(skillPath, SkillCollisionPipeline.VisualPlacementFields, visualPlacement);
+                ConfigWorkbookWriter.PatchOptional(skillPath, SkillCollisionPipeline.VisualPlacementFields,
+                    visualPlacement, transaction);
         }
 
         /// <summary>合并同一表现编号的根缩放，拒绝多个 Prefab 给出互相矛盾的数值。</summary>
@@ -248,6 +304,7 @@ namespace Roguelike.Features.Combat.Authoring.Editor
                     SkillConfig skill = tables.TbSkill.Get(shape.SkillId);
                     bool area = skill.CombatProfileId_Ref?.DeliveryType == ESkillDeliveryType.TargetArea;
                     float rootScale = UniformScale(root.transform);
+                    bool changed = false;
                     if (shape.DataVersion < CurrentDataVersion)
                     {
                         Vector3 oldCenter = shape.transform.localPosition;
@@ -257,12 +314,24 @@ namespace Roguelike.Features.Combat.Authoring.Editor
                         shape.OffsetXPixels = area ? 0f : Quantize(oldCenter.x * rootScale / pixelScale);
                         shape.OffsetYPixels = area ? 0f : Quantize(oldCenter.z * rootScale / pixelScale);
                         shape.DataVersion = CurrentDataVersion;
+                        changed = true;
                     }
-                    shape.gameObject.name = area ? "范围技能命中范围" : "弹丸命中范围";
-                    shape.transform.localPosition = Vector3.zero;
-                    shape.transform.localRotation = Quaternion.identity;
-                    shape.transform.localScale = Vector3.one;
-                    PrefabUtility.SaveAsPrefabAsset(root, path);
+                    string expectedName = area ? "范围技能命中范围" : "弹丸命中范围";
+                    if (shape.gameObject.name != expectedName)
+                    {
+                        shape.gameObject.name = expectedName;
+                        changed = true;
+                    }
+                    if (shape.transform.localPosition != Vector3.zero ||
+                        shape.transform.localRotation != Quaternion.identity ||
+                        shape.transform.localScale != Vector3.one)
+                    {
+                        shape.transform.localPosition = Vector3.zero;
+                        shape.transform.localRotation = Quaternion.identity;
+                        shape.transform.localScale = Vector3.one;
+                        changed = true;
+                    }
+                    if (changed) PrefabUtility.SaveAsPrefabAsset(root, path);
                 }
                 finally { PrefabUtility.UnloadPrefabContents(root); }
             }

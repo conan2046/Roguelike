@@ -26,11 +26,14 @@ public sealed partial class UpgradeOptionConfig : Luban.BeanBase
         if(_buf.ReadBool()){ TargetSkillId = _buf.ReadInt(); } else { TargetSkillId = null; }
         TargetSkillId_Ref = null;
         MaxRank = _buf.ReadInt();
-        Weight = _buf.ReadInt();
         {int n0 = _buf.ReadSize(); Modifiers = new System.Collections.Generic.List<RunAttributeModifier>(n0);for(var i0 = 0 ; i0 < n0 ; i0++) { RunAttributeModifier _e0;  _e0 = global::cfg.RunAttributeModifier.DeserializeRunAttributeModifier(_buf); Modifiers.Add(_e0);}}
         if(_buf.ReadBool()){ HealMilli = _buf.ReadLong(); } else { HealMilli = null; }
         if(_buf.ReadBool()){ IconResourceId = _buf.ReadInt(); } else { IconResourceId = null; }
         IconResourceId_Ref = null;
+        if(_buf.ReadBool()){ RunWeaponId = _buf.ReadInt(); } else { RunWeaponId = null; }
+        RunWeaponId_Ref = null;
+        if(_buf.ReadBool()){ RunPassiveId = _buf.ReadInt(); } else { RunPassiveId = null; }
+        RunPassiveId_Ref = null;
     }
 
     public static UpgradeOptionConfig DeserializeUpgradeOptionConfig(ByteBuf _buf)
@@ -64,22 +67,28 @@ public sealed partial class UpgradeOptionConfig : Luban.BeanBase
     /// </summary>
     public readonly int MaxRank;
     /// <summary>
-    /// 正整数抽取权重
-    /// </summary>
-    public readonly int Weight;
-    /// <summary>
     /// 属性ID:操作:数值
     /// </summary>
     public readonly System.Collections.Generic.List<RunAttributeModifier> Modifiers;
     /// <summary>
-    /// 立即恢复量，原单位乘1000
+    /// 立即恢复量；原单位乘1000
     /// </summary>
     public readonly long? HealMilli;
     /// <summary>
-    /// 图标资源；完成UI资源后填写
+    /// 图标资源；正式UI资源完成后填写
     /// </summary>
     public readonly int? IconResourceId;
     public ResourceConfig IconResourceId_Ref;
+    /// <summary>
+    /// 局内武器选项专用引用
+    /// </summary>
+    public readonly int? RunWeaponId;
+    public RunWeaponConfig RunWeaponId_Ref;
+    /// <summary>
+    /// 局内被动选项专用引用
+    /// </summary>
+    public readonly int? RunPassiveId;
+    public RunPassiveConfig RunPassiveId_Ref;
    
     public const int __ID__ = -728270797;
     public override int GetTypeId() => __ID__;
@@ -89,6 +98,8 @@ public sealed partial class UpgradeOptionConfig : Luban.BeanBase
         TargetSkillId_Ref = TargetSkillId!= null ? tables.TbSkill.GetOrDefault(TargetSkillId.Value) : null;
         foreach (var _e in Modifiers) { _e?.ResolveRef(tables); }
         IconResourceId_Ref = IconResourceId!= null ? tables.TbResource.GetOrDefault(IconResourceId.Value) : null;
+        RunWeaponId_Ref = RunWeaponId!= null ? tables.TbRunWeapon.GetOrDefault(RunWeaponId.Value) : null;
+        RunPassiveId_Ref = RunPassiveId!= null ? tables.TbRunPassive.GetOrDefault(RunPassiveId.Value) : null;
     }
 
     public override string ToString()
@@ -100,10 +111,11 @@ public sealed partial class UpgradeOptionConfig : Luban.BeanBase
         + "type:" + Type + ","
         + "targetSkillId:" + TargetSkillId + ","
         + "maxRank:" + MaxRank + ","
-        + "weight:" + Weight + ","
         + "modifiers:" + Luban.StringUtil.CollectionToString(Modifiers) + ","
         + "healMilli:" + HealMilli + ","
         + "iconResourceId:" + IconResourceId + ","
+        + "runWeaponId:" + RunWeaponId + ","
+        + "runPassiveId:" + RunPassiveId + ","
         + "}";
     }
 }

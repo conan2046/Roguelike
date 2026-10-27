@@ -12,7 +12,8 @@ namespace Roguelike.Features.Combat.Authoring.Editor
     {
         private static readonly string[] KindNames = { "弹丸命中范围", "范围技能命中范围" };
 
-        /// <summary>Unity 绘制 Inspector 时显示中文用途、像素字段和统一导出入口。</summary>
+        /// <summary>Unity 绘制 Inspector 时显示中文用途、像素字段、碰撞导出和逐片段层级编辑入口。</summary>
+        /// <remarks>碰撞仍保存到 Prefab 后导出；层级独立保存到 TbCombatRender，不改变几何或资源引用。</remarks>
         public override void OnInspectorGUI()
         {
             serializedObject.Update();
@@ -31,6 +32,7 @@ namespace Roguelike.Features.Combat.Authoring.Editor
                 DrawRuntimeGeometry(shape);
                 if (GUILayout.Button("刷新表现并对准命中范围")) SkillPrefabPreview.RefreshCurrent();
                 EditorGUILayout.HelpBox("修改后：保存 Prefab → Roguelike > 战斗 > 碰撞配置 > 导出全部预制体并生成配置。", MessageType.None);
+                CombatRenderInspector.DrawSkill(shape.SkillId);
                 return;
             }
             SerializedProperty radius = serializedObject.FindProperty("RadiusPixels");
@@ -44,6 +46,7 @@ namespace Roguelike.Features.Combat.Authoring.Editor
             serializedObject.ApplyModifiedProperties();
             if (GUILayout.Button("刷新表现并对准命中范围")) SkillPrefabPreview.RefreshCurrent();
             EditorGUILayout.HelpBox("修改后：保存 Prefab → Roguelike > 战斗 > 碰撞配置 > 导出全部预制体并生成配置。", MessageType.None);
+            if (shape != null) CombatRenderInspector.DrawSkill(shape.SkillId);
         }
 
         /// <summary>Scene 视图提供技能命中圆半径拖拽手柄。</summary>

@@ -28,6 +28,14 @@ namespace cfg
         /// 立即恢复
         /// </summary>
         Heal = 3,
+        /// <summary>
+        /// 获得武器或升星
+        /// </summary>
+        RunWeapon = 4,
+        /// <summary>
+        /// 获得被动或升级
+        /// </summary>
+        RunPassive = 5,
     }
 
 } 

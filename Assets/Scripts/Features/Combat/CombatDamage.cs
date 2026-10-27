@@ -47,6 +47,7 @@ namespace Roguelike.Features.Combat
         public long Health, MaxHealth;
         public double Defense, DefenseParameter, Evasion, CriticalResistance, InvulnerableUntil;
         public bool IsPlayer;
+        public CombatGuardState Guard;
 
         /// <summary>出生时由完整属性建立生命，禁止用此入口对死亡单位隐式回血。</summary>
         /// <param name="attributes">TbAttributeProfile 聚合结果。</param>
@@ -147,7 +148,7 @@ namespace Roguelike.Features.Combat
         /// <param name="seed">本局固定种子。</param>
         /// <param name="rules">TbCombatRules 的已验证快照。</param>
         /// <returns>拒绝原因、伤害、实际扣血及唯一死亡标记。</returns>
-        /// <remarks>只修改目标生命、次数免伤和玩家无敌截止时间；不检查攻击者当前生命，允许同 tick 互杀。</remarks>
+        /// <remarks>修改目标生命、次数免伤、玩家无敌和TbTribulationSignature铁壁蓄能/截止时间；只有实际扣血且存活才蓄能，保护期不刷新。不检查攻击者当前生命，允许同tick互杀。</remarks>
         /// <exception cref="InvalidOperationException">有效请求含非法计算输入。</exception>
         public static DamageResult Resolve(in AttackSnapshot attack, ref DamageTarget target, ulong expectedLifetime,
             bool contact, double time, ulong seed, in DamageRules rules)
@@ -168,11 +169,13 @@ namespace Roguelike.Features.Combat
             bool critical = CombatRandom.Inclusive(seed, attack.Sequence, target.Lifetime, CombatRandomPurpose.Critical, 1, CombatMath.BasisPoints) <= criticalThreshold;
             int random = CombatRandom.Inclusive(seed, attack.Sequence, target.Lifetime, CombatRandomPurpose.Damage, rules.RandomMinBp, rules.RandomMaxBp);
             long damage = CombatMath.Damage(attack.Attack, target.Defense, target.DefenseParameter, random, rules.CriticalMultiplierBp, critical);
+            if (target.Guard.IsActive(time)) damage = (long)Math.Floor(damage * target.Guard.DamageTakenMultiplier);
             long loss = Math.Min(target.Health, damage);
             double until = time + rules.PlayerInvulnerability;
             CombatMath.NonNegative(until);
             target.Health -= loss;
             if (loss > 0 && target.IsPlayer) target.InvulnerableUntil = until;
+            if (loss > 0 && target.Health > 0) target.Guard.RecordEffectiveHit(time);
             return new DamageResult { Outcome = critical ? DamageOutcome.Critical : DamageOutcome.Hit,
                 Damage = damage, HealthLost = loss, Killed = target.Health == 0 };
         }

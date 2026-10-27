@@ -29,11 +29,11 @@ namespace Roguelike.Infrastructure.Resources
         public string Name => "Resources";
 
         /// <summary>
-        /// Initializes the default YooAsset package before any table or game resource is requested.
+        /// Initializes the Raw and imported-asset YooAsset packages before any table or game resource is requested.
         /// </summary>
         /// <param name="cancellationToken">Token forwarded to package initialization.</param>
         /// <returns>A task that completes when the package manifest is active.</returns>
-        /// <remarks>Initializes application-owned YooAsset global state and must execute only once per application lifetime.</remarks>
+        /// <remarks>Initializes application-owned YooAsset global state and both local manifests once per application lifetime.</remarks>
         public Task ExecuteAsync(CancellationToken cancellationToken)
         {
             return initializer.InitializeAsync(playMode, cancellationToken);

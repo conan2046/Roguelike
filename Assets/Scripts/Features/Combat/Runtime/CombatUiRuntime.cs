@@ -1,5 +1,6 @@
 using System;
 using System.Globalization;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using cfg;
@@ -13,11 +14,13 @@ using UnityEngine.UI;
 namespace Roguelike.Features.Combat.Runtime
 {
     /// <summary>实例化并刷新正式战斗 UI Prefab，不把布局或业务文本复制到运行时代码。</summary>
-    public sealed class CombatUiRuntime : IDisposable
+    public sealed partial class CombatUiRuntime : IDisposable
     {
         private readonly CombatRunDefinition definition;
         private readonly GameObject root;
         private readonly CombatHudView hud;
+        private CombatBuildState displayedBuild;
+        private ulong displayedBuildRevision;
         private readonly BossHealthBarView boss;
         private readonly UpgradeChoicePanelView upgrade;
         private readonly SettlementPanelView settlement;
@@ -39,13 +42,24 @@ namespace Roguelike.Features.Combat.Runtime
         public GameObject Root => root;
 
         /// <summary>接管全部资源句柄和实例；调用方只能通过 CreateAsync 构造完整对象。</summary>
+        /// <param name="definition">正式单局配置。</param><param name="root">HUD 实例根。</param>
+        /// <param name="hud">HUD 绑定。</param><param name="boss">Boss 血条绑定。</param>
+        /// <param name="upgrade">升级面板绑定。</param><param name="settlement">结算面板绑定。</param>
+        /// <param name="upgradeCardPrefab">句柄持有的卡片模板。</param><param name="font">正式字体。</param>
+        /// <param name="hudHandle">HUD 资源所有权。</param><param name="bossHandle">Boss 资源所有权。</param>
+        /// <param name="upgradeHandle">升级面板资源所有权。</param><param name="cardHandle">卡片资源所有权。</param>
+        /// <param name="settlementHandle">结算面板资源所有权。</param><param name="fontHandle">字体资源所有权。</param>
+        /// <param name="ownedEventSystem">本运行器自建输入系统；复用既有系统时为空。</param>
+        /// <param name="chooseUpgrade">升级提交入口。</param><param name="restart">重开入口。</param>
+        /// <param name="eventUi">事件、箱面板和箱标记的资源所有者。</param><param name="claimChest">领取提交入口。</param>
+        /// <remarks>注册结算按钮监听；资源与实例必须由 Dispose 统一释放。</remarks>
         private CombatUiRuntime(CombatRunDefinition definition, GameObject root, CombatHudView hud,
             BossHealthBarView boss, UpgradeChoicePanelView upgrade, SettlementPanelView settlement,
             GameObject upgradeCardPrefab, Font font, IResourceHandle<GameObject> hudHandle,
             IResourceHandle<GameObject> bossHandle, IResourceHandle<GameObject> upgradeHandle,
             IResourceHandle<GameObject> cardHandle, IResourceHandle<GameObject> settlementHandle,
             IResourceHandle<Font> fontHandle, GameObject ownedEventSystem,
-            Func<ulong, int, bool> chooseUpgrade, Func<bool> restart)
+            Func<ulong, int, bool> chooseUpgrade, Func<bool> restart, EventUiBundle eventUi, Func<ulong, int, bool> claimChest)
         {
             this.definition = definition;
             this.root = root;
@@ -64,6 +78,8 @@ namespace Roguelike.Features.Combat.Runtime
             this.ownedEventSystem = ownedEventSystem;
             this.chooseUpgrade = chooseUpgrade;
             this.restart = restart;
+            this.eventUi = eventUi;
+            this.claimChest = claimChest;
             settlement.RestartButton.onClick.AddListener(RestartFromButton);
         }
 
@@ -75,11 +91,12 @@ namespace Roguelike.Features.Combat.Runtime
         /// <param name="chooseUpgrade">升级卡按钮提交入口。</param>
         /// <param name="restart">结算按钮重开入口。</param>
         /// <param name="token">退出加载令牌。</param>
+        /// <param name="claimChest">正式宝箱领取入口；不使用宝箱的测试入口可省略。</param>
         /// <returns>全部资源及实例就绪的正式 UI。</returns>
         /// <remarks>部分加载或实例化失败时立即释放已有句柄和对象，不保存 Scene 或 Prefab。</remarks>
         public static async Task<CombatUiRuntime> CreateAsync(CombatRunDefinition definition,
             IResourceService resources, Transform parent, Camera camera, Func<ulong, int, bool> chooseUpgrade,
-            Func<bool> restart, CancellationToken token)
+            Func<bool> restart, CancellationToken token, Func<ulong, int, bool> claimChest = null)
         {
             if (definition == null) throw new ArgumentNullException(nameof(definition));
             if (resources == null) throw new ArgumentNullException(nameof(resources));
@@ -90,6 +107,7 @@ namespace Roguelike.Features.Combat.Runtime
                 cardHandle = null, settlementHandle = null;
             IResourceHandle<Font> fontHandle = null;
             GameObject root = null, eventSystem = null;
+            EventUiBundle eventUi = null;
             try
             {
                 CombatUiSetConfig ui = definition.UiSet;
@@ -118,13 +136,15 @@ namespace Roguelike.Features.Combat.Runtime
                     eventSystem = new GameObject("Combat Event System", typeof(EventSystem), typeof(StandaloneInputModule));
                     eventSystem.transform.SetParent(parent, false);
                 }
+                eventUi = await EventUiBundle.CreateAsync(definition, resources, root.transform, token);
                 ApplyFont(root, fontHandle.Asset);
                 return new CombatUiRuntime(definition, root, hud, boss, upgrade, settlement,
                     cardHandle.Asset, fontHandle.Asset, hudHandle, bossHandle, upgradeHandle, cardHandle,
-                    settlementHandle, fontHandle, eventSystem, chooseUpgrade, restart);
+                    settlementHandle, fontHandle, eventSystem, chooseUpgrade, restart, eventUi, claimChest);
             }
             catch
             {
+                eventUi?.Dispose();
                 if (root != null) UnityEngine.Object.Destroy(root);
                 if (eventSystem != null) UnityEngine.Object.Destroy(eventSystem);
                 fontHandle?.Dispose(); settlementHandle?.Dispose(); cardHandle?.Dispose();
@@ -154,6 +174,22 @@ namespace Roguelike.Features.Combat.Runtime
             hud.KillsText.text = string.Format(CultureInfo.InvariantCulture, ui.KillsFormat, model.Kills);
             hud.WaveText.text = string.Format(CultureInfo.InvariantCulture, ui.WaveFormat, model.CompletedWaves);
             hud.ExperienceBar.value = Mathf.Clamp01(model.Experience / (float)requiredExperience);
+            if (model.Build != null && (displayedBuild != model.Build || displayedBuildRevision != model.Build.Revision))
+            {
+                RunBuildConfig build = model.Build.Config;
+                if (hud.WeaponSlotsText == null || hud.PassiveSlotsText == null)
+                    throw new InvalidOperationException("CombatHud prefab lacks authored build slot text bindings.");
+                hud.WeaponSlotsText.text = string.Format(CultureInfo.InvariantCulture, build.WeaponSlotsFormat,
+                    model.Build.WeaponRanks.Count, build.WeaponSlotCount, string.Join(build.EntrySeparator,
+                        model.Build.WeaponRanks.Select(pair => string.Format(CultureInfo.InvariantCulture, build.EntryFormat,
+                            model.Build.WeaponDisplayName(pair.Key), pair.Value))));
+                hud.PassiveSlotsText.text = string.Format(CultureInfo.InvariantCulture, build.PassiveSlotsFormat,
+                    model.Build.PassiveRanks.Count, build.PassiveSlotCount, string.Join(build.EntrySeparator,
+                        model.Build.PassiveRanks.Select(pair => string.Format(CultureInfo.InvariantCulture, build.PassiveEntryFormat,
+                            build.PassiveIds_Ref.First(passive => passive.Id == pair.Key).Name, pair.Value))));
+                displayedBuild = model.Build;
+                displayedBuildRevision = model.Build.Revision;
+            }
 
             bool bossVisible = TryReadBoss(session, out CombatUnit bossUnit);
             boss.gameObject.SetActive(bossVisible);
@@ -180,6 +216,7 @@ namespace Roguelike.Features.Combat.Runtime
                     minutes, seconds, model.Kills, model.Level);
                 settlement.RestartText.text = ui.RestartText;
             }
+            SynchronizeEventUi(model, coordinator, session);
         }
 
         /// <summary>销毁当前三选一卡片并按模型候选顺序实例化可点击卡片。</summary>
@@ -198,8 +235,10 @@ namespace Roguelike.Features.Combat.Runtime
                 ApplyFont(card.gameObject, font);
                 card.NameText.text = option.Name;
                 card.DescriptionText.text = option.Description;
-                int rank = model.UpgradeRanks.TryGetValue(option.Id, out int current) ? current + 1 : 1;
-                card.RankText.text = string.Format(CultureInfo.InvariantCulture, definition.UiSet.RankFormat, rank, option.MaxRank);
+                int rank = model.GetOptionRank(option) + 1;
+                string rankFormat = option.Type == EUpgradeOptionType.RunWeapon ? definition.BuildConfig.WeaponRankFormat :
+                    option.Type == EUpgradeOptionType.RunPassive ? definition.BuildConfig.PassiveRankFormat : definition.UiSet.RankFormat;
+                card.RankText.text = string.Format(CultureInfo.InvariantCulture, rankFormat, rank, option.MaxRank);
                 card.IconImage.enabled = option.IconResourceId.HasValue;
                 ulong generation = displayedPanelGeneration;
                 int optionId = option.Id;
@@ -265,6 +304,7 @@ namespace Roguelike.Features.Combat.Runtime
             if (disposed) return;
             disposed = true;
             settlement.RestartButton.onClick.RemoveListener(RestartFromButton);
+            eventUi.Dispose();
             if (root != null) UnityEngine.Object.Destroy(root);
             if (ownedEventSystem != null) UnityEngine.Object.Destroy(ownedEventSystem);
             fontHandle.Dispose(); settlementHandle.Dispose(); cardHandle.Dispose();

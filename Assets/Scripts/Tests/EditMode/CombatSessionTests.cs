@@ -154,6 +154,8 @@ namespace Roguelike.Tests
             session.Advance(session.StepSeconds, float2.zero);
             Assert.That(session.ReadUnit(1).Target.Health, Is.LessThan(health));
             Assert.That(session.ImpactCount, Is.EqualTo(1));
+            Assert.That(session.ReadImpact(0).TargetSlot, Is.EqualTo(1));
+            Assert.That(session.ReadImpact(0).TargetLifetime, Is.EqualTo(session.ReadUnit(1).Target.Lifetime));
             Assert.That(math.distance(session.ReadImpact(0).Position, new float2(2.25f, 1.35f)), Is.LessThan(1e-5f));
         }
 
@@ -887,6 +889,14 @@ namespace Roguelike.Tests
             if (source.ProjectileLifetime.HasValue) buffer.WriteInt(source.ProjectileLifetimeMilli.Value);
             buffer.WriteBool(windup.HasValue);
             if (windup.HasValue) buffer.WriteInt(ConfigNumber.Encode(windup.Value));
+            buffer.WriteInt(source.DamagePermille);
+            buffer.WriteBool(source.ProjectilePattern.HasValue);
+            if (source.ProjectilePattern.HasValue) buffer.WriteInt((int)source.ProjectilePattern.Value);
+            buffer.WriteInt(source.ProjectileCount); buffer.WriteFloat(source.SpreadDegrees);
+            buffer.WriteInt(source.PierceCount); buffer.WriteInt(source.ChainCount); buffer.WriteFloat(source.ChainRangePixels);
+            buffer.WriteInt(source.AreaDurationMilli); buffer.WriteInt(source.AreaPulseIntervalMilli); buffer.WriteBool(source.AreaFollowsOwner);
+            buffer.WriteFloat(source.ImpactRadiusPixels); buffer.WriteBool(source.AreaRetargets);
+            buffer.WriteInt(source.AreaRingCount); buffer.WriteFloat(source.AreaRingWidthPixels);
             return new SkillCombatConfig(buffer);
         }
 

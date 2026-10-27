@@ -13,7 +13,7 @@ using UnityEngine;
 namespace Roguelike.Features.Combat.Runtime
 {
     /// <summary>交互战斗入口：测试场景与正式 TbStage 共用 World、会话、表现和相机生命周期。</summary>
-    public sealed class CombatRuntimeRunner : MonoBehaviour
+    public sealed partial class CombatRuntimeRunner : MonoBehaviour
     {
         private readonly CancellationTokenSource lifetime = new CancellationTokenSource();
         private PerformanceScenarioConfig scenario;
@@ -69,7 +69,8 @@ namespace Roguelike.Features.Combat.Runtime
                 this.input = input;
                 ValidateScenarioPresentation();
                 assets = await CombatVisualResources.LoadAsync(scenario, resources, linked.Token);
-                CombatMapDefinition mapDefinition = CombatMapDefinition.Create(scenario.MapId_Ref);
+                CombatMapDefinition mapDefinition = CombatMapDefinition.Create(scenario.MapId_Ref)
+                    .FitViewport((double)Screen.width / Screen.height);
                 mapBackground = await CombatTilemapBackground.CreateAsync(mapDefinition, scenario.CombatRulesId_Ref,
                     resources, transform, linked.Token);
                 CreateWorld();
@@ -100,7 +101,8 @@ namespace Roguelike.Features.Combat.Runtime
         /// <param name="token">组合根退出令牌。</param>
         /// <returns>战斗、美术、相机及正式 UI 全部就绪的任务。</returns>
         /// <remarks>失败或取消时按 UI、表现、会话、World、共享美术顺序回收，不保存场景。</remarks>
-        /// <exception cref="InvalidOperationException">重复初始化、UI 缺配或 Prefab 无效。</exception>
+        /// <exception cref="InvalidOperationException">重复初始化、UI缺配或Prefab无效。</exception>
+        /// <exception cref="ArgumentNullException">正式定义或输入适配器为空。</exception>
         /// <exception cref="OperationCanceledException">初始化被取消。</exception>
         public async Task InitializeAsync(CombatRunDefinition definition, IResourceService resources,
             ICombatInput input, CancellationToken token)
@@ -115,7 +117,8 @@ namespace Roguelike.Features.Combat.Runtime
                 definition.RequireUiReady();
                 ValidateCameraPresentation();
                 assets = await CombatVisualResources.LoadAsync(definition, resources, linked.Token);
-                mapBackground = await CombatTilemapBackground.CreateAsync(definition.MapLayout, definition.CombatRules,
+                mapBackground = await CombatTilemapBackground.CreateAsync(
+                    definition.MapLayout.FitViewport((double)Screen.width / Screen.height), definition.CombatRules,
                     resources, transform, linked.Token);
                 CreateWorld();
                 Session = await CombatSessionFactory.CreateAsync(world, definition, resources, linked.Token);
@@ -130,7 +133,12 @@ namespace Roguelike.Features.Combat.Runtime
                 collisionDebug.Synchronize();
 #endif
                 ui = await CombatUiRuntime.CreateAsync(definition, resources, transform, ViewCamera,
-                    ChooseUpgrade, Restart, linked.Token);
+                    ChooseUpgrade, Restart, linked.Token, ClaimChest);
+                if (definition.Tribulation != null)
+                {
+                    tribulationUi = await CombatTribulationUi.CreateAsync(Coordinator, resources, transform, ViewCamera, ReturnToLobby, linked.Token);
+                    tribulationMarkers = new CombatTribulationMarkers(Coordinator, transform);
+                }
                 linked.Token.ThrowIfCancellationRequested();
                 RefreshStatus();
                 Ready = true;
@@ -150,14 +158,12 @@ namespace Roguelike.Features.Combat.Runtime
             started = true;
         }
 
-        /// <summary>创建本入口独占的 ECS World 并登记默认系统组。</summary>
-        /// <remarks>World 不追加到 PlayerLoop，由 LateUpdate 手动推进一次。</remarks>
+        /// <summary>通过战斗系统目录创建本入口独占的 ECS World。</summary>
+        /// <remarks>World 不追加到 PlayerLoop，由 LateUpdate 手动推进一次；项目业务系统不会通过 Default 自动发现进入。</remarks>
         private void CreateWorld()
         {
             lifetime.Token.ThrowIfCancellationRequested();
-            world = new World("Roguelike Combat");
-            DefaultWorldInitialization.AddSystemsToRootLevelSystemGroups(world,
-                DefaultWorldInitialization.GetAllSystems(WorldSystemFilterFlags.Default));
+            world = CombatWorldFactory.Create();
         }
 
         /// <summary>创建只属于本局的正交相机，并从 TbCombatPresentation 应用渲染参数。</summary>
@@ -255,7 +261,7 @@ namespace Roguelike.Features.Combat.Runtime
         /// <summary>输入采样后处理重开和暂停，再推进测试会话或正式协调器。</summary>
         /// <param name="elapsedSeconds">本渲染帧经过的未缩放时间。</param>
         /// <param name="frame">输入适配器或测试提供的同协议快照。</param>
-        /// <remarks>正式升级与结算由协调器冻结；UI 只刷新状态，不重复执行伤害。</remarks>
+        /// <remarks>正式升级与结算由协调器冻结；模拟完成后一次采集会话拥有的权威快照，主体与反馈只在本次同步中借用。刷新渲染组件和UI，不重复执行伤害。</remarks>
         public void AdvanceFrame(double elapsedSeconds, CombatInputFrame frame)
         {
             if (!Ready) return;
@@ -263,8 +269,9 @@ namespace Roguelike.Features.Combat.Runtime
             if (frame.PausePressed) TogglePause();
             if (Coordinator != null) Coordinator.Advance(elapsedSeconds, frame.Movement);
             else Session.Advance(elapsedSeconds, frame.Movement);
-            visuals.Synchronize();
-            feedback?.Synchronize();
+            var presentationUnits = Session.CapturePresentationUnits();
+            visuals.Synchronize(presentationUnits);
+            feedback?.Synchronize(presentationUnits);
 #if ROGUELIKE_COMBAT_COLLISION_DEBUG
             collisionDebug?.Synchronize();
 #endif
@@ -272,7 +279,7 @@ namespace Roguelike.Features.Combat.Runtime
         }
 
         /// <summary>Unity LateUpdate 在模拟和选帧后推进自有 World 的变换与 Presentation。</summary>
-        /// <remarks>暂停时仍绘制冻结画面；World 从不注册到全局 PlayerLoop。</remarks>
+        /// <remarks>暂停时仍绘制冻结画面；编辑器内同步临时行走边界红框，范围来自本局 TbMap，跟随标记所有者退出回收。World 从不注册到全局 PlayerLoop。</remarks>
         private void LateUpdate()
         {
             if (!Ready) return;
@@ -280,6 +287,9 @@ namespace Roguelike.Features.Combat.Runtime
             {
                 UpdateCameraFit();
                 UpdateCameraFollow();
+#if UNITY_EDITOR
+                tribulationMarkers?.SynchronizeArenaBoundary(ViewCamera);
+#endif
                 world.Update();
             }
             catch (Exception exception)
@@ -289,24 +299,24 @@ namespace Roguelike.Features.Combat.Runtime
             }
         }
 
-        /// <summary>按 TbMap 配置的逻辑像素高度和当前屏幕宽高比计算正交视野。</summary>
-        /// <remarks>视口高度来自 TbMap.cameraViewportHeightPixels，像素到世界单位比例来自 TbCombatRules.worldUnitsPerPixel；横向视野由 Camera.aspect 自动适配。</remarks>
+        /// <summary>按 TbMap 逻辑像素高度计算正交视野，并同步行走范围外半个视野的 Ground 覆盖。</summary>
+        /// <remarks>视口高度来自 TbMap.cameraViewportHeightPixels，比例来自 TbCombatRules.worldUnitsPerPixel；Camera.aspect 变化仅在地块范围改变时更新 Tilemap，不重新加载资源。</remarks>
         private void UpdateCameraFit()
         {
             MapConfig map = scenario != null ? scenario.MapId_Ref : runDefinition.Map;
             CombatRulesConfig rules = scenario != null ? scenario.CombatRulesId_Ref : runDefinition.CombatRules;
             ViewCamera.orthographicSize = map.CameraViewportHeightPixels * rules.WorldUnitsPerPixel * 0.5f;
+            mapBackground.FitViewport(ViewCamera.aspect);
         }
 
         /// <summary>在每帧模拟结束后将相机中心移动到玩家位置，并限制在程序化地图边界内。</summary>
-        /// <remarks>玩家位置来自当前 CombatSession；地图像素尺寸来自 TbMap，比例来自 TbCombatRules。该函数只移动本局临时相机，不修改 Scene、Prefab 或 ECS 数据。</remarks>
+        /// <remarks>玩家位置来自 CombatSession；地面边界来自 TbMap 与实际视野派生的 MapBackground.Layout，比例来自 TbCombatRules。只移动本局相机，不修改 Scene、Prefab 或 ECS 数据。</remarks>
         private void UpdateCameraFollow()
         {
-            MapConfig map = scenario != null ? scenario.MapId_Ref : runDefinition.Map;
             CombatRulesConfig rules = scenario != null ? scenario.CombatRulesId_Ref : runDefinition.CombatRules;
             CombatUnit player = Session.ReadUnit(0);
-            float mapHalfWidth = map.MapWidthPixels * rules.WorldUnitsPerPixel * 0.5f;
-            float mapHalfHeight = map.MapHeightPixels * rules.WorldUnitsPerPixel * 0.5f;
+            float mapHalfWidth = mapBackground.Layout.WidthPixels * rules.WorldUnitsPerPixel * 0.5f;
+            float mapHalfHeight = mapBackground.Layout.HeightPixels * rules.WorldUnitsPerPixel * 0.5f;
             float viewportHalfWidth = ViewCamera.orthographicSize * ViewCamera.aspect;
             float viewportHalfHeight = ViewCamera.orthographicSize;
             float x = ClampCameraAxis(player.Position.x, mapHalfWidth, viewportHalfWidth);
@@ -336,7 +346,7 @@ namespace Roguelike.Features.Combat.Runtime
 
         /// <summary>测试入口随时重置会话；正式入口仅在胜负结算时开始下一代单局。</summary>
         /// <returns>本次输入实际完成重开时为真。</returns>
-        /// <remarks>复用已加载 ANI、Prefab 和实体池，不重新加载资源。</remarks>
+        /// <remarks>复用已加载 ANI、Prefab 和实体池，不重新加载资源；会话重置后重新采集权威快照并刷新主体、反馈和UI，不保留上一代借用。</remarks>
         public bool Restart()
         {
             if (!Ready) return false;
@@ -348,8 +358,9 @@ namespace Roguelike.Features.Combat.Runtime
             {
                 Session.Restart();
             }
-            visuals.Synchronize();
-            feedback?.Synchronize();
+            var presentationUnits = Session.CapturePresentationUnits();
+            visuals.Synchronize(presentationUnits);
+            feedback?.Synchronize(presentationUnits);
 #if ROGUELIKE_COMBAT_COLLISION_DEBUG
             collisionDebug?.Synchronize();
 #endif
@@ -361,11 +372,13 @@ namespace Roguelike.Features.Combat.Runtime
         /// <param name="panelGeneration">卡片创建时记录的模型面板代次。</param>
         /// <param name="optionId">当前候选升级选项 ID。</param>
         /// <returns>协调器接受并完成 ECS 同步时为真。</returns>
+        /// <remarks>协调器消费TbUpgradeOption后重新采集本次权威状态，主体与反馈共享读取；刷新运行时组件和UI，不保存配置或资源。</remarks>
         public bool ChooseUpgrade(ulong panelGeneration, int optionId)
         {
             if (!Ready || Coordinator == null || !Coordinator.ChooseUpgrade(panelGeneration, optionId)) return false;
-            visuals.Synchronize();
-            feedback?.Synchronize();
+            var presentationUnits = Session.CapturePresentationUnits();
+            visuals.Synchronize(presentationUnits);
+            feedback?.Synchronize(presentationUnits);
 #if ROGUELIKE_COMBAT_COLLISION_DEBUG
             collisionDebug?.Synchronize();
 #endif
@@ -373,13 +386,30 @@ namespace Roguelike.Features.Combat.Runtime
             return true;
         }
 
-        /// <summary>模拟更新后刷新测试状态文本或正式 Prefab UI。</summary>
+        /// <summary>宝箱面板领取后立即同步超武、属性和正式 UI，不在表现层生成奖励。</summary>
+        /// <param name="panelGeneration">创建本箱按钮时的代次。</param>
+        /// <param name="optionId">普通奖励 ID；进化或耗尽箱为零。</param>
+        /// <returns>协调器接受领取并完成 ECS 同步时为真。</returns>
+        /// <remarks>刷新运行时表现和面板；旧按钮、双击和重开前回调由模型拒绝。</remarks>
+        public bool ClaimChest(ulong panelGeneration, int optionId)
+        {
+            if (!Ready || Coordinator == null || !Coordinator.ClaimChest(panelGeneration, optionId)) return false;
+            var presentationUnits = Session.CapturePresentationUnits();
+            visuals.Synchronize(presentationUnits);
+            feedback?.Synchronize(presentationUnits);
+            RefreshStatus();
+            return true;
+        }
+
+        /// <summary>模拟更新后刷新测试状态文本或正式Prefab UI，以及TbTribulationUi职业/试炼状态和内存预警；不推进模拟。</summary>
         private void RefreshStatus()
         {
             if (Coordinator != null)
             {
                 status = RunModel.State.ToString();
                 ui?.Refresh(RunModel, Coordinator, Session);
+                tribulationUi?.Refresh();
+                tribulationMarkers?.Synchronize();
                 return;
             }
             CombatUnit unit = Session.ReadUnit(0);
@@ -431,6 +461,9 @@ namespace Roguelike.Features.Combat.Runtime
         private void ReleaseOwnedObjects()
         {
             Ready = false;
+            Coordinator?.TerminateTribulation();
+            tribulationMarkers?.Dispose(); tribulationMarkers = null;
+            tribulationUi?.Dispose(); tribulationUi = null;
             ui?.Dispose();
             ui = null;
 #if ROGUELIKE_COMBAT_COLLISION_DEBUG

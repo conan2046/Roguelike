@@ -1,6 +1,7 @@
 using System;
 using cfg;
 using Unity.Entities;
+using Unity.Collections;
 using Unity.Mathematics;
 
 namespace Roguelike.Features.Combat.Ecs
@@ -12,7 +13,7 @@ namespace Roguelike.Features.Combat.Ecs
     public struct CombatUnit : IComponentData
     {
         public int ConfigId, VisualSetId;
-        public bool IsBoss;
+        public bool IsBoss, IsElite;
         public DamageTarget Target;
         public CombatCylinder Movement;
         public AttackSnapshot Attack;
@@ -43,6 +44,10 @@ namespace Roguelike.Features.Combat.Ecs
         public double Age, Remaining;
         public float Radius;
         public bool Active, BornThisTick;
+        public FixedList128Bytes<ulong> HitLifetimes;
+        public int PierceRemaining, ChainRemaining;
+        public float ChainRange, ImpactRadius, ImpactVisualRadiusMultiplier;
+        public float2 LocalCollisionOffset;
     }
 
     /// <summary>正式玩家的一把独立武器状态；配置在创建会话时转为纯值，固定 tick 内不访问托管表。</summary>
@@ -55,22 +60,47 @@ namespace Roguelike.Features.Combat.Ecs
         public double BaseInterval, Interval, Cooldown;
         public ESkillDeliveryType Delivery;
         public bool Active;
+        public EProjectilePattern Pattern;
+        public int ProjectileCount, PierceCount, ChainCount;
+        public float SpreadRadians, ChainRange;
+        public double AreaDuration, PulseInterval;
+        public int PulseCount;
+        public bool FollowsOwner;
+        public bool Retargets;
+        public int RingCount;
+        public float RingWidth, ImpactRadius, ImpactVisualRadiusMultiplier;
     }
 
-    /// <summary>弹丸首次有效几何接触后写入的单帧表现事件；超时与越界回收不会产生该事件。</summary>
+    /// <summary>会话拥有的持续区域纯值；按固定时钟脉冲，不依赖动画寿命或后续属性变更。</summary>
+    public struct CombatPersistentArea
+    {
+        public CombatWeaponState Weapon;
+        public AttackSnapshot Attack;
+        public float2 Position;
+        public double Age;
+        public int PulseIndex;
+        public ulong OwnerLifetime;
+        public FixedList128Bytes<ulong> TargetLifetimes;
+    }
+
+    /// <summary>弹丸首次有效几何接触后写入的单帧表现事件；TargetSlot 与 TargetLifetime 标识需要跟随的目标，Position 保留接触挂点以播放目标已死亡的命中反馈。超时与越界回收不会产生该事件。</summary>
     public struct CombatImpactEvent
     {
-        public int SkillId;
+        public int SkillId, TargetSlot;
         public float2 Position;
-        public ulong AttackSequence, Tick;
+        public ulong AttackSequence, Tick, TargetLifetime;
+        public float RadiusMultiplier;
     }
 
-    /// <summary>目标位置群体技能触发时写入的单帧表现事件；同一攻击序号只对应一次释放。</summary>
+    /// <summary>范围技能触发时写入的单帧表现事件；Radius 保存出生时实际判定半径，表现不回读后续升级状态。</summary>
     public struct CombatAreaEvent
     {
         public int SkillId;
         public float2 Position;
+        public float Radius;
         public ulong AttackSequence, Tick;
+        public bool FollowsOwner;
+        public ulong OwnerLifetime;
     }
 
     /// <summary>单位生命首次降至零时写入的单帧事件；配置身份随生命周期固定，不通过池槽反推。</summary>
@@ -89,7 +119,11 @@ namespace Roguelike.Features.Combat.Ecs
         public long Attacks, ProjectileSpawns, AreaCasts, Candidates, Hits, Evades, Criticals, Invulnerable, Immunities;
         public long DamageEvents, HealthLost, Deaths, Replenished;
         public long MeleeJudgements, MeleeWhiffs;
+        // 累积的技术观测量，不参与规则、伤害或随机序列；重开随会话统计清空。
+        public long MovementCandidates, MovementSweeps, MovementContacts, MovementRepeatedContacts, MovementZeroProgress, MovementLimitHits;
+        public long MovementConverged;
         public int AliveMonsters, ActiveProjectiles, PeakProjectiles;
+        public long SplashCasts;
         public bool PlayerDead, UsedBurst;
     }
 

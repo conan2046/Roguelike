@@ -48,7 +48,7 @@ namespace Roguelike.Features.Combat.Authoring.Editor
             {
                 try
                 {
-                    CombatHealthBarPipeline.Export(view);
+                    CombatHealthBarPipeline.ExportSavedPrefab();
                     error = null;
                 }
                 catch (Exception exception)
@@ -90,16 +90,32 @@ namespace Roguelike.Features.Combat.Authoring.Editor
         [MenuItem("Roguelike/战斗/血条配置/导出血条 Prefab 并生成配置")]
         public static void ExportSavedPrefab()
         {
-            const string path = "Assets/GameContent/UI/Combat/Prefabs/CombatHealthBar.prefab";
-            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
-            CombatHealthBarView view = prefab == null ? null : prefab.GetComponent<CombatHealthBarView>();
-            if (view == null) throw new InvalidOperationException(path + " 缺少 CombatHealthBarView。");
-            Export(view);
+            SkillCollisionPipeline.EnsureEditable();
+            Export(LoadSavedPrefab());
+        }
+
+        /// <summary>预览血条 Prefab 将写入的字段和值，不修改源表或 Luban。</summary>
+        /// <exception cref="InvalidOperationException">Prefab 缺失、参数非法或检测到 Excel 人工修改冲突。</exception>
+        [MenuItem("Roguelike/战斗/血条配置/预览血条导出变更（不写表）")]
+        public static void PreviewSavedPrefab()
+        {
+            SkillCollisionPipeline.EnsureEditable();
+            CombatHealthBarView view = LoadSavedPrefab();
+            ValidateSize(view);
+            string path = PresentationWorkbookPath();
+            var transaction = new AuthoringExportTransaction("combat-health-bar", true);
+            ConfigWorkbookWriter.Patch(path, Fields, Values(view), transaction);
+            transaction.Complete();
+            Debug.Log("血条配置 Dry Run 完成：未写入源表。查看 Library/CombatAuthoringDryRun.log。");
         }
 
         /// <summary>命令行自动化入口，行为与菜单导出一致。</summary>
         /// <remarks>仅供当前项目 BatchMode 验证调用。</remarks>
         public static void ExportFromCommandLine() => ExportSavedPrefab();
+
+        /// <summary>命令行血条 Dry Run 入口；不保存 Prefab、Excel 或 Luban。</summary>
+        /// <remarks>仅供当前项目 BatchMode 冲突检查调用。</remarks>
+        public static void PreviewFromCommandLine() => PreviewSavedPrefab();
 
         /// <summary>按 Prefab 的表现方案找到正式关卡战斗规则，并刷新内部显示画布。</summary>
         /// <param name="view">Prefab 资产或其预览实例上的血条调参组件。</param>
@@ -123,24 +139,26 @@ namespace Roguelike.Features.Combat.Authoring.Editor
         /// <remarks>失败时恢复 Excel 原文件；不会实例化运行时 GameObject，也不会创建预览资产。</remarks>
         internal static void Export(CombatHealthBarView view)
         {
-            RefreshPreview(view);
-            if (!(view.WidthPixels > 0f) || !(view.HeightPixels > 0f))
-                throw new InvalidOperationException("血条宽度和高度必须大于零像素。");
-
-            AssetDatabase.SaveAssets();
-            string path = Directory.GetFiles("Config/Datas/Tables", "*_CombatPresentationConfig.xlsx").Single();
+            if (view == null) throw new ArgumentNullException(nameof(view));
+            if (!EditorUtility.IsPersistent(view))
+                throw new InvalidOperationException("血条配置只能从正式 CombatHealthBar Prefab 资产导出。");
+            ValidateSize(view);
+            AssetDatabase.SaveAssetIfDirty(view.transform.root.gameObject);
+            string path = PresentationWorkbookPath();
+            Dictionary<int, float[]> values = Values(view);
+            var preview = new AuthoringExportTransaction("combat-health-bar", true);
+            ConfigWorkbookWriter.Patch(path, Fields, values, preview);
+            preview.Complete();
             byte[] backup = File.ReadAllBytes(path);
             try
             {
-                ConfigWorkbookWriter.Patch(path, Fields, new Dictionary<int, float[]>
-                {
-                    [view.PresentationId] = new[]
-                    {
-                        (float)Math.Round(view.WidthPixels, 3, MidpointRounding.AwayFromZero),
-                        (float)Math.Round(view.HeightPixels, 3, MidpointRounding.AwayFromZero)
-                    }
-                });
+                var transaction = new AuthoringExportTransaction("combat-health-bar", false);
+                ConfigWorkbookWriter.Patch(path, Fields, values, transaction);
+                transaction.Complete();
                 CombatCollisionPipeline.RunLuban();
+                AssetDatabase.Refresh();
+                ValidateSaved(view);
+                transaction.Commit();
             }
             catch
             {
@@ -148,13 +166,58 @@ namespace Roguelike.Features.Combat.Authoring.Editor
                 throw;
             }
 
-            AssetDatabase.Refresh();
+            Debug.Log($"血条像素配置导出完成：Dry Run 无冲突，{view.WidthPixels}×{view.HeightPixels}，运行时 DOTS 只读取 Luban。");
+        }
+
+        /// <summary>加载作为正式编辑源的唯一血条 Prefab。</summary>
+        /// <returns>Prefab 根节点上的血条调参组件。</returns>
+        /// <exception cref="InvalidOperationException">正式 Prefab 或调参组件缺失。</exception>
+        private static CombatHealthBarView LoadSavedPrefab()
+        {
+            const string path = "Assets/GameContent/UI/Combat/Prefabs/CombatHealthBar.prefab";
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+            CombatHealthBarView view = prefab == null ? null : prefab.GetComponent<CombatHealthBarView>();
+            return view ?? throw new InvalidOperationException(path + " 缺少 CombatHealthBarView。");
+        }
+
+        /// <summary>解析血条 Prefab 唯一允许写入的战斗表现源表。</summary>
+        /// <returns>CombatPresentationConfig 工作簿路径。</returns>
+        private static string PresentationWorkbookPath() =>
+            Directory.GetFiles("Config/Datas/Tables", "*_CombatPresentationConfig.xlsx").Single();
+
+        /// <summary>将血条 Prefab 像素字段量化为本次工作簿提案。</summary>
+        /// <param name="view">血条编辑源。</param>
+        /// <returns>按表现方案 ID 索引的宽高像素。</returns>
+        private static Dictionary<int, float[]> Values(CombatHealthBarView view) =>
+            new Dictionary<int, float[]>
+            {
+                [view.PresentationId] = new[]
+                {
+                    (float)Math.Round(view.WidthPixels, 3, MidpointRounding.AwayFromZero),
+                    (float)Math.Round(view.HeightPixels, 3, MidpointRounding.AwayFromZero)
+                }
+            };
+
+        /// <summary>拒绝无法成为正式配置的血条像素尺寸。</summary>
+        /// <param name="view">血条编辑源。</param>
+        /// <exception cref="InvalidOperationException">宽度或高度不是正数。</exception>
+        private static void ValidateSize(CombatHealthBarView view)
+        {
+            if (!(view.WidthPixels > 0f) || !float.IsFinite(view.WidthPixels) ||
+                !(view.HeightPixels > 0f) || !float.IsFinite(view.HeightPixels))
+                throw new InvalidOperationException("血条宽度和高度必须是有限正数像素。");
+        }
+
+        /// <summary>核对 Luban 生成后的血条像素仍与 Prefab 编辑源一致。</summary>
+        /// <param name="view">本次导出的血条编辑源。</param>
+        /// <exception cref="InvalidOperationException">生成配置与 Prefab 不一致。</exception>
+        private static void ValidateSaved(CombatHealthBarView view)
+        {
             CombatPresentationConfig saved = CombatCylinderPipeline.ReadTables()
                 .TbCombatPresentation.Get(view.PresentationId);
             if (Mathf.Abs(saved.HealthBarWidthPixels - view.WidthPixels) > 0.00051f ||
                 Mathf.Abs(saved.HealthBarHeightPixels - view.HeightPixels) > 0.00051f)
                 throw new InvalidOperationException("Luban 生成后的血条像素尺寸与 Prefab 不一致。");
-            Debug.Log($"血条像素配置导出完成：{view.WidthPixels}×{view.HeightPixels}，运行时 DOTS 只读取 Luban。");
         }
 
         /// <summary>查找使用指定表现方案的唯一正式关卡战斗规则。</summary>

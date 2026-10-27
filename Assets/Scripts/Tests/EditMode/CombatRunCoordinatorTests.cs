@@ -39,15 +39,15 @@ namespace Roguelike.Tests
                 Does.Contain(fixture.Session.ReadUnit(1).ConfigId));
         }
 
-        /// <summary>验证五个正式技能拥有独立状态，三枚弹丸与两次目标位置范围释放在同 tick 分别产生。</summary>
+        /// <summary>直接激活十二形态验证独立投递；引擎容量测试不代表正式构筑可以突破槽位或同时持有原形和超武。</summary>
         [Test]
         public void AllConfiguredWeaponsCastProjectileAndTargetAreaIndependently()
         {
             using var fixture = CreateFixture("Coordinator all player weapons");
             fixture.Session.SynchronizePlayerSkills(fixture.Definition.AvailableSkills.Select(item => item.Id));
-            Assert.That(fixture.Session.PlayerWeaponCount, Is.EqualTo(5));
+            Assert.That(fixture.Session.PlayerWeaponCount, Is.EqualTo(12));
             Assert.That(Enumerable.Range(0, fixture.Session.PlayerWeaponCount)
-                .Count(index => fixture.Session.ReadPlayerWeapon(index).Active), Is.EqualTo(5));
+                .Count(index => fixture.Session.ReadPlayerWeapon(index).Active), Is.EqualTo(12));
 
             int[] slots = new int[3];
             for (int index = 0; index < slots.Length; index++)
@@ -69,12 +69,12 @@ namespace Roguelike.Tests
             }
 
             Assert.That(fixture.Coordinator.Advance(fixture.Session.StepSeconds, float2.zero), Is.EqualTo(1));
-            Assert.That(fixture.Session.Statistics.Attacks, Is.EqualTo(5));
-            Assert.That(fixture.Session.Statistics.ProjectileSpawns, Is.EqualTo(3));
-            Assert.That(fixture.Session.Statistics.AreaCasts, Is.EqualTo(2));
-            Assert.That(fixture.Session.AreaCount, Is.EqualTo(2));
+            Assert.That(fixture.Session.Statistics.Attacks, Is.EqualTo(12));
+            Assert.That(fixture.Session.Statistics.ProjectileSpawns, Is.EqualTo(17));
+            Assert.That(fixture.Session.Statistics.AreaCasts, Is.EqualTo(6));
+            Assert.That(fixture.Session.AreaCount, Is.EqualTo(7));
             Assert.That(Enumerable.Range(0, fixture.Session.AreaCount)
-                .Select(index => fixture.Session.ReadArea(index).SkillId), Is.EquivalentTo(new[] { 20028, 20043 }));
+                .Select(index => fixture.Session.ReadArea(index).SkillId), Is.EquivalentTo(new[] { 20028, 20033, 20043, 20007, 20037, 20037, 20050 }));
             Assert.That(fixture.Session.ReadUnit(slots[0]).Target.Health, Is.LessThan(health[0]));
             Assert.That(fixture.Session.ReadUnit(slots[1]).Target.Health, Is.LessThan(health[1]));
             Assert.That(fixture.Session.ReadUnit(slots[2]).Target.Health, Is.EqualTo(health[2]));
@@ -110,7 +110,7 @@ namespace Roguelike.Tests
             for (int attempt = 0; attempt < 8 && attribute == null; attempt++)
             {
                 GrantNextLevel(fixture.Model);
-                attribute = fixture.Model.CurrentChoices.FirstOrDefault(item => item.Type == EUpgradeOptionType.Attribute);
+                attribute = fixture.Model.CurrentChoices.FirstOrDefault(item => item.Type == EUpgradeOptionType.RunPassive);
                 if (attribute == null)
                     Assert.That(fixture.Coordinator.ChooseUpgrade(fixture.Model.UpgradePanelGeneration,
                         fixture.Model.CurrentChoices[0].Id), Is.True);
@@ -132,7 +132,7 @@ namespace Roguelike.Tests
                 expected.AttackSpeedMultiplier, fixture.Definition.CombatRules.MinAttackInterval)).Within(1e-9));
         }
 
-        /// <summary>验证三选一解锁技能后，协调器只激活对应独立武器且不重置已有武器。</summary>
+        /// <summary>验证三选一获得未持有武器后，协调器只激活对应独立武器且不重置已有武器。</summary>
         [Test]
         public void SkillUnlockActivatesOneFormalWeapon()
         {
@@ -144,7 +144,7 @@ namespace Roguelike.Tests
             {
                 GrantNextLevel(fixture.Model);
                 unlock = fixture.Model.CurrentChoices.FirstOrDefault(item =>
-                    item.Type == EUpgradeOptionType.SkillUnlock);
+                    item.Type == EUpgradeOptionType.RunWeapon && !fixture.Model.Build.WeaponRanks.ContainsKey(item.RunWeaponId.Value));
                 if (unlock == null)
                     Assert.That(fixture.Coordinator.ChooseUpgrade(fixture.Model.UpgradePanelGeneration,
                         fixture.Model.CurrentChoices[0].Id), Is.True);
@@ -155,7 +155,7 @@ namespace Roguelike.Tests
             Assert.That(Enumerable.Range(0, fixture.Session.PlayerWeaponCount)
                 .Count(index => fixture.Session.ReadPlayerWeapon(index).Active), Is.EqualTo(2));
             int weaponIndex = Enumerable.Range(0, fixture.Session.PlayerWeaponCount)
-                .Single(index => fixture.Session.ReadPlayerWeapon(index).SkillId == unlock.TargetSkillId.Value);
+                .Single(index => fixture.Session.ReadPlayerWeapon(index).SkillId == unlock.RunWeaponId_Ref.Ranks[0].SkillId);
             Assert.That(fixture.Session.ReadPlayerWeapon(weaponIndex).Active, Is.True);
         }
 
@@ -277,12 +277,15 @@ namespace Roguelike.Tests
             model.GrantExperience(model.Definition.ExperienceLevels[model.Level - 1].RequiredExperience);
         }
 
-        /// <summary>从正式第一关配置、真实 ANI 与隔离 ECS World 创建协调器夹具。</summary>
+        /// <summary>从正式第一关配置、真实 ANI 与隔离 ECS World 创建协调器夹具；可仅在本次表副本收窄候选。</summary>
         /// <param name="worldName">便于失败日志定位的世界名称。</param>
+        /// <param name="onlyOptionId">指定时只在测试副本保留该升级候选，源工作簿和正式运行池不变。</param>
         /// <returns>负责按正确顺序释放会话与 World 的夹具。</returns>
-        private static CoordinatorFixture CreateFixture(string worldName)
+        internal static CoordinatorFixture CreateFixture(string worldName, int? onlyOptionId = null)
         {
             Tables tables = LoadTables();
+            if (onlyOptionId.HasValue)
+                tables.TbStage.Get(1).StageRuleId_Ref.UpgradePoolId_Ref.Entries.RemoveAll(entry => entry.OptionId != onlyOptionId.Value);
             CombatRunDefinition definition = CombatRunDefinition.Create(tables, 1);
             var world = new World(worldName);
             try
@@ -300,13 +303,50 @@ namespace Roguelike.Tests
             }
         }
 
+        /// <summary>让正式武器实际发射后升星，验证局部伤害、冷却比例与范围在 ECS 中同步且重开清零。</summary>
+        [Test]
+        public void WeaponStarUpdatesEcsAndPreservesCooldownFraction()
+        {
+            Tables tables = LoadTables();
+            int initialId = tables.TbStage.Get(1).RunBuildId_Ref.InitialWeaponIds[0];
+            int optionId = tables.TbUpgradeOption.DataList.Single(option => option.RunWeaponId == initialId).Id;
+            using var fixture = CreateFixture("Build star snapshot", optionId);
+            Assert.That(fixture.Session.TrySpawnMonster(fixture.Definition.Monsters[0],
+                fixture.Definition.Map.SpawnRadiusPixels, 1, false, out int slot), Is.True);
+            CombatUnit monster = fixture.Session.ReadUnit(slot);
+            monster.Position = fixture.Session.ReadUnit(0).Position + new float2(2, 0);
+            monster.PreviousPosition = monster.Position;
+            monster.MoveSpeed = 0;
+            monster.Cooldown = 1000;
+            monster.Target.Health = monster.Target.MaxHealth = 100000;
+            monster.Target.Evasion = 0;
+            fixture.World.EntityManager.SetComponentData(fixture.Session.UnitEntity(slot), monster);
+            AdvanceTicks(fixture.Coordinator, 3);
+            int weaponIndex = Enumerable.Range(0, fixture.Session.PlayerWeaponCount).Single(index => fixture.Session.ReadPlayerWeapon(index).Active);
+            CombatWeaponState before = fixture.Session.ReadPlayerWeapon(weaponIndex);
+            Assert.That(before.Cooldown, Is.GreaterThan(0));
+            GrantNextLevel(fixture.Model);
+            Assert.That(fixture.Coordinator.ChooseUpgrade(fixture.Model.UpgradePanelGeneration, optionId), Is.True);
+            CombatWeaponState after = fixture.Session.ReadPlayerWeapon(weaponIndex);
+            Assert.That(after.Attack.Attack, Is.GreaterThan(before.Attack.Attack));
+            Assert.That(after.Interval, Is.LessThan(before.Interval));
+            Assert.That(after.Cooldown / after.Interval, Is.EqualTo(before.Cooldown / before.Interval).Within(1e-9));
+            AdvanceTicks(fixture.Coordinator, 20);
+            Assert.That(fixture.Session.ReadUnit(slot).Target.Health, Is.LessThan(100000));
+            Assert.That(fixture.Session.Statistics.Hits, Is.GreaterThan(0));
+            fixture.Model.ApplyPlayerDamage(fixture.Model.MaxHealth);
+            Assert.That(fixture.Coordinator.Restart(), Is.True);
+            Assert.That(fixture.Model.Build.WeaponRanks.Values.Single(), Is.EqualTo(1));
+            Assert.That(fixture.Session.ReadPlayerWeapon(weaponIndex).Attack.Attack, Is.EqualTo(before.Attack.Attack).Within(1e-9));
+        }
+
         /// <summary>从 StreamingAssets 读取并解析已生成的 Luban bytes。</summary>
         /// <returns>已经解析引用关系的只读配置表集合。</returns>
         private static Tables LoadTables() => new Tables(name => new ByteBuf(File.ReadAllBytes(
             Path.Combine(Application.streamingAssetsPath, "Config", "Luban", name + ".bytes"))));
 
         /// <summary>统一持有协调器测试的 ECS World、定义、模型和会话。</summary>
-        private sealed class CoordinatorFixture : IDisposable
+        internal sealed class CoordinatorFixture : IDisposable
         {
             public World World { get; }
             public CombatRunDefinition Definition { get; }

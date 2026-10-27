@@ -20,6 +20,7 @@ namespace Roguelike.Features.Combat
         public double Attack, Defense, MaxHealth, Hit, Evasion, Critical, CriticalResistance;
         public double AttackSpeedMultiplier, MoveSpeed, DefenseParameter, HitParameter;
         public double EvasionParameter, CriticalParameter, CriticalResistanceParameter;
+        public double SkillRangeMultiplier;
 
         /// <summary>从当前 CombatAttributes 复制战斗运行时使用的全部属性语义。</summary>
         /// <param name="attributes">由 TbAttributeProfile 和局内升级来源聚合的属性。</param>
@@ -43,7 +44,8 @@ namespace Roguelike.Features.Combat
                 HitParameter = attributes.Get(EAttributeType.HitParameter),
                 EvasionParameter = attributes.Get(EAttributeType.EvasionParameter),
                 CriticalParameter = attributes.Get(EAttributeType.CriticalParameter),
-                CriticalResistanceParameter = attributes.Get(EAttributeType.CriticalResistanceParameter)
+                CriticalResistanceParameter = attributes.Get(EAttributeType.CriticalResistanceParameter),
+                SkillRangeMultiplier = attributes.Get(EAttributeType.SkillRangeMultiplier)
             };
         }
     }

@@ -13,6 +13,8 @@ namespace Roguelike.Features.Combat.Runtime
         [SerializeField] private Text killsText;
         [SerializeField] private Text waveText;
         [SerializeField] private Slider experienceBar;
+        [SerializeField] private Text weaponSlotsText;
+        [SerializeField] private Text passiveSlotsText;
 
         public Text HealthText => healthText;
         public Text TimerText => timerText;
@@ -21,5 +23,7 @@ namespace Roguelike.Features.Combat.Runtime
         public Text KillsText => killsText;
         public Text WaveText => waveText;
         public Slider ExperienceBar => experienceBar;
+        public Text WeaponSlotsText => weaponSlotsText;
+        public Text PassiveSlotsText => passiveSlotsText;
     }
 }

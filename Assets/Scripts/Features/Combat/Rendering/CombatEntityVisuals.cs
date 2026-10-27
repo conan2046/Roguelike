@@ -5,6 +5,8 @@ using cfg;
 using Roguelike.Features.Combat.Ecs;
 using Roguelike.Features.Combat.Run;
 using Unity.Entities;
+using Unity.Collections;
+using Unity.Profiling;
 using Unity.Mathematics;
 using Unity.Rendering;
 using Unity.Transforms;
@@ -15,11 +17,22 @@ namespace Roguelike.Features.Combat.Rendering
     /// <summary>向会话实体绑定 Entities Graphics 共享帧资源；不创建每单位 GameObject。</summary>
     public sealed class CombatEntityVisuals : IDisposable
     {
+        private static readonly ProfilerMarker AniMarker = new ProfilerMarker("Roguelike.Presentation.AniSample");
+        private static readonly ProfilerMarker RenderWriteMarker = new ProfilerMarker("Roguelike.Presentation.RenderWrite");
+        private static readonly ProfilerMarker SkillMarker = new ProfilerMarker("Roguelike.Presentation.Skills");
         private readonly EntityManager manager;
         private readonly World world;
         private readonly CombatSession session;
         private readonly CombatVisualResources resources;
         private CombatVisualPlayer[] players;
+        private UnitRenderState[] unitRenderStates = Array.Empty<UnitRenderState>();
+
+        /// <summary>本绑定拥有的渲染组件上次提交值；只用于避免重复写入，不替代权威单位状态。</summary>
+        private struct UnitRenderState
+        {
+            public bool Initialized, Visible;
+            public int Mesh, Material;
+        }
         private long[] previousHealth;
         private ulong[] previousLifetimes;
         private ulong[] hitFlashUntilTicks;
@@ -31,7 +44,7 @@ namespace Roguelike.Features.Combat.Rendering
         private readonly RenderMeshDescription description;
         private readonly List<ImpactVisual> impacts = new List<ImpactVisual>();
         private readonly List<AreaVisual> areas = new List<AreaVisual>();
-        private readonly HashSet<ulong> seenImpacts = new HashSet<ulong>();
+        private readonly HashSet<(ulong, ulong)> seenImpacts = new HashSet<(ulong, ulong)>();
         private readonly HashSet<ulong> seenAreas = new HashSet<ulong>();
         private bool disposed;
         private ulong lastTick;
@@ -39,12 +52,14 @@ namespace Roguelike.Features.Combat.Rendering
         public int VisibleImpactCount { get; private set; }
         public int VisibleAreaCount { get; private set; }
 
-        /// <summary>命中 ANI 的池化播放状态；实体只在池扩容时创建。</summary>
+        /// <summary>命中 ANI 的池化播放状态；用槽位和生命周期跟随同一目标，实体只在池扩容时创建。</summary>
         private sealed class ImpactVisual
         {
             public Entity Entity;
-            public int SkillId, ClipId;
-            public ulong StartTick;
+            public int SkillId, ClipId, TargetSlot;
+            public ulong StartTick, TargetLifetime;
+            public bool FollowsTarget;
+            public float2 Offset;
             public bool Active;
         }
 
@@ -55,6 +70,9 @@ namespace Roguelike.Features.Combat.Rendering
             public int SkillId, ClipId;
             public ulong StartTick;
             public bool Active;
+            public bool FollowsOwner;
+            public ulong OwnerLifetime;
+            public float2 Offset;
         }
 
         /// <summary>资源准备完成后为本局单位附加共享渲染组件，并采样出生帧。</summary>
@@ -72,7 +90,7 @@ namespace Roguelike.Features.Combat.Rendering
         {
         }
 
-        /// <summary>为正式关卡绑定角色、四类普通怪、Boss 和全部可解锁技能的共享表现。</summary>
+        /// <summary>为正式关卡绑定角色、普通怪、事件精英、Boss 和全部可解锁技能的共享表现。</summary>
         /// <param name="world">必须与会话相同的存活世界。</param>
         /// <param name="session">正式单局实体所有者。</param>
         /// <param name="definition">TbStage 聚合的单位与技能目录。</param>
@@ -125,13 +143,23 @@ namespace Roguelike.Features.Combat.Rendering
             catch { Dispose(); throw; }
         }
 
-        /// <summary>每次会话 Advance 返回后同步帧索引、帧包围盒和可见状态，不分配材质或网格。</summary>
-        /// <remarks>调用方仍须推进世界的 Transform/Presentation 系统完成实际绘制；本方法不推进模拟和墙钟。</remarks>
+        /// <summary>独立调用时重新采集权威单位状态并同步表现，不复用上一帧快照。</summary>
+        /// <remarks>同帧主体与反馈应使用接受只读借用的重载共享一次采集；不推进模拟或墙钟。</remarks>
         /// <exception cref="ObjectDisposedException">绑定已释放。</exception>
         public void Synchronize()
         {
             if (disposed) throw new ObjectDisposedException(nameof(CombatEntityVisuals));
-            BindNewUnits();
+            Synchronize(session.CapturePresentationUnits());
+        }
+
+        /// <summary>消费当前同步帧的权威只读借用，按变化提交材质、网格、包围盒及可见状态。</summary>
+        /// <param name="units">调用方刚从本会话采集、且尚未再次采集或改动单位槽的只读借用。</param>
+        /// <remarks>不保存借用；动态绑定、白闪和技能跟随使用同一状态。仍需调用方推进World完成绘制。</remarks>
+        /// <exception cref="ObjectDisposedException">绑定已释放。</exception>
+        public void Synchronize(NativeArray<CombatUnit>.ReadOnly units)
+        {
+            if (disposed) throw new ObjectDisposedException(nameof(CombatEntityVisuals));
+            BindNewUnits(units);
             ulong tick = session.Statistics.Tick;
             if (tick < lastTick)
             {
@@ -144,23 +172,42 @@ namespace Roguelike.Features.Combat.Rendering
             lastTick = tick;
             for (int slot = 0; slot < players.Length; slot++)
             {
-                CombatUnit unit = session.ReadUnit(slot);
+                CombatUnit unit = units[slot];
                 UpdateHitFlash(slot, unit, tick);
                 var player = players[slot];
-                player.Sample(unit, tick, session.StepSeconds);
-                var entity = session.UnitEntity(slot);
-                bool hidden = manager.HasComponent<DisableRendering>(entity);
-                if (player.Visible && hidden) manager.RemoveComponent<DisableRendering>(entity);
-                else if (!player.Visible && !hidden) manager.AddComponent<DisableRendering>(entity);
-                if (!player.Visible) continue;
-                int materialIndex = IsHitFlashing(slot) ? player.HitFlashMaterialIndex : player.MaterialIndex;
-                manager.SetComponentData(entity, MaterialMeshInfo.FromRenderMeshArrayIndices(materialIndex, player.MeshIndex));
-                var bounds = resources.Meshes[player.MeshIndex].bounds;
-                manager.SetComponentData(entity, new RenderBounds { Value = new AABB { Center = bounds.center, Extents = bounds.extents } });
+                using (AniMarker.Auto()) player.Sample(unit, tick, session.StepSeconds);
+                using (RenderWriteMarker.Auto())
+                {
+                    var entity = session.UnitEntity(slot);
+                    ref UnitRenderState state = ref unitRenderStates[slot];
+                    if (!state.Initialized || state.Visible != player.Visible)
+                    {
+                        bool hidden = manager.HasComponent<DisableRendering>(entity);
+                        if (player.Visible && hidden) manager.RemoveComponent<DisableRendering>(entity);
+                        else if (!player.Visible && !hidden) manager.AddComponent<DisableRendering>(entity);
+                        state.Visible = player.Visible;
+                    }
+                    if (!player.Visible) continue;
+                    int materialIndex = unit.Target.Health > 0 && tick < hitFlashUntilTicks[slot]
+                        ? player.HitFlashMaterialIndex : player.MaterialIndex;
+                    if (!state.Initialized || state.Mesh != player.MeshIndex || state.Material != materialIndex)
+                        manager.SetComponentData(entity, MaterialMeshInfo.FromRenderMeshArrayIndices(materialIndex, player.MeshIndex));
+                    if (!state.Initialized || state.Mesh != player.MeshIndex)
+                    {
+                        var bounds = resources.Meshes[player.MeshIndex].bounds;
+                        manager.SetComponentData(entity, new RenderBounds { Value = new AABB { Center = bounds.center, Extents = bounds.extents } });
+                    }
+                    state.Mesh = player.MeshIndex;
+                    state.Material = materialIndex;
+                    state.Initialized = true;
+                }
             }
-            SynchronizeProjectiles();
-            SynchronizeImpacts(tick);
-            SynchronizeAreas(tick);
+            using (SkillMarker.Auto())
+            {
+                SynchronizeProjectiles();
+                SynchronizeImpacts(tick, units);
+                SynchronizeAreas(tick, units);
+            }
         }
 
         /// <summary>诊断和测试读取某单位当前选帧，不转移游标所有权。</summary>
@@ -190,18 +237,20 @@ namespace Roguelike.Features.Combat.Rendering
         }
 
         /// <summary>会话按批扩容后，为新增槽位建立播放器并绑定已加载的共享美术。</summary>
+        /// <param name="units">本次同步帧的权威只读借用，不跨帧保存。</param>
         /// <remarks>单位类型读取 CombatUnit.VisualSetId；只在容量增长时分配播放器数组，不重复加载纹理、材质或网格。旧槽复用由生命周期变化重置动画。</remarks>
-        private void BindNewUnits()
+        private void BindNewUnits(NativeArray<CombatUnit>.ReadOnly units)
         {
             if (players.Length == session.UnitCount) return;
             int previous = players.Length;
             Array.Resize(ref players, session.UnitCount);
+            Array.Resize(ref unitRenderStates, session.UnitCount);
             Array.Resize(ref previousHealth, session.UnitCount);
             Array.Resize(ref previousLifetimes, session.UnitCount);
             Array.Resize(ref hitFlashUntilTicks, session.UnitCount);
             for (int slot = previous; slot < players.Length; slot++)
             {
-                CombatUnit unit = session.ReadUnit(slot);
+                CombatUnit unit = units[slot];
                 int visualId = unit.VisualSetId;
                 if (!visualSets.TryGetValue(visualId, out var visual))
                     throw new InvalidOperationException("Combat unit references a visual that was not preloaded: " + visualId);
@@ -261,13 +310,14 @@ namespace Roguelike.Features.Combat.Rendering
 
         /// <summary>消费本帧首次接触事件并推进所有仍在播放的非循环命中 ANI。</summary>
         /// <param name="tick">CombatSession 已完成的模拟 tick。</param>
-        /// <remarks>同一攻击序号只创建一次表现；播放结束隐藏并复用实体，不影响伤害结算。</remarks>
-        private void SynchronizeImpacts(ulong tick)
+        /// <param name="units">当前同步帧的权威单位只读借用；通过事件槽位和生命周期确认跟随目标。</param>
+        /// <remarks>同一弹丸对同一目标生命周期只创建一次；挂点来自 TbCharacter/TbMonster.hitEffectOffset，局部偏移与缩放来自 TbSkill.impactVisualOffset/Scale，爆发按实际范围倍率缩放。存活同代目标每帧跟随，死亡或复用后停在最后位置播完；播放结束回池，不参与伤害或修改模拟。</remarks>
+        private void SynchronizeImpacts(ulong tick, NativeArray<CombatUnit>.ReadOnly units)
         {
             for (int index = 0; index < session.ImpactCount; index++)
             {
                 var impactEvent = session.ReadImpact(index);
-                if (!seenImpacts.Add(impactEvent.AttackSequence)) continue;
+                if (!seenImpacts.Add((impactEvent.AttackSequence, impactEvent.TargetLifetime))) continue;
                 if (!skills.TryGetValue(impactEvent.SkillId, out var projectileSkill) || projectileSkill.ImpactClipId_Ref == null) continue;
                 if (!projectileSkill.ImpactVisualOffsetXPixels.HasValue ||
                     !projectileSkill.ImpactVisualOffsetYPixels.HasValue ||
@@ -278,11 +328,17 @@ namespace Roguelike.Features.Combat.Rendering
                 visual.SkillId = impactEvent.SkillId;
                 visual.ClipId = projectileSkill.ImpactClipId.Value;
                 visual.StartTick = impactEvent.Tick;
+                visual.TargetSlot = impactEvent.TargetSlot;
+                visual.TargetLifetime = impactEvent.TargetLifetime;
+                visual.FollowsTarget = true;
                 float2 offset = new float2(projectileSkill.ImpactVisualOffsetXPixels.Value,
                     projectileSkill.ImpactVisualOffsetYPixels.Value) * worldUnitsPerPixel;
+                float radiusMultiplier = projectileSkill.CombatProfileId_Ref.ImpactRadiusPixels > 0 ? impactEvent.RadiusMultiplier : 1;
+                if (!(radiusMultiplier > 0)) throw new InvalidOperationException("Impact explosion lost its radius snapshot.");
+                visual.Offset = offset * radiusMultiplier;
                 manager.SetComponentData(visual.Entity, LocalTransform.FromPositionRotationScale(
-                    new float3(impactEvent.Position + offset, 0), quaternion.identity,
-                    projectileSkill.ImpactVisualScale.Value));
+                    new float3(impactEvent.Position + visual.Offset, 0), quaternion.identity,
+                    projectileSkill.ImpactVisualScale.Value * radiusMultiplier));
                 SetVisible(visual.Entity, true);
             }
 
@@ -296,6 +352,20 @@ namespace Roguelike.Features.Combat.Rendering
                 {
                     HideImpact(visual);
                     continue;
+                }
+                if (visual.FollowsTarget)
+                {
+                    if ((uint)visual.TargetSlot >= (uint)units.Length ||
+                        units[visual.TargetSlot].Target.Lifetime != visual.TargetLifetime ||
+                        units[visual.TargetSlot].Target.Health <= 0)
+                        visual.FollowsTarget = false;
+                    else
+                    {
+                        CombatUnit target = units[visual.TargetSlot];
+                        LocalTransform transform = manager.GetComponentData<LocalTransform>(visual.Entity);
+                        transform.Position = new float3(target.Position + target.HitEffectOffset + visual.Offset, 0);
+                        manager.SetComponentData(visual.Entity, transform);
+                    }
                 }
                 ApplyFrame(visual.Entity, clip, clip.Animation.Sample(0, age), clip.FlipX);
                 VisibleImpactCount++;
@@ -319,8 +389,9 @@ namespace Roguelike.Features.Combat.Rendering
 
         /// <summary>消费目标位置释放事件，并让一个技能配置的全部 Area 片段在同一位置同时播放。</summary>
         /// <param name="tick">CombatSession 已完成的模拟 tick。</param>
-        /// <remarks>同一攻击序号只创建一次表现；每段结束后独立回收到共享范围表现池。</remarks>
-        private void SynchronizeAreas(ulong tick)
+        /// <param name="units">当前同步帧单位借用，用于读取跟随拥有者。</param>
+        /// <remarks>同一攻击序号只创建一次表现；按事件实际半径同步星级/被动范围缩放，每段结束后独立回池。</remarks>
+        private void SynchronizeAreas(ulong tick, NativeArray<CombatUnit>.ReadOnly units)
         {
             for (int index = 0; index < session.AreaCount; index++)
             {
@@ -330,10 +401,13 @@ namespace Roguelike.Features.Combat.Rendering
                     skill.AreaClipIds_Ref == null || skill.AreaClipIds_Ref.Count == 0)
                     throw new InvalidOperationException("Combat area event references a skill visual that was not preloaded.");
                 if (!skill.AreaVisualOffsetXPixels.HasValue || !skill.AreaVisualOffsetYPixels.HasValue ||
-                    !skill.AreaVisualScale.HasValue || !(skill.AreaVisualScale.Value > 0f))
+                    !skill.AreaVisualScale.HasValue || !(skill.AreaVisualScale.Value > 0f) ||
+                    !skill.AreaRadiusPixels.HasValue || !(skill.AreaRadiusPixels.Value > 0f) ||
+                    !(areaEvent.Radius > 0f) || float.IsNaN(areaEvent.Radius) || float.IsInfinity(areaEvent.Radius))
                     throw new InvalidOperationException("Combat area visual placement is incomplete: " + areaEvent.SkillId);
+                float radiusMultiplier = areaEvent.Radius / (skill.AreaRadiusPixels.Value * worldUnitsPerPixel);
                 float2 offset = new float2(skill.AreaVisualOffsetXPixels.Value,
-                    skill.AreaVisualOffsetYPixels.Value) * worldUnitsPerPixel;
+                    skill.AreaVisualOffsetYPixels.Value) * worldUnitsPerPixel * radiusMultiplier;
                 foreach (AnimationClipConfig clipConfig in skill.AreaClipIds_Ref)
                 {
                     AreaVisual visual = AcquireArea();
@@ -341,9 +415,12 @@ namespace Roguelike.Features.Combat.Rendering
                     visual.SkillId = areaEvent.SkillId;
                     visual.ClipId = clipConfig.Id;
                     visual.StartTick = areaEvent.Tick;
+                    visual.FollowsOwner = areaEvent.FollowsOwner;
+                    visual.OwnerLifetime = areaEvent.OwnerLifetime;
+                    visual.Offset = offset;
                     manager.SetComponentData(visual.Entity,
                         LocalTransform.FromPositionRotationScale(new float3(areaEvent.Position + offset, 0),
-                            quaternion.identity, skill.AreaVisualScale.Value));
+                            quaternion.identity, skill.AreaVisualScale.Value * radiusMultiplier));
                     SetVisible(visual.Entity, true);
                 }
             }
@@ -353,6 +430,15 @@ namespace Roguelike.Features.Combat.Rendering
             {
                 if (!visual.Active) continue;
                 CombatVisualResources.Clip clip = resources.Read(visual.SkillId, visual.ClipId);
+                if (visual.FollowsOwner)
+                {
+                    CombatUnit owner = units[0];
+                    if (owner.Target.Health <= 0 || owner.Target.Lifetime != visual.OwnerLifetime)
+                    { HideArea(visual); continue; }
+                    LocalTransform transform = manager.GetComponentData<LocalTransform>(visual.Entity);
+                    transform.Position = new float3(owner.Position + owner.BodyOffset + visual.Offset, 0);
+                    manager.SetComponentData(visual.Entity, transform);
+                }
                 double age = (tick - visual.StartTick) * session.StepSeconds;
                 if (age >= clip.Animation.DurationSeconds(0))
                 {

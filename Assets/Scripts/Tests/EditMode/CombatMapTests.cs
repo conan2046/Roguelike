@@ -30,7 +30,6 @@ namespace Roguelike.Tests
             Assert.That(first.Columns, Is.EqualTo(32));
             Assert.That(first.Rows, Is.EqualTo(32));
             Assert.That(first.TileCount, Is.EqualTo(1024));
-            Assert.That(first.Map.CameraViewportHeightPixels, Is.EqualTo(750));
             Assert.That(first.TileResources.Select(item => item.Id),
                 Is.EqualTo(new[] { 420044, 420045, 420046, 420047, 420048, 420049 }));
             int[] firstLayout = Enumerable.Range(0, first.TileCount)
@@ -71,6 +70,84 @@ namespace Roguelike.Tests
             Assert.That(resources.ReleaseCount, Is.EqualTo(6));
         }
 
+        /// <summary>检查横屏、竖屏及超宽屏下四个行走边角的完整摄像机范围均位于地面内。</summary>
+        /// <param name="mapId">正式 TbMap 行。</param>
+        /// <param name="aspect">测试摄像机宽高比。</param>
+        [TestCase(1, 16d / 9d)]
+        [TestCase(1, 9d / 16d)]
+        [TestCase(1, 21d / 9d)]
+        [TestCase(1, 32d / 9d)]
+        [TestCase(101, 16d / 9d)]
+        [TestCase(101, 9d / 16d)]
+        [TestCase(101, 21d / 9d)]
+        [TestCase(101, 32d / 9d)]
+        public void ViewportLayout_CoversCameraAtEveryArenaCorner(int mapId, double aspect)
+        {
+            var map = LoadTables().TbMap.Get(mapId);
+            var layout = CombatMapDefinition.Create(map).FitViewport(aspect);
+            double viewHalfHeight = map.CameraViewportHeightPixels * 0.5;
+            double viewHalfWidth = viewHalfHeight * aspect;
+            foreach (int x in new[] { -1, 1 })
+                foreach (int y in new[] { -1, 1 })
+                {
+                    double centerX = x * map.ArenaHalfWidthPixels, centerY = y * map.ArenaHalfHeightPixels;
+                    Assert.That(centerX - viewHalfWidth, Is.GreaterThanOrEqualTo(-layout.WidthPixels * 0.5));
+                    Assert.That(centerX + viewHalfWidth, Is.LessThanOrEqualTo(layout.WidthPixels * 0.5));
+                    Assert.That(centerY - viewHalfHeight, Is.GreaterThanOrEqualTo(-layout.HeightPixels * 0.5));
+                    Assert.That(centerY + viewHalfHeight, Is.LessThanOrEqualTo(layout.HeightPixels * 0.5));
+                }
+            Assert.That(layout.WidthPixels - 2 * (map.ArenaHalfWidthPixels + viewHalfWidth), Is.LessThan(2 * map.TileSizePixels));
+            Assert.That(layout.HeightPixels - 2 * (map.ArenaHalfHeightPixels + viewHalfHeight), Is.LessThan(2 * map.TileSizePixels));
+            Assert.That(layout.Columns % 2, Is.Zero);
+            Assert.That(layout.Rows % 2, Is.Zero);
+            Assert.That(layout.FitViewport(aspect), Is.SameAs(layout));
+        }
+
+        /// <summary>拒绝非法设备比例，防止构造空地面或整数溢出。</summary>
+        [Test]
+        public void ViewportLayout_RejectsInvalidAspect()
+        {
+            var definition = CombatMapDefinition.Create(LoadTables().TbMap.Get(101));
+            foreach (double aspect in new[] { 0d, -1d, double.NaN, double.PositiveInfinity, double.MaxValue })
+                Assert.Throws<InvalidOperationException>(() => definition.FitViewport(aspect));
+        }
+
+        /// <summary>实际缩窄地面后验证旧格清除、世界位置和纹理稳定，以及六张纹理只加载和释放一次。</summary>
+        /// <remarks>只创建内存 Tilemap 和纹理，退出即释放，不保存任何资产。</remarks>
+        [Test]
+        public void TilemapBackground_ResizePreservesWorldCellsAndResourceOwnership()
+        {
+            Tables tables = LoadTables();
+            var definition = CombatMapDefinition.Create(tables.TbMap.Get(101)).FitViewport(16d / 9d);
+            var owner = new GameObject("Combat Map Resize Test Owner");
+            using var resources = new MemoryTextureResources(definition.Map.TileSizePixels);
+            CombatTilemapBackground background = null;
+            try
+            {
+                background = CombatTilemapBackground.CreateAsync(definition, tables.TbCombatRules.Get(1),
+                    resources, owner.transform, CancellationToken.None).GetAwaiter().GetResult();
+                var oldCell = new Vector3Int(definition.Columns / 2, definition.Rows / 2, 0);
+                TileBase tile = background.Tilemap.GetTile(oldCell);
+                Vector3 position = background.Tilemap.GetCellCenterWorld(oldCell);
+                Assert.That(background.FitViewport(9f / 16f), Is.True);
+                var newCell = new Vector3Int(background.Layout.Columns / 2, background.Layout.Rows / 2, 0);
+                Assert.That(background.Tilemap.GetTile(newCell), Is.SameAs(tile));
+                Assert.That(Vector3.Distance(background.Tilemap.GetCellCenterWorld(newCell), position), Is.LessThan(0.0001f));
+                Assert.That(background.Tilemap.cellBounds.size, Is.EqualTo(new Vector3Int(background.Layout.Columns, background.Layout.Rows, 1)));
+                Assert.That(background.Tilemap.GetTile(new Vector3Int(definition.Columns - 1, 0, 0)), Is.Null);
+                Assert.That(background.TileCount, Is.EqualTo(background.Layout.TileCount));
+                Assert.That(background.FitViewport(9f / 16f), Is.False);
+                Assert.That(resources.TextureCount, Is.EqualTo(6));
+                Assert.That(resources.ReleaseCount, Is.Zero);
+            }
+            finally
+            {
+                background?.Dispose();
+                Object.DestroyImmediate(owner);
+            }
+            Assert.That(resources.ReleaseCount, Is.EqualTo(6));
+        }
+
         /// <summary>从 Assets/StreamingAssets/Config/Luban 装载测试所需的正式生成数据。</summary>
         /// <returns>完成全部跨表引用解析的 Luban 表集合。</returns>
         private static Tables LoadTables()
@@ -87,6 +164,9 @@ namespace Roguelike.Tests
 
             /// <summary>获取已释放的模拟资源句柄数量。</summary>
             public int ReleaseCount { get; private set; }
+
+            /// <summary>获取加载次数，用于排除视野变化时重复创建纹理。</summary>
+            public int TextureCount => textures.Count;
 
             /// <summary>保存 TbMap.tileSizePixels，保证测试纹理符合正式尺寸约束。</summary>
             /// <param name="tileSize">正方形纹理边长。</param>

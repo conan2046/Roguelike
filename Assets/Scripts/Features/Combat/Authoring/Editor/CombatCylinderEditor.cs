@@ -10,7 +10,7 @@ namespace Roguelike.Features.Combat.Authoring.Editor
     public sealed class CombatCylinderEditor : UnityEditor.Editor
     {
         /// <summary>Unity 绘制 Inspector 时使用中文字段名和用途说明。</summary>
-        /// <remarks>这里只修改预制体；运行时数据必须通过统一碰撞配置菜单导出。</remarks>
+        /// <remarks>几何字段修改预制体并通过碰撞菜单导出；模型层级通过独立按钮保存到 TbCombatRender，不写入组件。</remarks>
         public override void OnInspectorGUI()
         {
             serializedObject.Update();
@@ -24,6 +24,7 @@ namespace Roguelike.Features.Combat.Authoring.Editor
                 Field("CombatRulesId", "战斗规则编号", "用于像素和 Scene 单位之间换算。", true);
                 serializedObject.ApplyModifiedProperties();
                 EditorGUILayout.HelpBox("保存 Prefab 后执行：Roguelike > 战斗 > 碰撞配置 > 导出全部预制体并生成配置。DOTS 不启用 Physics2D。", MessageType.None);
+                CombatRenderInspector.DrawModel(shape);
                 return;
             }
             EditorGUILayout.HelpBox("【移动阻挡范围】决定角色和怪物移动时是否互相穿过。所有尺寸都填像素；保存预制体后再一键导入配置表。", MessageType.Info);
@@ -37,6 +38,7 @@ namespace Roguelike.Features.Combat.Authoring.Editor
             Field("ElevationPixels", "离地高度（像素）", "圆柱底面相对地面的高度。", false);
             serializedObject.ApplyModifiedProperties();
             EditorGUILayout.HelpBox("修改后：保存 Prefab → Roguelike > 战斗 > 碰撞配置 > 导出全部预制体并生成配置。", MessageType.None);
+            CombatRenderInspector.DrawModel(shape);
         }
 
         /// <summary>按序列化字段绘制本地化标签，并限制尺寸字段不得为负数。</summary>

@@ -14,6 +14,8 @@ namespace Roguelike.Features.Combat.Rendering
         private int direction, previousClip;
         private double started;
         private bool initialized;
+        private CombatUnit sampledUnit;
+        private double sampledStep;
         public int ClipId { get; private set; }
         public int ActionIndex { get; private set; }
         public int GlobalFrame { get; private set; }
@@ -36,11 +38,22 @@ namespace Roguelike.Features.Combat.Rendering
         /// <param name="unit">只读的 CombatSession 单位快照。</param>
         /// <param name="tick">会话已完成 tick 数，暂停时保持不变。</param>
         /// <param name="stepSeconds">TbCombatRules.simulationHz 换算的步长。</param>
-        /// <remarks>仅修改本播放器游标，不改变生命、朝向或攻击计数。代际变化及 tick 回退清空播放进度。</remarks>
+        /// <remarks>仅修改本播放器游标，不改变生命、朝向或攻击计数。代际变化及 tick 回退清空播放进度；同Tick仅在全部选帧输入未变时跳过，外部生命或动画状态变化仍可见。</remarks>
         public void Sample(in CombatUnit unit, ulong tick, double stepSeconds)
         {
             bool reset = !initialized || lifetime != unit.Target.Lifetime || tick < lastTick;
-            if (!reset && tick == lastTick) return;
+            // 暂停或高渲染帧率会重复读取同一Tick；比较实际选帧输入，避免漏掉同Tick的外部修改。
+            if (!reset && tick == lastTick && sampledStep == stepSeconds &&
+                (unit.Target.Health > 0) == (sampledUnit.Target.Health > 0) &&
+                unit.Target.IsPlayer == sampledUnit.Target.IsPlayer &&
+                math.all(unit.Position == sampledUnit.Position) && math.all(unit.PreviousPosition == sampledUnit.PreviousPosition) &&
+                math.all(unit.Facing == sampledUnit.Facing) && unit.AttackActive == sampledUnit.AttackActive &&
+                unit.AttackAge == sampledUnit.AttackAge && unit.WindupSeconds == sampledUnit.WindupSeconds &&
+                unit.PendingAttack.Sequence == sampledUnit.PendingAttack.Sequence &&
+                unit.AttackOption.ActionIndex == sampledUnit.AttackOption.ActionIndex &&
+                unit.AttackOption.AlignedActionIndex == sampledUnit.AttackOption.AlignedActionIndex &&
+                unit.AttackOption.FlipX == sampledUnit.AttackOption.FlipX) return;
+            sampledUnit = unit; sampledStep = stepSeconds;
             double now = tick * stepSeconds;
             if (reset)
             {

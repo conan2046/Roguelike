@@ -34,6 +34,10 @@ public sealed partial class StageConfig : Luban.BeanBase
         InitialCharacterId = _buf.ReadInt();
         InitialCharacterId_Ref = null;
         {int n0 = _buf.ReadSize(); InitialSkillIds = new System.Collections.Generic.List<int>(n0);for(var i0 = 0 ; i0 < n0 ; i0++) { int _e0;  _e0 = _buf.ReadInt(); InitialSkillIds.Add(_e0);}}
+        if(_buf.ReadBool()){ RunBuildId = _buf.ReadInt(); } else { RunBuildId = null; }
+        RunBuildId_Ref = null;
+        if(_buf.ReadBool()){ TribulationSliceId = _buf.ReadInt(); } else { TribulationSliceId = null; }
+        TribulationSliceId_Ref = null;
     }
 
     public static StageConfig DeserializeStageConfig(ByteBuf _buf)
@@ -84,6 +88,16 @@ public sealed partial class StageConfig : Luban.BeanBase
     /// </summary>
     public readonly System.Collections.Generic.List<int> InitialSkillIds;
     public System.Collections.Generic.List<SkillConfig> InitialSkillIds_Ref;
+    /// <summary>
+    /// 局内构筑方案；空仅用于既有兼容入口
+    /// </summary>
+    public readonly int? RunBuildId;
+    public RunBuildConfig RunBuildId_Ref;
+    /// <summary>
+    /// 可选借劫炼器切片配置
+    /// </summary>
+    public readonly int? TribulationSliceId;
+    public TribulationSliceConfig TribulationSliceId_Ref;
    
     public const int __ID__ = 1215177664;
     public override int GetTypeId() => __ID__;
@@ -99,6 +113,8 @@ public sealed partial class StageConfig : Luban.BeanBase
         InitialSkillIds_Ref = new System.Collections.Generic.List<SkillConfig>();
         foreach (var _v in InitialSkillIds) { InitialSkillIds_Ref.Add(tables.TbSkill.GetOrDefault(_v)); }
 
+        RunBuildId_Ref = RunBuildId!= null ? tables.TbRunBuild.GetOrDefault(RunBuildId.Value) : null;
+        TribulationSliceId_Ref = TribulationSliceId!= null ? tables.TbTribulationSlice.GetOrDefault(TribulationSliceId.Value) : null;
     }
 
     public override string ToString()
@@ -113,6 +129,8 @@ public sealed partial class StageConfig : Luban.BeanBase
         + "uiSetId:" + UiSetId + ","
         + "initialCharacterId:" + InitialCharacterId + ","
         + "initialSkillIds:" + Luban.StringUtil.CollectionToString(InitialSkillIds) + ","
+        + "runBuildId:" + RunBuildId + ","
+        + "tribulationSliceId:" + TribulationSliceId + ","
         + "}";
     }
 }

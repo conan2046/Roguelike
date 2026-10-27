@@ -121,6 +121,54 @@ public partial class Tables
     /// TbCombatUiSet generated from Excel
     /// </summary>
     public TbCombatUiSet TbCombatUiSet {get; }
+    /// <summary>
+    /// 局内构筑正式配置
+    /// </summary>
+    public TbRunWeapon TbRunWeapon {get; }
+    /// <summary>
+    /// 局内构筑正式配置
+    /// </summary>
+    public TbRunPassive TbRunPassive {get; }
+    /// <summary>
+    /// 局内构筑正式配置
+    /// </summary>
+    public TbRunBuild TbRunBuild {get; }
+    /// <summary>
+    /// 局内宝箱武器进化
+    /// </summary>
+    public TbWeaponEvolution TbWeaponEvolution {get; }
+    /// <summary>
+    /// 局内事件与宝箱
+    /// </summary>
+    public TbRunEvent TbRunEvent {get; }
+    /// <summary>
+    /// 局内事件与宝箱
+    /// </summary>
+    public TbChestProfile TbChestProfile {get; }
+    /// <summary>
+    /// 借劫炼器体验切片
+    /// </summary>
+    public TbTribulationSlice TbTribulationSlice {get; }
+    /// <summary>
+    /// 借劫炼器体验切片
+    /// </summary>
+    public TbTribulationRule TbTribulationRule {get; }
+    /// <summary>
+    /// 借劫炼器体验切片
+    /// </summary>
+    public TbTribulationSignature TbTribulationSignature {get; }
+    /// <summary>
+    /// 借劫炼器体验切片
+    /// </summary>
+    public TbTribulationRefinement TbTribulationRefinement {get; }
+    /// <summary>
+    /// 借劫炼器体验切片
+    /// </summary>
+    public TbTribulationUi TbTribulationUi {get; }
+    /// <summary>
+    /// 模型与技能片段独立渲染层级
+    /// </summary>
+    public TbCombatRender TbCombatRender {get; }
 
     public Tables(System.Func<string, ByteBuf> loader)
     {
@@ -151,6 +199,18 @@ public partial class Tables
         TbUpgradePool = new TbUpgradePool(loader("tbupgradepool"));
         TbUpgradeOption = new TbUpgradeOption(loader("tbupgradeoption"));
         TbCombatUiSet = new TbCombatUiSet(loader("tbcombatuiset"));
+        TbRunWeapon = new TbRunWeapon(loader("tbrunweapon"));
+        TbRunPassive = new TbRunPassive(loader("tbrunpassive"));
+        TbRunBuild = new TbRunBuild(loader("tbrunbuild"));
+        TbWeaponEvolution = new TbWeaponEvolution(loader("tbweaponevolution"));
+        TbRunEvent = new TbRunEvent(loader("tbrunevent"));
+        TbChestProfile = new TbChestProfile(loader("tbchestprofile"));
+        TbTribulationSlice = new TbTribulationSlice(loader("tbtribulationslice"));
+        TbTribulationRule = new TbTribulationRule(loader("tbtribulationrule"));
+        TbTribulationSignature = new TbTribulationSignature(loader("tbtribulationsignature"));
+        TbTribulationRefinement = new TbTribulationRefinement(loader("tbtribulationrefinement"));
+        TbTribulationUi = new TbTribulationUi(loader("tbtribulationui"));
+        TbCombatRender = new TbCombatRender(loader("tbcombatrender"));
         ResolveRef();
     }
     
@@ -183,6 +243,18 @@ public partial class Tables
         TbUpgradePool.ResolveRef(this);
         TbUpgradeOption.ResolveRef(this);
         TbCombatUiSet.ResolveRef(this);
+        TbRunWeapon.ResolveRef(this);
+        TbRunPassive.ResolveRef(this);
+        TbRunBuild.ResolveRef(this);
+        TbWeaponEvolution.ResolveRef(this);
+        TbRunEvent.ResolveRef(this);
+        TbChestProfile.ResolveRef(this);
+        TbTribulationSlice.ResolveRef(this);
+        TbTribulationRule.ResolveRef(this);
+        TbTribulationSignature.ResolveRef(this);
+        TbTribulationRefinement.ResolveRef(this);
+        TbTribulationUi.ResolveRef(this);
+        TbCombatRender.ResolveRef(this);
     }
 }
 

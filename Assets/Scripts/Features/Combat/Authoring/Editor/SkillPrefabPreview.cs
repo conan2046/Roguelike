@@ -85,7 +85,7 @@ namespace Roguelike.Features.Combat.Authoring.Editor
             else Clear();
         }
 
-        /// <summary>Unity 打开技能预制体时解析 TbSkill.visualSetId 首片段，在预览场景中创建独立临时根。</summary>
+        /// <summary>Unity 打开技能预制体时解析所选 TbSkill 片段及其 TbCombatRender 层级，在隔离场景中创建独立临时根。</summary>
         /// <param name="stage">Unity 当前预制体隔离编辑场景。</param>
         /// <remarks>对象与网格、纹理、材质均不保存到磁盘；作为独立根避免写入预制体层级，关闭或重载时释放。</remarks>
         private static void Open(PrefabStage stage)
@@ -123,7 +123,11 @@ namespace Roguelike.Features.Combat.Authoring.Editor
                 mesh.hideFlags = HideFlags.HideAndDontSave;
                 var shader = Shader.Find(scenario.PresentationId_Ref.ShaderName);
                 if (shader == null) throw new InvalidOperationException("技能预览 Shader 不存在。");
-                material = new Material(shader) { hideFlags = HideFlags.HideAndDontSave, renderQueue = (int)RenderQueue.Transparent };
+                // 尚未配置正式投递的旧素材仍允许只读查看；正式飞行/范围技能缺绑定时明确失败，不走该兼容分支。
+                bool formalVisual = skill.CombatProfileId_Ref != null &&
+                    skill.CombatProfileId_Ref.DeliveryType != ESkillDeliveryType.Melee;
+                int queue = formalVisual ? new CombatRenderCatalog(scenario.PresentationId_Ref).ReadSkill(skill.Id, clip.Id) : (int)RenderQueue.Transparent;
+                material = new Material(shader) { hideFlags = HideFlags.HideAndDontSave, renderQueue = queue };
                 material.SetTexture("_BaseMap", texture); material.SetColor("_BaseColor", Color.white);
                 material.SetFloat("_Surface", 1); material.SetFloat("_SrcBlend", (float)BlendMode.SrcAlpha);
                 material.SetFloat("_DstBlend", (float)BlendMode.OneMinusSrcAlpha); material.SetFloat("_ZWrite", 0);

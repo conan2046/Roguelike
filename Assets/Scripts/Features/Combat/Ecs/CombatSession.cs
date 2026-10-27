@@ -5,14 +5,17 @@ using cfg;
 using Roguelike.Features.Combat.Run;
 using Unity.Collections;
 using Unity.Entities;
+using Unity.Profiling;
 using Unity.Mathematics;
 using Unity.Transforms;
 
 namespace Roguelike.Features.Combat.Ecs
 {
     /// <summary>独立战斗生命周期：统一配置入口供表，原生快照驱动 ECS，场景或性能入口共享此实现。</summary>
-    public sealed class CombatSession : IDisposable
+    public sealed partial class CombatSession : IDisposable
     {
+        private static readonly ProfilerMarker PresentationReadMarker = new ProfilerMarker("Roguelike.Presentation.UnitRead");
+        private NativeList<CombatUnit> presentationUnits;
         private readonly World world;
         private readonly EntityManager manager;
         private readonly CombatTickSystem system;
@@ -22,11 +25,13 @@ namespace Roguelike.Features.Combat.Ecs
         private NativeList<Entity> units;
         private NativeArray<Entity> projectiles;
         private NativeList<CombatUnit> templates;
+        private NativeList<CombatUnit> unitStates;
         private NativeArray<CombatCounters> counters;
         private NativeParallelMultiHashMap<int2, int> grid;
         private NativeList<CombatDamageRequest> requests;
         private NativeList<CombatImpactEvent> impacts;
         private NativeList<CombatAreaEvent> areas;
+        private NativeList<CombatPersistentArea> persistentAreas;
         private NativeList<CombatDeathEvent> deaths;
         private NativeList<CombatAttackOption> attackOptions;
         private NativeArray<CombatWeaponState> playerWeapons;
@@ -98,6 +103,8 @@ namespace Roguelike.Features.Combat.Ecs
                 int count = checked(settings.InitialMonsterCount + 1);
                 templates = new NativeList<CombatUnit>(count, Allocator.Persistent);
                 templates.Resize(count, NativeArrayOptions.ClearMemory);
+                unitStates = new NativeList<CombatUnit>(count, Allocator.Persistent);
+                unitStates.Resize(count, NativeArrayOptions.ClearMemory);
                 units = new NativeList<Entity>(count, Allocator.Persistent);
                 units.Resize(count, NativeArrayOptions.ClearMemory);
                 counters = new NativeArray<CombatCounters>(1, Allocator.Persistent);
@@ -159,6 +166,7 @@ namespace Roguelike.Features.Combat.Ecs
                             monster.MoveOffsetYPixels, monster.MoveElevationPixels, monster.CollisionShape), position, false);
                     var template = templates[slot];
                     template.ConfigId = monster.Id;
+                    template.IsElite = monster.IsElite;
                     template.VisualSetId = monster.VisualSetId;
                     template.AttackOptionStart = offsets[monster.VisualSetId];
                     template.AttackOptionCount = attacksByVisual[monster.VisualSetId].Length;
@@ -180,7 +188,8 @@ namespace Roguelike.Features.Combat.Ecs
                         if (skill.CombatProfileId_Ref.DeliveryType == ESkillDeliveryType.Projectile)
                             projectileCapacity = checked(projectileCapacity +
                                 (long)Math.Ceiling(skill.CombatProfileId_Ref.ProjectileLifetime.Value /
-                                    rules.MinAttackInterval) + 1);
+                                rules.MinAttackInterval) * skill.CombatProfileId_Ref.ProjectileCount +
+                                skill.CombatProfileId_Ref.ProjectileCount);
                 if (projectileCapacity > int.MaxValue - count)
                     throw new InvalidOperationException("TbSkillCombat: projectile capacity overflow.");
                 projectiles = new NativeArray<Entity>((int)projectileCapacity, Allocator.Persistent);
@@ -191,6 +200,7 @@ namespace Roguelike.Features.Combat.Ecs
                     Allocator.Persistent);
                 impacts = new NativeList<CombatImpactEvent>(Allocator.Persistent);
                 areas = new NativeList<CombatAreaEvent>(Allocator.Persistent);
+                persistentAreas = new NativeList<CombatPersistentArea>(Allocator.Persistent);
                 deaths = new NativeList<CombatDeathEvent>(Allocator.Persistent);
                 Restart();
             }
@@ -201,7 +211,7 @@ namespace Roguelike.Features.Combat.Ecs
         /// <param name="elapsedSeconds">本渲染帧未缩放的有效经过时间。</param>
         /// <param name="movement">输入层提供的二维移动方向，归一化限制斜向速度。</param>
         /// <returns>本帧真正执行的固定 tick 数。</returns>
-        /// <remarks>暂停或玩家死亡时冻结全部模拟；内部任务同步完成，返回后可安全读取实体。</remarks>
+        /// <remarks>暂停或玩家死亡时冻结全部模拟；每Tick独占缓冲从ECS采集并统一写回，外部属性修改在下个Tick生效；任务同步完成后可安全读取实体。</remarks>
         /// <exception cref="ObjectDisposedException">会话已释放。</exception>
         /// <exception cref="InvalidOperationException">时间或输入非有限。</exception>
         public int Advance(double elapsedSeconds, float2 movement)
@@ -223,10 +233,11 @@ namespace Roguelike.Features.Combat.Ecs
             {
                 system.RunTick(new CombatTickJob
                 {
-                    Units = units.AsArray(), Projectiles = projectiles, Templates = templates.AsArray(), Counters = counters,
+                    Units = units.AsArray(), UnitStates = unitStates.AsArray(), Projectiles = projectiles, Templates = templates.AsArray(), Counters = counters,
                     Grid = grid, Requests = requests, Rules = damageRules, Input = movement,
                     Impacts = impacts,
                     Areas = areas,
+                    PersistentAreas = persistentAreas,
                     Deaths = deaths,
                     PlayerWeapons = playerWeapons,
                     AttackOptions = attackOptions.AsArray(),
@@ -269,6 +280,7 @@ namespace Roguelike.Features.Combat.Ecs
                 if ((timedSpawn || settings.IsFormalRun) && slot != 0) unit.Target.Health = 0;
                 unit.Target.Lifetime = ++nextLifetime;
                 unit.Attack.AttackerLifetime = nextLifetime;
+                unitStates[slot] = unit;
                 manager.SetComponentData(units[slot], unit);
                 manager.SetComponentData(units[slot], LocalTransform.FromPositionRotationScale(new float3(unit.Position, 0), quaternion.identity, unit.Target.Health > 0 ? 1 : 0));
             }
@@ -286,7 +298,7 @@ namespace Roguelike.Features.Combat.Ecs
             counters[0] = new CombatCounters { NextLifetime = nextLifetime, AliveMonsters = timedSpawn || settings.IsFormalRun ? 0 : settings.InitialMonsterCount };
             nextSpawnTick = timedSpawn ? SpawnDelayTicks(settings.SpawnIntervalSeconds) : 0;
             WaveNumber = 0; SpawnedInWave = 0; SpawnedMonsters = 0;
-            grid.Clear(); requests.Clear(); impacts.Clear(); areas.Clear();
+            grid.Clear(); requests.Clear(); impacts.Clear(); areas.Clear(); persistentAreas.Clear();
             deaths.Clear();
             Paused = false;
             BacklogSeconds = PeakBacklogSeconds = 0;
@@ -538,7 +550,7 @@ namespace Roguelike.Features.Combat.Ecs
         /// <summary>为指定真实怪物追加一个固定表现类型的池槽，初始保持失活。</summary>
         /// <param name="monster">本会话目录中的 TbMonster。</param>
         /// <returns>新槽在单位数组中的索引。</returns>
-        /// <remarks>只在固定 Job 完成后的主线程调用；槽位后续仅复用同一 ConfigId，表现绑定无需重建。</remarks>
+        /// <remarks>只在固定Job完成后的主线程扩展实体、模板和同槽状态缓冲；后续仅复用同一ConfigId，缓冲在退出时统一释放。</remarks>
         private int AddMonsterSlot(MonsterConfig monster)
         {
             var template = BuildUnit(settings.GetMonsterProfile(monster), monster.DefaultSkillId_Ref,
@@ -550,6 +562,7 @@ namespace Roguelike.Features.Combat.Ecs
                     monster.MoveOffsetXPixels, monster.MoveOffsetYPixels, monster.MoveElevationPixels, monster.CollisionShape),
                 float2.zero, false);
             template.ConfigId = monster.Id;
+            template.IsElite = monster.IsElite;
             template.VisualSetId = monster.VisualSetId;
             template.AttackOptionStart = attackOffsets[monster.VisualSetId];
             template.AttackOptionCount = attackCounts[monster.VisualSetId];
@@ -559,6 +572,7 @@ namespace Roguelike.Features.Combat.Ecs
             templates.Add(template);
             var inactive = template;
             inactive.Target.Health = 0;
+            unitStates.Add(inactive);
             manager.SetComponentData(entity, inactive);
             manager.SetComponentData(entity, LocalTransform.FromScale(0));
             maximumRadius = math.max(maximumRadius,
@@ -568,6 +582,22 @@ namespace Roguelike.Features.Combat.Ecs
             requests.Capacity = Math.Max(requests.Capacity,
                 checked(units.Length * requestCapacityMultiplier + projectiles.Length));
             return slot;
+        }
+
+        /// <summary>每次主体与反馈同步前采集一次权威ECS状态，供同一同步帧共享读取。</summary>
+        /// <returns>会话独占缓冲的只读借用；只允许在下一次采集、动态扩容或释放之前消费，不得跨帧保存。</returns>
+        /// <remarks>每次都刷新，包含同Tick外部属性变更、出生、死亡复用及重开；从实际槽数推导容量，Dispose释放，不写存档或配置。</remarks>
+        /// <exception cref="ObjectDisposedException">会话已释放。</exception>
+        public NativeArray<CombatUnit>.ReadOnly CapturePresentationUnits()
+        {
+            EnsureAlive();
+            using (PresentationReadMarker.Auto())
+            {
+                if (!presentationUnits.IsCreated) presentationUnits = new NativeList<CombatUnit>(units.Length, Allocator.Persistent);
+                presentationUnits.ResizeUninitialized(units.Length);
+                system.CapturePresentationUnits(units.AsArray(), presentationUnits.AsArray());
+                return presentationUnits.AsArray().AsReadOnly();
+            }
         }
 
         /// <summary>表现与诊断在 tick 完成后读取单位组件副本，不暴露原生容器所有权。</summary>
@@ -672,6 +702,7 @@ namespace Roguelike.Features.Combat.Ecs
                     weapon.Cooldown = CombatMath.RescaleCooldown(weapon.Cooldown, weapon.Interval, weaponInterval);
                     weapon.Interval = weaponInterval;
                     weapon.Attack = AttackSnapshot.Capture(attributes, unit.Target.Lifetime, 0, unit.Target.Faction);
+                    weapon.Attack.Attack *= weaponConfig.DamagePermille / 1000d;
                     playerWeapons[index] = weapon;
                 }
             }
@@ -682,9 +713,10 @@ namespace Roguelike.Features.Combat.Ecs
 
         /// <summary>升级选择后以 CombatRunModel.activeSkills 切换正式玩家武器；每把武器保留独立冷却。</summary>
         /// <param name="skillIds">当前模型已解锁的 TbSkill.id 集合。</param>
+        /// <param name="build">TbRunWeapon 当前快照；进化替换时从原技能转移冷却完成比例。</param>
         /// <remarks>新解锁武器立即 Ready；已有武器不重置冷却。只修改正式会话自有原生状态。</remarks>
         /// <exception cref="InvalidOperationException">测试会话调用、技能重复或包含本关目录外技能。</exception>
-        public void SynchronizePlayerSkills(IEnumerable<int> skillIds)
+        public void SynchronizePlayerSkills(IEnumerable<int> skillIds, IReadOnlyList<CombatWeaponUpgrade> build = null)
         {
             EnsureAlive();
             if (!settings.IsFormalRun) throw new InvalidOperationException("Player weapon synchronization requires a formal run.");
@@ -696,12 +728,70 @@ namespace Roguelike.Features.Combat.Ecs
             var known = new HashSet<int>(settings.AvailablePlayerSkills.Select(item => item.Id));
             if (requested.Any(id => !known.Contains(id)))
                 throw new InvalidOperationException("Formal active skill is outside the stage catalog.");
+            var previous = new Dictionary<int, CombatWeaponState>();
+            for (int index = 0; index < playerWeapons.Length; index++)
+                if (playerWeapons[index].Active) previous.Add(playerWeapons[index].SkillId, playerWeapons[index]);
             for (int index = 0; index < playerWeapons.Length; index++)
             {
                 CombatWeaponState weapon = playerWeapons[index];
                 bool active = requested.Contains(weapon.SkillId);
-                if (active && !weapon.Active) weapon.Cooldown = 0;
+                if (active && !weapon.Active)
+                {
+                    weapon.Cooldown = 0;
+                    if (build != null)
+                        foreach (CombatWeaponUpgrade upgrade in build)
+                            if (upgrade.SkillId == weapon.SkillId && upgrade.OriginalSkillId != upgrade.SkillId &&
+                                previous.TryGetValue(upgrade.OriginalSkillId, out CombatWeaponState original))
+                                weapon.Cooldown = CombatMath.RescaleCooldown(original.Cooldown, original.Interval, weapon.Interval);
+                }
                 weapon.Active = active;
+                playerWeapons[index] = weapon;
+            }
+        }
+
+        /// <summary>构筑变化后把 TbRunWeapon.ranks 与角色补偿应用到各自武器，保留冷却完成比例。</summary>
+        /// <param name="upgrades">当前占槽武器的纯值修正，已在模型中验证。</param>
+        /// <param name="attributes">来自正式属性方案与被动聚合的快照。</param>
+        /// <remarks>只修改会话自有武器原生数组；已发射弹丸继续持有原攻击快照，不追溯改伤害。</remarks>
+        /// <exception cref="InvalidOperationException">参数非法或活动技能不在预加载目录。</exception>
+        /// <exception cref="ObjectDisposedException">会话已经释放。</exception>
+        public void ApplyWeaponUpgrades(IReadOnlyList<CombatWeaponUpgrade> upgrades, in CombatAttributeSnapshot attributes)
+        {
+            EnsureAlive();
+            if (!settings.IsFormalRun || upgrades == null)
+                throw new InvalidOperationException("Weapon upgrades require a formal build snapshot.");
+            CombatMath.Positive(attributes.SkillRangeMultiplier);
+            var player = ReadUnit(0);
+            var seen = new HashSet<int>();
+            foreach (CombatWeaponUpgrade upgrade in upgrades)
+            {
+                if (!seen.Add(upgrade.SkillId)) throw new InvalidOperationException("Duplicate build skill.");
+                CombatMath.Positive(upgrade.DamageMultiplier);
+                CombatMath.Positive(upgrade.IntervalMultiplier);
+                CombatMath.Positive(upgrade.RangeMultiplier);
+                int index = -1;
+                for (int candidate = 0; candidate < playerWeapons.Length; candidate++)
+                    if (playerWeapons[candidate].SkillId == upgrade.SkillId) { index = candidate; break; }
+                if (index < 0 || !playerWeapons[index].Active)
+                    throw new InvalidOperationException("Build skill is not active in the stage catalog.");
+                SkillConfig skill = settings.AvailablePlayerSkills[index];
+                CombatWeaponState weapon = playerWeapons[index];
+                double interval = CombatMath.AttackInterval(skill.CombatProfileId_Ref.BaseInterval * upgrade.IntervalMultiplier,
+                    attributes.AttackSpeedMultiplier, rules.MinAttackInterval);
+                weapon.Cooldown = CombatMath.RescaleCooldown(weapon.Cooldown, weapon.Interval, interval);
+                weapon.Interval = interval;
+                weapon.Attack = AttackSnapshot.Capture(attributes, player.Target.Lifetime, weapon.Attack.Sequence, player.Target.Faction);
+                weapon.Attack.Attack *= upgrade.DamageMultiplier * skill.CombatProfileId_Ref.DamagePermille / 1000d;
+                CombatMath.NonNegative(weapon.Attack.Attack);
+                float rangeMultiplier = (float)(attributes.SkillRangeMultiplier * upgrade.RangeMultiplier);
+                weapon.Range = skill.CombatProfileId_Ref.RangePixels * rules.WorldUnitsPerPixel * rangeMultiplier;
+                if (skill.AreaRadiusPixels.HasValue)
+                    weapon.AreaRadius = skill.AreaRadiusPixels.Value * rules.WorldUnitsPerPixel * rangeMultiplier;
+                weapon.RingWidth = skill.CombatProfileId_Ref.AreaRingWidthPixels * rules.WorldUnitsPerPixel * rangeMultiplier;
+                weapon.ChainRange = skill.CombatProfileId_Ref.ChainRangePixels * rules.WorldUnitsPerPixel * rangeMultiplier;
+                weapon.ImpactRadius = skill.CombatProfileId_Ref.ImpactRadiusPixels * rules.WorldUnitsPerPixel * rangeMultiplier;
+                weapon.ImpactVisualRadiusMultiplier = rangeMultiplier;
+                CombatMath.NonNegative(weapon.Range);
                 playerWeapons[index] = weapon;
             }
         }
@@ -735,6 +825,7 @@ namespace Roguelike.Features.Combat.Ecs
         {
             SkillCombatConfig combat = skillConfig?.CombatProfileId_Ref ??
                 throw new InvalidOperationException("Formal player weapon requires TbSkillCombat.");
+            CombatSkillRules.Validate(combat);
             float range = combat.RangePixels * rules.WorldUnitsPerPixel;
             CombatMath.NonNegative(range);
             CombatMath.Positive(combat.BaseInterval);
@@ -750,6 +841,7 @@ namespace Roguelike.Features.Combat.Ecs
                     rules.MinAttackInterval),
                 Active = active
             };
+            weapon.Attack.Attack *= combat.DamagePermille / 1000d;
             if (combat.DeliveryType == ESkillDeliveryType.Projectile)
             {
                 if (!combat.ProjectileSpeedPixelsPerSecond.HasValue || !combat.ProjectileLifetime.HasValue ||
@@ -765,16 +857,39 @@ namespace Roguelike.Features.Combat.Ecs
                 weapon.ProjectileRadius = skillConfig.ProjectileRadiusPixels.Value * rules.WorldUnitsPerPixel;
                 weapon.ProjectileOffset = new float2(skillConfig.ProjectileOffsetXPixels.Value,
                     skillConfig.ProjectileOffsetYPixels.Value) * rules.WorldUnitsPerPixel;
+                weapon.Pattern = combat.ProjectilePattern.Value;
+                weapon.ProjectileCount = combat.ProjectileCount;
+                weapon.SpreadRadians = math.radians(combat.SpreadDegrees);
+                weapon.PierceCount = combat.PierceCount;
+                weapon.ChainCount = combat.ChainCount;
+                weapon.ChainRange = combat.ChainRangePixels * rules.WorldUnitsPerPixel;
+                weapon.ImpactRadius = combat.ImpactRadiusPixels * rules.WorldUnitsPerPixel;
+                weapon.ImpactVisualRadiusMultiplier = 1;
+                // FixedList 是 Burst 组件的内联存储边界；上限由容器自身能力决定，不是策划规则。
+                if ((long)weapon.PierceCount + weapon.ChainCount + 1 > new FixedList128Bytes<ulong>().Capacity)
+                    throw new InvalidOperationException($"TbSkillCombat {combat.Id}: hit budget exceeds native lifetime storage.");
                 return weapon;
             }
             if (combat.DeliveryType != ESkillDeliveryType.TargetArea || !skillConfig.AreaRadiusPixels.HasValue)
                 throw new InvalidOperationException($"TbSkill {skillConfig.Id}: incomplete target-area weapon.");
             weapon.AreaRadius = skillConfig.AreaRadiusPixels.Value * rules.WorldUnitsPerPixel;
+            weapon.AreaDuration = combat.AreaDurationMilli / 1000d;
+            weapon.PulseInterval = combat.AreaPulseIntervalMilli / 1000d;
+            weapon.PulseCount = combat.AreaDurationMilli == 0 ? 0 :
+                checked((int)(((long)combat.AreaDurationMilli + combat.AreaPulseIntervalMilli - 1) / combat.AreaPulseIntervalMilli));
+            weapon.FollowsOwner = combat.AreaFollowsOwner;
+            weapon.Retargets = combat.AreaRetargets;
+            weapon.RingCount = combat.AreaRingCount;
+            weapon.RingWidth = combat.AreaRingWidthPixels * rules.WorldUnitsPerPixel;
+            if (weapon.Retargets && weapon.PulseCount > new FixedList128Bytes<ulong>().Capacity)
+                throw new InvalidOperationException($"TbSkillCombat {combat.Id}: retarget budget exceeds native lifetime storage.");
+            if (weapon.RingCount > 0 && weapon.RingWidth > weapon.AreaRadius / weapon.RingCount)
+                throw new InvalidOperationException($"TbSkillCombat {combat.Id}: ring width exceeds ring spacing.");
             CombatMath.Positive(weapon.AreaRadius);
             return weapon;
         }
 
-        /// <summary>入局时将 TbAttributeProfile、TbSkillCombat 与身体半径转为非托管模板，并把移动速度由逻辑像素换算到模拟坐标。</summary>
+        /// <summary>入局时将TbAttributeProfile、TbSkillCombat与身体半径转为非托管模板；正式玩家支持区域起手且不读取弹丸空字段，移动速度由逻辑像素换算。</summary>
         /// <param name="profile">完整属性方案。</param>
         /// <param name="skillConfig">TbSkill 技能，碰撞半径与偏移独立于其 TbSkillCombat 引用。</param>
         /// <param name="radius">TbCharacter/TbMonster.bodyRadiusPixels 换算后的模拟半径。</param>
@@ -782,10 +897,10 @@ namespace Roguelike.Features.Combat.Ecs
         /// <param name="hitEffectOffset">TbCharacter/TbMonster 命中特效挂点像素偏移换算后的模拟偏移。</param>
         /// <param name="movement">TbCharacter/TbMonster 导出的独立移动圆柱。</param>
         /// <param name="position">入口配置转换后的出生位置。</param>
-        /// <param name="player">区分玩家弹丸与怪物近战角色。</param>
+        /// <param name="player">区分玩家与怪物；正式玩家允许Projectile或TargetArea起手，测试场景继续只接受弹丸。</param>
         /// <returns>冷却就绪且目标为空的出生模板。</returns>
         /// <exception cref="InvalidOperationException">属性、几何或技能配置不合法。</exception>
-        private CombatUnit BuildUnit(AttributeProfileConfig profile, SkillConfig skillConfig, float radius, float2 bodyOffset,
+private CombatUnit BuildUnit(AttributeProfileConfig profile, SkillConfig skillConfig, float radius, float2 bodyOffset,
             float2 hitEffectOffset, CombatCylinder movement, float2 position, bool player)
         {
             var skill = skillConfig.CombatProfileId_Ref ?? throw new InvalidOperationException("Missing skill combat profile.");
@@ -797,15 +912,17 @@ namespace Roguelike.Features.Combat.Ecs
                 math.abs(position.y + bodyOffset.y) + radius > settings.Arena.y)
                 throw new InvalidOperationException("Combat unit is outside the configured arena.");
             CombatMath.NonNegative(range);
-            if (skill.DeliveryType != (player ? ESkillDeliveryType.Projectile : ESkillDeliveryType.Melee))
+            bool projectile = player && skill.DeliveryType == ESkillDeliveryType.Projectile;
+            if (player ? !projectile && !(settings.IsFormalRun && skill.DeliveryType == ESkillDeliveryType.TargetArea)
+                : skill.DeliveryType != ESkillDeliveryType.Melee)
                 throw new InvalidOperationException($"TbSkillCombat {skill.Id}: unsupported actor delivery role.");
-            if (player)
+            if (projectile)
             {
                 if (!skill.ProjectileSpeedPixelsPerSecond.HasValue || !skillConfig.ProjectileRadiusPixels.HasValue || !skill.ProjectileLifetime.HasValue || !skillConfig.ProjectileOffsetXPixels.HasValue || !skillConfig.ProjectileOffsetYPixels.HasValue)
                     throw new InvalidOperationException($"TbSkillCombat {skill.Id}: missing projectile fields.");
                 CombatMath.Positive(skill.ProjectileSpeedPixelsPerSecond.Value); CombatMath.Positive(skillConfig.ProjectileRadiusPixels.Value); CombatMath.Positive(skill.ProjectileLifetime.Value);
             }
-            else
+            else if (!player)
             {
                 if (!skill.AttackWindupSeconds.HasValue)
                     throw new InvalidOperationException($"TbSkillCombat {skill.Id}: missing attackWindupSeconds.");
@@ -826,11 +943,11 @@ namespace Roguelike.Features.Combat.Ecs
                 BaseInterval = skill.BaseInterval,
                 WindupSeconds = player ? 0 : skill.AttackWindupSeconds.Value,
                 Facing = new float2(settings.Presentation.InitialDirectionId_Ref.X, settings.Presentation.InitialDirectionId_Ref.Y),
-                // 近战不消费弹丸字段；零仅为空布局，不作为弹丸参数兜底。
+                // 近战与正式区域起手不消费弹丸字段；零仅为空布局，不作为弹丸参数兜底。区域武器仍由BuildWeapon校验全部正式投递字段。
                 SkillId = skillConfig.Id,
-                ProjectileOffset = player ? new float2(skillConfig.ProjectileOffsetXPixels.Value, skillConfig.ProjectileOffsetYPixels.Value) * rules.WorldUnitsPerPixel : float2.zero,
-                ProjectileSpeed = player ? skill.ProjectileSpeedPixelsPerSecond.Value * rules.WorldUnitsPerPixel : 0,
-                ProjectileLifetime = player ? skill.ProjectileLifetime.Value : 0, ProjectileRadius = player ? skillConfig.ProjectileRadiusPixels.Value * rules.WorldUnitsPerPixel : 0 };
+                ProjectileOffset = projectile ? new float2(skillConfig.ProjectileOffsetXPixels.Value, skillConfig.ProjectileOffsetYPixels.Value) * rules.WorldUnitsPerPixel : float2.zero,
+                ProjectileSpeed = projectile ? skill.ProjectileSpeedPixelsPerSecond.Value * rules.WorldUnitsPerPixel : 0,
+                ProjectileLifetime = projectile ? skill.ProjectileLifetime.Value : 0, ProjectileRadius = projectile ? skillConfig.ProjectileRadiusPixels.Value * rules.WorldUnitsPerPixel : 0 };
         }
 
         /// <summary>从角色或怪物表构建移动形状，按 collisionShape 决定保留旧圆柱还是启用统一纵向胶囊。</summary>
@@ -874,7 +991,7 @@ namespace Roguelike.Features.Combat.Ecs
         }
 
         /// <summary>退出或初始化失败时只释放本局创建的实体和原生容器，可重复调用。</summary>
-        /// <remarks>不销毁调用者 World、其他单位、资源或场景对象；每个 tick 已同步完成。</remarks>
+        /// <remarks>不销毁调用者World、其他单位、资源或场景对象；每Tick与表现采集任务均已同步完成，释放模拟和表现快照缓冲等会话容器，所有只读借用随即失效。</remarks>
         public void Dispose()
         {
             if (disposed) return;
@@ -887,11 +1004,14 @@ namespace Roguelike.Features.Combat.Ecs
             if (units.IsCreated) units.Dispose();
             if (projectiles.IsCreated) projectiles.Dispose();
             if (templates.IsCreated) templates.Dispose();
+            if (unitStates.IsCreated) unitStates.Dispose();
+            if (presentationUnits.IsCreated) presentationUnits.Dispose();
             if (counters.IsCreated) counters.Dispose();
             if (grid.IsCreated) grid.Dispose();
             if (requests.IsCreated) requests.Dispose();
             if (impacts.IsCreated) impacts.Dispose();
             if (areas.IsCreated) areas.Dispose();
+            if (persistentAreas.IsCreated) persistentAreas.Dispose();
             if (deaths.IsCreated) deaths.Dispose();
             if (attackOptions.IsCreated) attackOptions.Dispose();
             if (playerWeapons.IsCreated) playerWeapons.Dispose();

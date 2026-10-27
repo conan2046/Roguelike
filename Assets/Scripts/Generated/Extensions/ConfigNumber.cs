@@ -130,6 +130,16 @@ namespace cfg
         public float HitFlashB => ConfigNumber.Decode(HitFlashBMilli);
         /// <summary>白闪叠加不透明度 读取 CombatPresentationConfig.hitFlashOpacityMilli，除以 ConfigNumber.Scale 还原原单位。</summary>
         public float HitFlashOpacity => ConfigNumber.Decode(HitFlashOpacityMilli);
+        /// <summary>伤害跳字上升动画时长，读取 TbCombatPresentation.damageNumberRiseDurationMilli 并还原为秒。</summary>
+        public float DamageNumberRiseDurationSeconds => ConfigNumber.Decode(DamageNumberRiseDurationMilli);
+        /// <summary>伤害跳字起始缩放，读取 TbCombatPresentation.damageNumberScaleStartPermille 并还原为倍率。</summary>
+        public float DamageNumberScaleStart => ConfigNumber.Decode(DamageNumberScaleStartPermille);
+        /// <summary>伤害跳字结束缩放，读取 TbCombatPresentation.damageNumberScaleEndPermille 并还原为倍率。</summary>
+        public float DamageNumberScaleEnd => ConfigNumber.Decode(DamageNumberScaleEndPermille);
+        /// <summary>伤害跳字字距，读取 TbCombatPresentation.damageNumberKerningPermille 并还原为倍率。</summary>
+        public float DamageNumberKerning => ConfigNumber.Decode(DamageNumberKerningPermille);
+        /// <summary>伤害跳字字形缩放，读取 TbCombatPresentation.damageNumberGlyphScalePermille 并还原为倍率。</summary>
+        public float DamageNumberGlyphScale => ConfigNumber.Decode(DamageNumberGlyphScalePermille);
     }
 
     /// <summary>CombatRulesConfig 的统一单位换算入口；原始整数保留在 Luban 生成字段中，不维护第二套默认配置。</summary>

@@ -17,7 +17,7 @@ namespace Roguelike.Features.Combat.Runtime
     }
 
     /// <summary>连接纯逻辑单局与 ECS 会话，统一处理时钟、刷怪、死亡、经验、升级、Boss、结算和重开。</summary>
-    public sealed class CombatRunCoordinator
+    public sealed partial class CombatRunCoordinator
     {
         private readonly CombatRunModel model;
         private readonly CombatSession session;
@@ -43,19 +43,21 @@ namespace Roguelike.Features.Combat.Runtime
             var player = session.ReadUnit(0);
             if (player.ConfigId != model.Definition.Character.Id || player.Target.Health != (long)model.CurrentHealth)
                 throw new InvalidOperationException("Formal run model and ECS player do not share the same initial configuration.");
+            if (model.Build != null) session.ApplyWeaponUpgrades(model.Build.CaptureWeapons(), model.AttributeSnapshot);
+            InitializeTribulation();
         }
 
         /// <summary>每渲染帧先推进 ECS 固定 tick，再按真实执行 tick 推进单局时钟并消费全部事件。</summary>
         /// <param name="elapsedSeconds">未缩放渲染时间。</param>
         /// <param name="movement">玩家输入方向。</param>
         /// <returns>本帧实际执行的固定 tick 数。</returns>
-        /// <remarks>升级、暂停和结算冻结会话与规则时钟；生成失败的请求保序等待，不静默丢怪。</remarks>
+        /// <remarks>升级、炼器领奖、暂停和结算冻结会话与规则时钟；TbTribulationRule/Signature在真实固定步后投递正式伤害，再统一消费死亡。生成失败的请求保序等待，不静默丢怪。</remarks>
         /// <exception cref="ArgumentOutOfRangeException">经过时间非法。</exception>
         public int Advance(double elapsedSeconds, float2 movement)
         {
             if (double.IsNaN(elapsedSeconds) || double.IsInfinity(elapsedSeconds) || elapsedSeconds < 0)
                 throw new ArgumentOutOfRangeException(nameof(elapsedSeconds));
-            if (Paused || !IsSimulationActive(model.State))
+            if (Paused || !IsSimulationActive(model.State) || TribulationBlocksSimulation)
             {
                 session.Paused = true;
                 return 0;
@@ -63,21 +65,25 @@ namespace Roguelike.Features.Combat.Runtime
 
             session.Paused = false;
             int steps = session.Advance(elapsedSeconds, movement);
+            int deltaMilli = ConvertTicksToMilliseconds(steps);
+            AdvanceTribulation(deltaMilli);
             ConsumeCombatEvents();
             if (!IsSimulationActive(model.State))
             {
+                if (model.Result.HasValue) { runtimeChests.Clear(); TerminateTribulation(); }
                 session.Paused = true;
                 return steps;
             }
 
-            int deltaMilli = ConvertTicksToMilliseconds(steps);
             if (deltaMilli > 0)
             {
                 EnqueueSpawns(model.Advance(deltaMilli));
                 DrainSpawns();
+                ConsumeRunEvents();
                 AdvanceDrops(steps * session.StepSeconds);
+                CollectNearbyChests();
             }
-            session.Paused = Paused || !IsSimulationActive(model.State);
+            session.Paused = Paused || !IsSimulationActive(model.State) || TribulationBlocksSimulation;
             return steps;
         }
 
@@ -85,40 +91,46 @@ namespace Roguelike.Features.Combat.Runtime
         public void TogglePause()
         {
             if (IsSimulationActive(model.State)) Paused = !Paused;
-            session.Paused = Paused || !IsSimulationActive(model.State);
+            session.Paused = Paused || !IsSimulationActive(model.State) || TribulationBlocksSimulation;
         }
 
         /// <summary>应用当前升级面板中的一项选择，并把属性和生命精确同步回 ECS 玩家。</summary>
         /// <param name="panelGeneration">UI 创建时记录的面板代次。</param>
         /// <param name="optionId">当前候选 TbUpgradeOption.id。</param>
         /// <returns>选择通过模型校验并完成同步时为真。</returns>
-        /// <remarks>技能解锁由后续多武器调度入口消费；本方法已经同步属性与治疗结果。</remarks>
+        /// <remarks>同步活动技能、被动属性和TbRunWeapon.ranks局部倍率；TbTribulationRule待领奖保持冻结，已发射快照不追溯变更。</remarks>
+        /// <exception cref="InvalidOperationException">已验证的选择后玩家生命周期异常改变。</exception>
         public bool ChooseUpgrade(ulong panelGeneration, int optionId)
         {
             if (!model.ChooseUpgrade(panelGeneration, optionId)) return false;
             var player = session.ReadUnit(0);
             if (!session.SynchronizeRunPlayer(player.Target.Lifetime, model.AttributeSnapshot, model.CurrentHealth))
                 throw new InvalidOperationException("Formal player lifecycle changed during upgrade selection.");
-            session.SynchronizePlayerSkills(model.ActiveSkills.Keys);
-            session.Paused = !IsSimulationActive(model.State) || Paused;
+            session.SynchronizePlayerSkills(model.ActiveSkills.Keys, model.Build?.CaptureWeapons());
+            if (model.Build != null) session.ApplyWeaponUpgrades(model.Build.CaptureWeapons(), model.AttributeSnapshot);
+            session.Paused = !IsSimulationActive(model.State) || Paused || TribulationBlocksSimulation;
             return true;
         }
 
         /// <summary>从胜负结算开始下一代单局，并清除实体、掉落、待生成请求和时钟余数。</summary>
         /// <returns>模型处于结算状态并成功重开时为真。</returns>
-        /// <remarks>复用配置、ANI 和实体池；上一代次的掉落及面板句柄失效。</remarks>
+        /// <remarks>复用配置、ANI和实体池；上一代掉落/面板失效，并重建TbTribulationSlice职业、阵域及试炼代次。</remarks>
+        /// <exception cref="InvalidOperationException">重开后玩家不能同步到正式属性或切片规则无效。</exception>
         public bool Restart()
         {
             if (!model.Restart()) return false;
             session.Restart();
             pendingSpawns.Clear();
             drops.Clear();
+            runtimeChests.Clear();
             tickMilliRemainder = 0;
             Paused = false;
             var player = session.ReadUnit(0);
             if (!session.SynchronizeRunPlayer(player.Target.Lifetime, model.AttributeSnapshot, model.CurrentHealth))
                 throw new InvalidOperationException("Formal player failed to synchronize after restart.");
-            session.SynchronizePlayerSkills(model.ActiveSkills.Keys);
+            session.SynchronizePlayerSkills(model.ActiveSkills.Keys, model.Build?.CaptureWeapons());
+            if (model.Build != null) session.ApplyWeaponUpgrades(model.Build.CaptureWeapons(), model.AttributeSnapshot);
+            InitializeTribulation();
             return true;
         }
 
@@ -132,7 +144,16 @@ namespace Roguelike.Features.Combat.Runtime
                 if (death.IsPlayer) continue;
                 ulong dropId = model.RecordMonsterDeath(death.Lifetime, death.IsBoss);
                 if (dropId != 0)
+                {
                     drops.Add(dropId, new CombatRuntimeDrop { Id = dropId, Position = death.Position, State = ExperienceDropState.Dropped });
+                    MonsterConfig monster = model.Definition.Monsters.First(item => item.Id == death.ConfigId);
+                    if (monster.DeathChestProfileId_Ref != null)
+                    {
+                        ulong chestId = model.RegisterChest(monster.DeathChestProfileId_Ref);
+                        if (chestId != 0) runtimeChests.Add(chestId, new CombatRuntimeChest
+                            { Id = chestId, Position = death.Position, Profile = monster.DeathChestProfileId_Ref });
+                    }
+                }
             }
             var player = session.ReadUnit(0);
             double loss = Math.Max(0, model.CurrentHealth - player.Target.Health);
@@ -174,7 +195,7 @@ namespace Roguelike.Features.Combat.Runtime
                 var request = pendingSpawns.Peek();
                 float radius = request.IsBoss
                     ? model.Definition.Boss.SpawnRadiusPixels
-                    : model.Definition.Map.SpawnRadiusPixels;
+                    : request.RunEvent != null ? request.RunEvent.SpawnDistancePixels : model.Definition.Map.SpawnRadiusPixels;
                 if (!session.TrySpawnMonster(request.Monster, radius, request.Sequence, request.IsBoss, out _)) return;
                 pendingSpawns.Dequeue();
             }

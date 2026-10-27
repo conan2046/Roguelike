@@ -19,6 +19,7 @@ namespace Roguelike.Features.Combat.Rendering
         private readonly List<Sprite> sprites = new List<Sprite>();
         private readonly List<Tile> tiles = new List<Tile>();
         private bool disposed;
+        private float worldUnitsPerPixel;
 
         /// <summary>获取本局动态创建且不会保存到 Scene 或 Prefab 的地图根对象。</summary>
         public GameObject Root { get; private set; }
@@ -28,6 +29,9 @@ namespace Roguelike.Features.Combat.Rendering
 
         /// <summary>获取实际渲染格子数。</summary>
         public int TileCount { get; private set; }
+
+        /// <summary>当前实际绘制布局；视野变化后更新，供摄像机使用相同的地面边界。</summary>
+        public CombatMapDefinition Layout { get; private set; }
 
         /// <summary>限制外部直接构造，确保异步资源和 Unity 对象由同一个生命周期所有者管理。</summary>
         private CombatTilemapBackground()
@@ -84,20 +88,17 @@ namespace Roguelike.Features.Combat.Rendering
             }
         }
 
-        /// <summary>将已加载纹理转换为共享 Tile，并以单次 SetTilesBlock 填充 TbMap 指定的格子范围。</summary>
+        /// <summary>将已加载纹理转换为共享 Tile，再按当前布局创建可复用的分块地面。</summary>
         /// <param name="definition">确定性地块选择和地图尺寸定义。</param>
         /// <param name="worldUnitsPerPixel">TbCombatRules.worldUnitsPerPixel 直接比例值。</param>
         /// <param name="parent">本局运行器根节点。</param>
-        /// <remarks>只生成两个 GameObject；1024 个逻辑格不生成独立 Transform 或 SpriteRenderer。</remarks>
+        /// <remarks>只生成两个 GameObject；逻辑格不生成独立 Transform 或 SpriteRenderer，视野变化复用全部纹理与 Tile。</remarks>
         private void Build(CombatMapDefinition definition, float worldUnitsPerPixel, Transform parent)
         {
+            this.worldUnitsPerPixel = worldUnitsPerPixel;
             float cellWorldSize = definition.Map.TileSizePixels * worldUnitsPerPixel;
             Root = new GameObject("[Roguelike.Map]");
             Root.transform.SetParent(parent, false);
-            Root.transform.localPosition = new Vector3(
-                -definition.Map.MapWidthPixels * worldUnitsPerPixel * 0.5f,
-                -definition.Map.MapHeightPixels * worldUnitsPerPixel * 0.5f,
-                BackgroundDepth);
             Grid grid = Root.AddComponent<Grid>();
             grid.cellLayout = GridLayout.CellLayout.Rectangle;
             grid.cellSize = new Vector3(cellWorldSize, cellWorldSize, 1f);
@@ -125,17 +126,48 @@ namespace Roguelike.Features.Combat.Rendering
                 tiles.Add(tile);
             }
 
+            Populate(definition);
+        }
+
+        /// <summary>相机视野变化时只在跨越地块阈值后重铺背景，四边始终覆盖行走范围外半个视野。</summary>
+        /// <param name="viewportAspect">当前摄像机宽高比。</param>
+        /// <returns>布局实际重建时为真；相同格子范围不做分配或写入。</returns>
+        /// <remarks>只修改本局 Tilemap 和地面根位置，不重新加载纹理或生成持久资源。</remarks>
+        /// <exception cref="ObjectDisposedException">地图已释放。</exception>
+        /// <exception cref="InvalidOperationException">由 TbMap 与视野推导的尺寸非法。</exception>
+        public bool FitViewport(float viewportAspect)
+        {
+            if (disposed) throw new ObjectDisposedException(nameof(CombatTilemapBackground));
+            CombatMapDefinition fitted = Layout.FitViewport(viewportAspect);
+            if (ReferenceEquals(fitted, Layout)) return false;
+            Populate(fitted);
+            return true;
+        }
+
+        /// <summary>初始化或地块范围改变时铺设对称背景，按世界格子坐标保持已有地块纹理稳定。</summary>
+        /// <param name="definition">TbMap 和当前可见范围派生的布局。</param>
+        /// <remarks>清除旧范围并复用当前 Tile/Sprite；根坐标及格子边界使用同一实际宽高，不修改 Scene 或配置。</remarks>
+        private void Populate(CombatMapDefinition definition)
+        {
+            Root.transform.localPosition = new Vector3(
+                -definition.WidthPixels * worldUnitsPerPixel * 0.5f,
+                -definition.HeightPixels * worldUnitsPerPixel * 0.5f,
+                BackgroundDepth);
+
             var tileValues = new TileBase[definition.TileCount];
             int offset = 0;
             for (int y = 0; y < definition.Rows; y++)
             {
                 for (int x = 0; x < definition.Columns; x++)
                 {
-                    tileValues[offset++] = tiles[definition.SelectTileIndex(x, y)];
+                    tileValues[offset++] = tiles[definition.SelectTileIndexAtCell(x - definition.Columns / 2, y - definition.Rows / 2)];
                 }
             }
 
+            Tilemap.ClearAllTiles();
             Tilemap.SetTilesBlock(new BoundsInt(0, 0, 0, definition.Columns, definition.Rows, 1), tileValues);
+            Tilemap.CompressBounds();
+            Layout = definition;
             TileCount = tileValues.Length;
         }
 
@@ -161,6 +193,7 @@ namespace Roguelike.Features.Combat.Rendering
             foreach (IResourceHandle<Texture2D> handle in textureHandles) handle.Dispose();
             textureHandles.Clear();
             TileCount = 0;
+            Layout = null;
         }
 
         /// <summary>在运行模式延迟销毁 Unity 对象，在 EditMode 测试中立即回收内存对象。</summary>

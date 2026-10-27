@@ -22,6 +22,7 @@ public sealed partial class ResourceConfig : Luban.BeanBase
         Id = _buf.ReadInt();
         Type = (EResourceType)_buf.ReadInt();
         Path = _buf.ReadString();
+        Package = (EResourcePackage)_buf.ReadInt();
     }
 
     public static ResourceConfig DeserializeResourceConfig(ByteBuf _buf)
@@ -41,6 +42,10 @@ public sealed partial class ResourceConfig : Luban.BeanBase
     /// 相对 StreamingAssets 的资源路径，仅允许本表保存路径
     /// </summary>
     public readonly string Path;
+    /// <summary>
+    /// YooAsset 包归属（Raw 原始字节；GameAsset Unity 资产）
+    /// </summary>
+    public readonly EResourcePackage Package;
    
     public const int __ID__ = -1505018608;
     public override int GetTypeId() => __ID__;
@@ -55,6 +60,7 @@ public sealed partial class ResourceConfig : Luban.BeanBase
         + "id:" + Id + ","
         + "type:" + Type + ","
         + "path:" + Path + ","
+        + "package:" + Package + ","
         + "}";
     }
 }

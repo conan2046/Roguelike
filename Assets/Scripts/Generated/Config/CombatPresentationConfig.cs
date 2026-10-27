@@ -65,6 +65,20 @@ public sealed partial class CombatPresentationConfig : Luban.BeanBase
         FeedbackRenderQueue = _buf.ReadInt();
         HealthBarWidthPixels = _buf.ReadFloat();
         HealthBarHeightPixels = _buf.ReadFloat();
+        HealthBarFrameResourceId = _buf.ReadInt();
+        HealthBarFrameResourceId_Ref = null;
+        HealthBarFillResourceId = _buf.ReadInt();
+        HealthBarFillResourceId_Ref = null;
+        DamageNumberAtlasResourceId = _buf.ReadInt();
+        DamageNumberAtlasResourceId_Ref = null;
+        DamageNumberGlyphs = _buf.ReadString();
+        DamageNumberRiseDurationMilli = _buf.ReadInt();
+        DamageNumberRiseHeightPixels = _buf.ReadFloat();
+        DamageNumberScaleStartPermille = _buf.ReadInt();
+        DamageNumberScaleEndPermille = _buf.ReadInt();
+        DamageNumberKerningPermille = _buf.ReadInt();
+        DamageNumberGlyphScalePermille = _buf.ReadInt();
+        {int n0 = _buf.ReadSize(); RenderConfigIds = new System.Collections.Generic.List<int>(n0);for(var i0 = 0 ; i0 < n0 ; i0++) { int _e0;  _e0 = _buf.ReadInt(); RenderConfigIds.Add(_e0);}}
     }
 
     public static CombatPresentationConfig DeserializeCombatPresentationConfig(ByteBuf _buf)
@@ -255,6 +269,54 @@ public sealed partial class CombatPresentationConfig : Luban.BeanBase
     /// 战斗血条最终显示高度；由 CombatHealthBar Prefab 导出，逻辑像素；直接填写像素值，最多3位小数。
     /// </summary>
     public readonly float HealthBarHeightPixels;
+    /// <summary>
+    /// 血条底框纹理资源；引用 TbResource Texture。
+    /// </summary>
+    public readonly int HealthBarFrameResourceId;
+    public ResourceConfig HealthBarFrameResourceId_Ref;
+    /// <summary>
+    /// 血条填充纹理资源；引用 TbResource Texture。
+    /// </summary>
+    public readonly int HealthBarFillResourceId;
+    public ResourceConfig HealthBarFillResourceId_Ref;
+    /// <summary>
+    /// 伤害数字横向等分图集；引用 TbResource Texture。
+    /// </summary>
+    public readonly int DamageNumberAtlasResourceId;
+    public ResourceConfig DamageNumberAtlasResourceId_Ref;
+    /// <summary>
+    /// 伤害数字图集从左到右的字符顺序；字符必须唯一并包含 0-9。
+    /// </summary>
+    public readonly string DamageNumberGlyphs;
+    /// <summary>
+    /// 伤害数字上升动画持续秒数；原单位&#215;1000存整数，实际值=表值/1000。
+    /// </summary>
+    public readonly int DamageNumberRiseDurationMilli;
+    /// <summary>
+    /// 伤害数字上升距离；逻辑像素，运行时按战斗规则转换世界单位。
+    /// </summary>
+    public readonly float DamageNumberRiseHeightPixels;
+    /// <summary>
+    /// 伤害数字动画起始缩放；千分比，1000=1倍。
+    /// </summary>
+    public readonly int DamageNumberScaleStartPermille;
+    /// <summary>
+    /// 伤害数字动画结束缩放；千分比，1000=1倍。
+    /// </summary>
+    public readonly int DamageNumberScaleEndPermille;
+    /// <summary>
+    /// 相邻伤害数字字形间距；千分比，1000=完整字宽。
+    /// </summary>
+    public readonly int DamageNumberKerningPermille;
+    /// <summary>
+    /// 伤害数字字形基础缩放；千分比，1000=图集原始逻辑像素尺寸。
+    /// </summary>
+    public readonly int DamageNumberGlyphScalePermille;
+    /// <summary>
+    /// 模型与技能片段层级绑定目录；运行时必须显式匹配，不使用统一层级回退。
+    /// </summary>
+    public readonly System.Collections.Generic.List<int> RenderConfigIds;
+    public System.Collections.Generic.List<CombatRenderConfig> RenderConfigIds_Ref;
    
     public const int __ID__ = 600358192;
     public override int GetTypeId() => __ID__;
@@ -267,6 +329,12 @@ public sealed partial class CombatPresentationConfig : Luban.BeanBase
 
         AttackDirectionIds_Ref = new System.Collections.Generic.List<AttackDirectionConfig>();
         foreach (var _v in AttackDirectionIds) { AttackDirectionIds_Ref.Add(tables.TbAttackDirection.GetOrDefault(_v)); }
+
+        HealthBarFrameResourceId_Ref = tables.TbResource.GetOrDefault(HealthBarFrameResourceId);
+        HealthBarFillResourceId_Ref = tables.TbResource.GetOrDefault(HealthBarFillResourceId);
+        DamageNumberAtlasResourceId_Ref = tables.TbResource.GetOrDefault(DamageNumberAtlasResourceId);
+        RenderConfigIds_Ref = new System.Collections.Generic.List<CombatRenderConfig>();
+        foreach (var _v in RenderConfigIds) { RenderConfigIds_Ref.Add(tables.TbCombatRender.GetOrDefault(_v)); }
 
     }
 
@@ -318,6 +386,17 @@ public sealed partial class CombatPresentationConfig : Luban.BeanBase
         + "feedbackRenderQueue:" + FeedbackRenderQueue + ","
         + "healthBarWidthPixels:" + HealthBarWidthPixels + ","
         + "healthBarHeightPixels:" + HealthBarHeightPixels + ","
+        + "healthBarFrameResourceId:" + HealthBarFrameResourceId + ","
+        + "healthBarFillResourceId:" + HealthBarFillResourceId + ","
+        + "damageNumberAtlasResourceId:" + DamageNumberAtlasResourceId + ","
+        + "damageNumberGlyphs:" + DamageNumberGlyphs + ","
+        + "damageNumberRiseDurationMilli:" + DamageNumberRiseDurationMilli + ","
+        + "damageNumberRiseHeightPixels:" + DamageNumberRiseHeightPixels + ","
+        + "damageNumberScaleStartPermille:" + DamageNumberScaleStartPermille + ","
+        + "damageNumberScaleEndPermille:" + DamageNumberScaleEndPermille + ","
+        + "damageNumberKerningPermille:" + DamageNumberKerningPermille + ","
+        + "damageNumberGlyphScalePermille:" + DamageNumberGlyphScalePermille + ","
+        + "renderConfigIds:" + Luban.StringUtil.CollectionToString(RenderConfigIds) + ","
         + "}";
     }
 }

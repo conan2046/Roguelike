@@ -37,7 +37,7 @@ namespace Roguelike.Features.Combat.Ecs
             return new CombatSession(world, scenario, options);
         }
 
-        /// <summary>为正式关卡预加载全部普通怪和 Boss 的攻击 ANI 时序，再创建动态生成会话。</summary>
+        /// <summary>为正式关卡预加载普通怪、事件精英和 Boss 的攻击 ANI 时序，再创建动态生成会话。</summary>
         /// <param name="world">调用者持有的 Unity 主线程世界。</param>
         /// <param name="definition">由 TbStage 聚合并验证的正式单局定义。</param>
         /// <param name="resources">已初始化的资源服务。</param>

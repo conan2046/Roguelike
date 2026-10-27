@@ -48,7 +48,7 @@ namespace Roguelike.Infrastructure.Configuration
         public async Task InitializeAsync(CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            ResourcePackage package = packageInitializer.Package;
+            ResourcePackage package = packageInitializer.RawPackage;
             AssetInfo[] assets = package.GetAssetInfos(YooAssetProjectConstants.LubanConfigTag);
             if (assets == null || assets.Length == 0)
             {

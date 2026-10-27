@@ -25,19 +25,25 @@ namespace Roguelike.Infrastructure.Resources
     /// </summary>
     public class YooAssetPackageInitializer : IDisposable
     {
-        private ResourcePackage package;
+        private ResourcePackage rawPackage;
+        private ResourcePackage gameAssetPackage;
         private bool disposed;
 
         /// <summary>
-        /// Gets the initialized package used by configuration and resource services.
+        /// Gets the initialized RawBundle package used by Luban and legacy byte resources.
         /// </summary>
         /// <exception cref="InvalidOperationException">Thrown before successful package initialization.</exception>
-        public ResourcePackage Package => package != null && package.InitializeStatus == EOperationStatus.Succeed
-            ? package
-            : throw new InvalidOperationException("YooAsset package is not initialized.");
+        public ResourcePackage RawPackage => RequireInitialized(rawPackage, YooAssetProjectConstants.RawPackageName);
 
         /// <summary>
-        /// Initializes YooAsset and the default package for EditorSimulate or Offline play.
+        /// Gets the initialized AssetBundle package used by imported Unity assets.
+        /// </summary>
+        /// <exception cref="InvalidOperationException">Thrown before successful package initialization.</exception>
+        public ResourcePackage GameAssetPackage =>
+            RequireInitialized(gameAssetPackage, YooAssetProjectConstants.GameAssetPackageName);
+
+        /// <summary>
+        /// Initializes YooAsset, the Raw package, and the imported-asset package for EditorSimulate or Offline play.
         /// </summary>
         /// <param name="playMode">Provider policy selected by the application composition root.</param>
         /// <param name="cancellationToken">Token observed before and after YooAsset's operation.</param>
@@ -55,46 +61,76 @@ namespace Roguelike.Infrastructure.Resources
                 YooAssets.Initialize();
             }
 
-            package = YooAssets.TryGetPackage(YooAssetProjectConstants.PackageName)
-                      ?? YooAssets.CreatePackage(YooAssetProjectConstants.PackageName);
+            rawPackage = await InitializePackageAsync(
+                YooAssetProjectConstants.RawPackageName,
+                playMode,
+                cancellationToken);
+            gameAssetPackage = await InitializePackageAsync(
+                YooAssetProjectConstants.GameAssetPackageName,
+                playMode,
+                cancellationToken);
+        }
 
-            InitializeParameters parameters = CreateParameters(playMode);
-            InitializationOperation operation = package.InitializeAsync(parameters);
+        /// <summary>
+        /// Creates, initializes, and activates one named local YooAsset package.
+        /// </summary>
+        /// <param name="packageName">Stable package name declared by the project collector setup.</param>
+        /// <param name="playMode">Provider policy selected by the application composition root.</param>
+        /// <param name="cancellationToken">Token observed around every provider operation.</param>
+        /// <returns>The initialized package with an active local manifest.</returns>
+        /// <exception cref="InvalidOperationException">Thrown when YooAsset initialization or manifest activation fails.</exception>
+        /// <remarks>The returned package remains owned by this initializer until application shutdown.</remarks>
+        private async Task<ResourcePackage> InitializePackageAsync(
+            string packageName,
+            ResourcePlayMode playMode,
+            CancellationToken cancellationToken)
+        {
+            ResourcePackage targetPackage = YooAssets.TryGetPackage(packageName)
+                                            ?? YooAssets.CreatePackage(packageName);
+            InitializeParameters parameters = CreateParameters(playMode, packageName);
+            InitializationOperation operation = targetPackage.InitializeAsync(parameters);
             await operation.Task;
             cancellationToken.ThrowIfCancellationRequested();
 
             if (operation.Status != EOperationStatus.Succeed)
             {
-                throw new InvalidOperationException($"YooAsset package initialization failed: {operation.Error}");
+                throw new InvalidOperationException(
+                    $"YooAsset package '{packageName}' initialization failed: {operation.Error}");
             }
 
-            await ActivateLocalManifestAsync(cancellationToken);
+            await ActivateLocalManifestAsync(targetPackage, cancellationToken);
+            return targetPackage;
         }
 
         /// <summary>
         /// Requests the version available in the selected local file system and activates its manifest before services can query assets.
         /// </summary>
+        /// <param name="targetPackage">Initialized package whose local manifest will be activated.</param>
         /// <param name="cancellationToken">Token observed between YooAsset's version and manifest operations.</param>
         /// <returns>A task that completes when the package exposes an active manifest.</returns>
         /// <exception cref="InvalidOperationException">Thrown when the local version or manifest cannot be loaded.</exception>
         /// <remarks>Replaces the package's active manifest after both provider operations complete successfully.</remarks>
-        private async Task ActivateLocalManifestAsync(CancellationToken cancellationToken)
+        private static async Task ActivateLocalManifestAsync(
+            ResourcePackage targetPackage,
+            CancellationToken cancellationToken)
         {
-            RequestPackageVersionOperation versionOperation = package.RequestPackageVersionAsync(false);
+            RequestPackageVersionOperation versionOperation = targetPackage.RequestPackageVersionAsync(false);
             await versionOperation.Task;
             cancellationToken.ThrowIfCancellationRequested();
             if (versionOperation.Status != EOperationStatus.Succeed)
             {
-                throw new InvalidOperationException($"YooAsset package version request failed: {versionOperation.Error}");
+                throw new InvalidOperationException(
+                    $"YooAsset package '{targetPackage.PackageName}' version request failed: {versionOperation.Error}");
             }
 
             UpdatePackageManifestOperation manifestOperation =
-                package.UpdatePackageManifestAsync(versionOperation.PackageVersion);
+                targetPackage.UpdatePackageManifestAsync(versionOperation.PackageVersion);
             await manifestOperation.Task;
             cancellationToken.ThrowIfCancellationRequested();
             if (manifestOperation.Status != EOperationStatus.Succeed)
             {
-                throw new InvalidOperationException($"YooAsset package manifest activation failed: {manifestOperation.Error}");
+                throw new InvalidOperationException(
+                    $"YooAsset package '{targetPackage.PackageName}' manifest activation failed: {manifestOperation.Error}");
             }
         }
 
@@ -102,16 +138,17 @@ namespace Roguelike.Infrastructure.Resources
         /// Creates provider parameters for the selected local play mode and routes Host mode to its future extension hook.
         /// </summary>
         /// <param name="playMode">Resource startup policy selected by the application.</param>
-        /// <returns>YooAsset initialization parameters for the default package.</returns>
+        /// <param name="packageName">Package name used by EditorSimulate to build the matching virtual manifest.</param>
+        /// <returns>YooAsset initialization parameters for the requested package.</returns>
         /// <exception cref="ArgumentOutOfRangeException">Thrown for an unknown play mode.</exception>
         /// <remarks>EditorSimulate invokes YooAsset's simulate build and writes transient output under the ignored Bundles directory.</remarks>
-        private InitializeParameters CreateParameters(ResourcePlayMode playMode)
+        private InitializeParameters CreateParameters(ResourcePlayMode playMode, string packageName)
         {
             switch (playMode)
             {
                 case ResourcePlayMode.EditorSimulate:
 #if UNITY_EDITOR
-                    PackageInvokeBuildResult buildResult = EditorSimulateModeHelper.SimulateBuild(YooAssetProjectConstants.PackageName);
+                    PackageInvokeBuildResult buildResult = EditorSimulateModeHelper.SimulateBuild(packageName);
                     return new EditorSimulateModeParameters
                     {
                         EditorFileSystemParameters =
@@ -154,7 +191,8 @@ namespace Roguelike.Infrastructure.Resources
             }
 
             disposed = true;
-            package = null;
+            rawPackage = null;
+            gameAssetPackage = null;
             if (YooAssets.Initialized)
             {
                 YooAssets.Destroy();
@@ -171,6 +209,20 @@ namespace Roguelike.Infrastructure.Resources
             {
                 throw new ObjectDisposedException(nameof(YooAssetPackageInitializer));
             }
+        }
+
+        /// <summary>
+        /// Verifies that a package completed initialization before exposing it to a service.
+        /// </summary>
+        /// <param name="targetPackage">Package instance owned by this initializer.</param>
+        /// <param name="packageName">Diagnostic package name used before an instance is available.</param>
+        /// <returns>The successfully initialized package.</returns>
+        /// <exception cref="InvalidOperationException">Thrown when initialization has not completed successfully.</exception>
+        private static ResourcePackage RequireInitialized(ResourcePackage targetPackage, string packageName)
+        {
+            return targetPackage != null && targetPackage.InitializeStatus == EOperationStatus.Succeed
+                ? targetPackage
+                : throw new InvalidOperationException($"YooAsset package '{packageName}' is not initialized.");
         }
     }
 }

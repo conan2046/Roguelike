@@ -46,8 +46,9 @@ namespace Roguelike.Infrastructure.Resources
                 throw new ArgumentException($"Resource type '{typeof(TAsset).FullName}' is not a Unity asset.", nameof(TAsset));
             }
 
-            string location = ResolveLocation(resourceId);
-            AssetHandle handle = packageInitializer.Package.LoadAssetAsync(location, typeof(TAsset));
+            ResourceConfig resource = ResolveResource(resourceId);
+            RequirePackage(resource, EResourcePackage.GameAsset, nameof(LoadAssetAsync));
+            AssetHandle handle = packageInitializer.GameAssetPackage.LoadAssetAsync(resource.Path, typeof(TAsset));
             try
             {
                 await handle.Task;
@@ -82,8 +83,9 @@ namespace Roguelike.Infrastructure.Resources
         public async Task<IRawResourceHandle> LoadRawFileAsync(int resourceId, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            string location = ResolveLocation(resourceId);
-            RawFileHandle handle = packageInitializer.Package.LoadRawFileAsync(location);
+            ResourceConfig resource = ResolveResource(resourceId);
+            RequirePackage(resource, EResourcePackage.Raw, nameof(LoadRawFileAsync));
+            RawFileHandle handle = packageInitializer.RawPackage.LoadRawFileAsync(resource.Path);
             try
             {
                 await handle.Task;
@@ -103,12 +105,12 @@ namespace Roguelike.Infrastructure.Resources
         }
 
         /// <summary>
-        /// Reads the provider address exclusively from the generated TbResource path field.
+        /// Resolves the provider address and package exclusively from the generated TbResource row.
         /// </summary>
         /// <param name="resourceId">Identifier from Luban TbResource.id.</param>
-        /// <returns>The YooAsset location stored in the table row.</returns>
+        /// <returns>The validated Luban TbResource row.</returns>
         /// <exception cref="KeyNotFoundException">Thrown when the ID or its path is missing.</exception>
-        private string ResolveLocation(int resourceId)
+        private ResourceConfig ResolveResource(int resourceId)
         {
             ResourceConfig resource = configService.Tables.TbResource.GetOrDefault(resourceId);
             if (resource == null || string.IsNullOrWhiteSpace(resource.Path))
@@ -116,7 +118,27 @@ namespace Roguelike.Infrastructure.Resources
                 throw new KeyNotFoundException($"Luban TbResource does not contain a valid path for ID {resourceId}.");
             }
 
-            return resource.Path;
+            return resource;
+        }
+
+        /// <summary>
+        /// Rejects a caller that requests a provider API incompatible with the Luban-declared package.
+        /// </summary>
+        /// <param name="resource">Resolved row from Luban TbResource.</param>
+        /// <param name="expectedPackage">Package required by the selected resource API.</param>
+        /// <param name="operation">Calling operation name included in diagnostics.</param>
+        /// <exception cref="InvalidOperationException">Thrown when the row belongs to another package.</exception>
+        private static void RequirePackage(
+            ResourceConfig resource,
+            EResourcePackage expectedPackage,
+            string operation)
+        {
+            if (resource.Package != expectedPackage)
+            {
+                throw new InvalidOperationException(
+                    $"Resource ID {resource.Id} uses package '{resource.Package}' and cannot be loaded by {operation}; " +
+                    $"expected package '{expectedPackage}'.");
+            }
         }
 
         /// <summary>
