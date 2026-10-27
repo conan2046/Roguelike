@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="2220" viewBox="0 0 1600 2220">
+  <defs>
+    <marker id="arrow" markerWidth="14" markerHeight="10" refX="12" refY="5" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L14,5 L0,10 z" fill="#3445db"/>
+    </marker>
+    <style>
+      .title{font:700 46px 'Microsoft YaHei','Noto Sans SC',sans-serif;fill:#16213e}
+      .node{fill:#eef4ff;stroke:#3445db;stroke-width:4}
+      .decision{fill:#fff2d9;stroke:#d98200;stroke-width:4}
+      .text{font:600 28px 'Microsoft YaHei','Noto Sans SC',sans-serif;fill:#1d2a44;text-anchor:middle;dominant-baseline:middle}
+      .small{font:500 24px 'Microsoft YaHei','Noto Sans SC',sans-serif;fill:#1d2a44;text-anchor:middle;dominant-baseline:middle}
+      .label{font:700 23px 'Microsoft YaHei','Noto Sans SC',sans-serif;fill:#3445db;text-anchor:middle}
+      .line{fill:none;stroke:#3445db;stroke-width:5;marker-end:url(#arrow)}
+    </style>
+  </defs>
+  <rect width="1600" height="2220" fill="#ffffff"/>
+  <text x="800" y="70" class="title" text-anchor="middle">局内三选一升级流程</text>
+
+  <rect x="530" y="120" width="540" height="90" rx="45" class="node"/>
+  <text x="800" y="165" class="text">经验满足升级条件</text>
+  <path d="M800 210 V280" class="line"/>
+
+  <rect x="430" y="290" width="740" height="100" rx="18" class="node"/>
+  <text x="800" y="340" class="text">读取关卡引用的 TbUpgradePool</text>
+  <path d="M800 390 V460" class="line"/>
+
+  <rect x="310" y="470" width="980" height="120" rx="18" class="node"/>
+  <text x="800" y="510" class="text">按 optionId 排序并依次过滤</text>
+  <text x="800" y="555" class="small">满级 → 即时效果不可用</text>
+  <path d="M800 590 V670" class="line"/>
+
+  <polygon points="800,680 1040,810 800,940 560,810" class="decision"/>
+  <text x="800" y="790" class="text">合法候选是否达到</text>
+  <text x="800" y="830" class="text">drawCount？</text>
+
+  <path d="M1040 810 H1310 V1020" class="line"/>
+  <text x="1165" y="785" class="label">否</text>
+  <rect x="1120" y="1030" width="380" height="110" rx="18" class="decision"/>
+  <text x="1310" y="1065" class="small">执行表内耗尽策略</text>
+  <text x="1310" y="1105" class="small">降量 / 后备池 / 结束</text>
+  <path d="M1310 1140 V1220" class="line"/>
+  <polygon points="1310,1230 1490,1330 1310,1430 1130,1330" class="decision"/>
+  <text x="1310" y="1310" class="small">是否还有</text>
+  <text x="1310" y="1350" class="small">可展示候选？</text>
+  <path d="M1490 1330 H1540 V1510 H1480" class="line"/>
+  <text x="1520" y="1305" class="label">否</text>
+  <rect x="1030" y="1455" width="450" height="110" rx="18" fill="#e7f8ed" stroke="#208a4d" stroke-width="4"/>
+  <text x="1255" y="1490" class="small">结束本次选择</text>
+  <text x="1255" y="1530" class="small">不打开空面板并恢复战斗</text>
+  <path d="M1130 1330 H1040 V1060 H940" class="line"/>
+  <text x="1080" y="1305" class="label">是</text>
+
+  <path d="M560 810 H290 V1020" class="line"/>
+  <text x="435" y="785" class="label">是</text>
+  <rect x="100" y="1030" width="840" height="110" rx="18" class="node"/>
+  <text x="520" y="1065" class="text">确定性权重无放回抽取</text>
+  <text x="520" y="1105" class="small">展示 1～drawCount 张升级卡</text>
+  <path d="M520 1140 V1220" class="line"/>
+
+  <rect x="180" y="1230" width="680" height="100" rx="18" class="node"/>
+  <text x="520" y="1280" class="text">玩家选择并锁定本代面板</text>
+  <path d="M520 1330 V1410" class="line"/>
+
+  <rect x="120" y="1420" width="800" height="120" rx="18" class="node"/>
+  <text x="520" y="1460" class="text">校验面板代次与选项状态</text>
+  <text x="520" y="1505" class="small">校验通过前不改变正式局内状态</text>
+  <path d="M520 1540 V1620" class="line"/>
+
+  <polygon points="520,1630 750,1750 520,1870 290,1750" class="decision"/>
+  <text x="520" y="1730" class="text">效果执行</text>
+  <text x="520" y="1770" class="text">是否成功？</text>
+
+  <path d="M290 1750 H110 V2030 H160" class="line"/>
+  <text x="205" y="1725" class="label">是</text>
+  <rect x="160" y="1970" width="720" height="120" rx="18" fill="#e7f8ed" stroke="#208a4d" stroke-width="4"/>
+  <text x="520" y="2010" class="text">提交等级与局内状态</text>
+  <text x="520" y="2055" class="small">关闭面板并恢复战斗</text>
+
+  <path d="M750 1750 H1160 V1860" class="line"/>
+  <text x="950" y="1725" class="label">否</text>
+  <rect x="990" y="1870" width="500" height="110" rx="18" fill="#fff0f0" stroke="#c33a3a" stroke-width="4"/>
+  <text x="1240" y="1905" class="small">拒绝提交并保留面板</text>
+  <text x="1240" y="1945" class="small">记录可定位错误</text>
+</svg>

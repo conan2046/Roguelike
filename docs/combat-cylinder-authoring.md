@@ -18,7 +18,7 @@
 2. 选择同级 `命中特效挂点`，用 Transform 的 Position X/Y 或场景移动手柄调整被弹丸命中时的特效播放点；挂点与碰撞范围互不影响。
 3. 胶囊必须保持 `Vertical`、`Is Trigger`，且 `Size Y >= Size X`；不要增加 Rigidbody2D，也不要把 Physics2D 当运行时判定源。
 4. 不要用根节点或碰撞节点缩放修改碰撞。根缩放只控制视觉；保存时工具按 `TbCombatRules.worldUnitsPerPixel` 将 Collider2D 的 Offset/Size 换算为像素。
-5. 保存 Prefab，打开 **Roguelike > 战斗 > 碰撞配置 > 打开配置窗口**，点击 **导出全部预制体并生成配置**。角色表、怪物表、技能表和 Luban 只生成一次；未保存的 Prefab Stage 会拒绝导出。
+5. 保存 Prefab，先执行 **预览全部导出变更（不写表）**；确认 `Library/CombatAuthoringDryRun.log` 无冲突后，再点击 **导出全部预制体并生成配置**。角色表、怪物表、技能表和 Luban 只生成一次；未保存的 Prefab Stage 会拒绝导出。
 6. 重新进入战斗。运行中不会读取正在编辑的 Prefab 参数。
 
 Collider2D 编辑平面与战斗平面均为 XY。导出后 DOTS 使用等价的纵向胶囊数学进行移动扫掠、受击、近战、弹丸和范围命中；运行时不启用、不查询 Physics2D。
@@ -41,10 +41,19 @@ Collider2D 编辑平面与战斗平面均为 XY。导出后 DOTS 使用等价的
 - **生成缺失的技能碰撞预制体**：按技能投递类型创建 `弹丸命中范围` 或 `范围技能命中范围`。
 - **迁移测试关卡 Collider2D**：只迁移 TbStage 1 引用闭包；单位使用纵向胶囊，弹丸/目标位置范围技能使用圆形 Collider2D，近战不创建独立碰撞编辑器。
 - **迁移全部角色怪物技能 Collider2D**：迁移全部角色、怪物及所有弹丸/目标位置范围技能；近战和未接入战斗的技能不创建无意义碰撞圆。
+- **预览全部导出变更（不写表）**：按表、ID、字段记录 Excel 旧值与 Prefab 新值；不写 Excel、Prefab 或 Luban。人工改过 Prefab 拥有字段时会报告冲突并阻止正式导出。
 - **导出全部预制体并生成配置**：统一更新三张业务 Excel 和表现缩放，再调用一次生成脚本。日志为 `Library/CombatCollisionExport.log`。
 - **刷新修改状态**：检查模板与生成 bytes 一致性，列出待导出资源；窗口获得焦点时也会刷新。
 
 移动字段为 `moveRadiusPixels`、`moveHeightPixels`、`moveOffsetXPixels`、`moveOffsetYPixels`、`moveElevationPixels`；受击字段为 `bodyRadiusPixels`、`bodyOffsetXPixels`、`bodyOffsetYPixels`；命中特效挂点字段为 `hitEffectOffsetXPixels`、`hitEffectOffsetYPixels`。合并胶囊会把前两组字段写成同一几何，`collisionShape=VerticalCapsule`。全部直接存储像素浮点值，最多三位小数，不再乘 1000。Prefab 是编辑源，表是运行时可审计结果；运行时只读 Luban，不读 Prefab。
+
+## 字段所有权与冲突保护
+
+- Prefab 拥有：单位碰撞/受击范围、命中特效挂点、视觉等比缩放、技能碰撞与表现偏移、血条宽高。
+- Excel 拥有：规则、数值、概率、文本、资源关系及跨表引用；Prefab 导出不会改这些字段。
+- `Config/Authoring/combat-prefab-ownership.json` 保存最近一次成功导出的字段级基线，键为工作簿、ID、字段；清单不保存本机绝对路径。
+- 首次建立基线时，Excel 当前值必须与 Prefab 一致。建立后若 Excel 当前值同时不同于上次基线和本次 Prefab 值，视为人工修改冲突；工具只报告，不覆盖。
+- 正式导出必定先完整 Dry Run；仅在无冲突、Luban 生成及回读校验成功后更新基线。其他 Excel 字段和用户未保存的 Prefab/Scene 不在保存范围内。
 
 ## 技能碰撞
 

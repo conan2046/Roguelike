@@ -34,12 +34,12 @@ cd Roguelike
 ### Windows 离线包
 
 Windows Player 固定使用 YooAsset `OfflinePlayMode`。构建脚本会先校验 Luban，完整重建
-`DefaultPackage` 并同步到内置资源目录，然后构建 Player 和执行启动冒烟验证。
+RawBundle `DefaultPackage` 与 AssetBundle `GameAssetPackage` 并同步到各自内置资源目录，然后构建 Player 和执行启动冒烟验证。
 
 将 `$UnityEditorPath` 设为本机 Unity 2022.3.62f3 的 `Unity.exe` 路径后执行：
 
 ```powershell
-./Tools/Build/build-windows-offline.ps1 `
+pwsh -NoProfile -File ./Tools/Build/build-windows-offline.ps1 `
   -UnityEditorPath $UnityEditorPath `
   -PackageVersion '1.0.0'
 ```
@@ -53,7 +53,7 @@ Windows Player 固定使用 YooAsset `OfflinePlayMode`。构建脚本会先校�
 `TbPerformanceScenario`。以下命令构建离线 Win64 Player，并运行场景 1 的 1000 实体测试：
 
 ```powershell
-./Tools/Performance/run-performance-scenario.ps1 `
+pwsh -NoProfile -File ./Tools/Performance/run-performance-scenario.ps1 `
   -UnityEditorPath $UnityEditorPath `
   -PackageVersion '1.0.0-perf' `
   -ScenarioId 1
@@ -71,7 +71,7 @@ Excel 是配置数据的唯一来源。表结构和源数据位于 `Config/Datas
 
 ```powershell
 # Windows
-./Tools/Config/generate.ps1
+pwsh -NoProfile -File ./Tools/Config/generate.ps1
 ```
 
 ```bash
@@ -83,7 +83,7 @@ bash ./Tools/Config/generate.sh
 
 ```powershell
 # Windows
-./Tools/Config/validate.ps1
+pwsh -NoProfile -File ./Tools/Config/validate.ps1
 ```
 
 ```bash
