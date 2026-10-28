@@ -30,6 +30,7 @@ namespace Roguelike.Features.Combat.Ecs
         private NativeParallelMultiHashMap<int2, int> grid;
         private NativeList<CombatDamageRequest> requests;
         private NativeList<CombatImpactEvent> impacts;
+        private NativeList<CombatCastEvent> casts;
         private NativeList<CombatAreaEvent> areas;
         private NativeList<CombatPersistentArea> persistentAreas;
         private NativeList<CombatDeathEvent> deaths;
@@ -199,6 +200,7 @@ namespace Roguelike.Features.Combat.Ecs
                 requests = new NativeList<CombatDamageRequest>(checked(count * requestCapacityMultiplier + projectiles.Length),
                     Allocator.Persistent);
                 impacts = new NativeList<CombatImpactEvent>(Allocator.Persistent);
+                casts = new NativeList<CombatCastEvent>(Allocator.Persistent);
                 areas = new NativeList<CombatAreaEvent>(Allocator.Persistent);
                 persistentAreas = new NativeList<CombatPersistentArea>(Allocator.Persistent);
                 deaths = new NativeList<CombatDeathEvent>(Allocator.Persistent);
@@ -220,6 +222,7 @@ namespace Roguelike.Features.Combat.Ecs
             CombatMath.NonNegative(elapsedSeconds);
             if (!math.all(math.isfinite(movement))) throw new InvalidOperationException("Combat input must be finite.");
             impacts.Clear();
+            casts.Clear();
             areas.Clear();
             deaths.Clear();
             if (Paused || Statistics.PlayerDead) return 0;
@@ -236,6 +239,7 @@ namespace Roguelike.Features.Combat.Ecs
                     Units = units.AsArray(), UnitStates = unitStates.AsArray(), Projectiles = projectiles, Templates = templates.AsArray(), Counters = counters,
                     Grid = grid, Requests = requests, Rules = damageRules, Input = movement,
                     Impacts = impacts,
+                    Casts = casts,
                     Areas = areas,
                     PersistentAreas = persistentAreas,
                     Deaths = deaths,
@@ -299,6 +303,7 @@ namespace Roguelike.Features.Combat.Ecs
             nextSpawnTick = timedSpawn ? SpawnDelayTicks(settings.SpawnIntervalSeconds) : 0;
             WaveNumber = 0; SpawnedInWave = 0; SpawnedMonsters = 0;
             grid.Clear(); requests.Clear(); impacts.Clear(); areas.Clear(); persistentAreas.Clear();
+            casts.Clear();
             deaths.Clear();
             Paused = false;
             BacklogSeconds = PeakBacklogSeconds = 0;
@@ -629,6 +634,15 @@ namespace Roguelike.Features.Combat.Ecs
         /// <returns>当前武器纯值状态。</returns>
         /// <exception cref="ObjectDisposedException">会话已释放。</exception>
         public CombatWeaponState ReadPlayerWeapon(int index) { EnsureAlive(); return playerWeapons[index]; }
+
+        /// <summary>获取本次 Advance 内实际技能释放次数；下一次 Advance 或重开清空。</summary>
+        public int CastCount { get { EnsureAlive(); return casts.Length; } }
+
+        /// <summary>表现层读取技能真正发射时的施法者身份，不通过弹丸存活状态反推施法。</summary>
+        /// <param name="index">零起始事件索引。</param>
+        /// <returns>带施法者槽、生命周期、攻击序号及模拟 tick 的副本。</returns>
+        /// <exception cref="ObjectDisposedException">会话已经释放。</exception>
+        public CombatCastEvent ReadCast(int index) { EnsureAlive(); return casts[index]; }
 
         /// <summary>获取本次 Advance 内首次接触事件数量；下一次 Advance 开始时清空。</summary>
         public int ImpactCount { get { EnsureAlive(); return impacts.Length; } }
@@ -1010,6 +1024,7 @@ private CombatUnit BuildUnit(AttributeProfileConfig profile, SkillConfig skillCo
             if (grid.IsCreated) grid.Dispose();
             if (requests.IsCreated) requests.Dispose();
             if (impacts.IsCreated) impacts.Dispose();
+            if (casts.IsCreated) casts.Dispose();
             if (areas.IsCreated) areas.Dispose();
             if (persistentAreas.IsCreated) persistentAreas.Dispose();
             if (deaths.IsCreated) deaths.Dispose();

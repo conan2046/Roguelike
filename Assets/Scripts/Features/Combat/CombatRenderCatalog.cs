@@ -54,7 +54,8 @@ namespace Roguelike.Features.Combat
                     throw new InvalidOperationException($"TbCombatRender {binding.Id}: unresolved skill or clip.");
                 bool belongs = skill.ProjectileClipId == clip.Id && clip.Action == EAnimationAction.Projectile ||
                     skill.ImpactClipId == clip.Id && clip.Action == EAnimationAction.Impact ||
-                    skill.AreaClipIds.Contains(clip.Id) && clip.Action == EAnimationAction.Area;
+                    skill.AreaClipIds.Contains(clip.Id) && clip.Action == EAnimationAction.Area ||
+                    skill.CastClipId == clip.Id && clip.Action == EAnimationAction.CastEffect && !clip.Loop;
                 if (!belongs)
                     throw new InvalidOperationException($"TbCombatRender {binding.Id}: clip is not an explicit visual of this skill.");
                 var key = (skill.Id, clip.Id);
@@ -85,7 +86,7 @@ namespace Roguelike.Features.Combat
             return binding.RenderQueue;
         }
 
-        /// <summary>加载飞行、命中或任意 Area 片段时读取当前技能自身的片段层级。</summary>
+        /// <summary>加载飞行、命中、随身施法或任意 Area 片段时读取当前技能自身的片段层级。</summary>
         /// <param name="skillId">TbSkill.id，允许同一动画由不同技能配置不同层级。</param>
         /// <param name="clipId">该技能实际引用的 TbAnimationClip.id。</param>
         /// <returns>TbCombatRender.renderQueue。</returns>

@@ -101,7 +101,8 @@ pwsh -NoProfile -File ./Tools/Config/validate-combat.ps1
 ## 战斗表现配置
 
 - `TbAnimationDirection`：方向 ID、向量、ANI 动作索引与水平镜像，映射来自既有 `CocosModelAniPlayer.FaceActionIndex/FaceFlipped`，不在新运行时代码中复制方向分支。
-- `TbAnimationClip.flipX`：片段自身的强制水平镜像，只切换预建镜像网格，不改变弹道角度、速度或碰撞轨迹。当前仅 `30002 / skill_1_f` 为 `true`，用于修正源 ANI 朝向。
+- `TbAnimationClip.flipX`：片段自身的强制水平镜像，只切换预建镜像网格，不改变弹道角度、速度或碰撞轨迹。当前按人工审核修正 `skill_1 / 27 / 32 / 44 / 50` 的飞行片段：`30002 / 30042 / 30051 / 30066 / 30067 / 30077` 为 `true`；`skill_44` 包含两个方向变体。具体引用见 `docs/skill-effect-review/test-skill-effect-reference-update-20261027.md`。
+- `TbSkill.castClipId / castVisualOffsetXPixels / castVisualOffsetYPixels / castVisualScalePermille`：显式绑定施法者随身层及相对根节点的像素偏移/缩放。片段角色为 `CastEffect`，不循环；真实释放事件与弹丸同时触发，散射只播放一次。随身层按模拟时钟播放并跟随同一生命周期施法者，不新增停步或前摇；死亡、重开与退出回收。缺少随身资源时引用留空，不通过后缀猜测或自动借用资源。详见 `docs/skill-effect-review/caster-effect-runtime-integration.md`。
 - `TbCombatPresentation`：源时钟、时长兼容规则、出生方向、方向列表、怪物静止策略、输入轴/按键、界面文本/尺寸、血条像素宽高、反馈资源、伤害跳字参数和相机/诊断弹丸颜色。规则来自既有播放器及本轮确认的基础表现范围。
 - `TbPerformanceScenario.presentationId`：Combat 场景 4/5 引用方案 1，旧场景 1–3 留空；新增字段改变 bytes 布局，生成 C# 和 bytes 必须一起发布。
 - `CombatAnimation` 加载时构造累计时长，以调用方提供的模拟秒数采样；`CombatDirections` 校验并归一化方向向量，静止保留历史朝向。`idleFrameIndex` 指动作内帧索引，不是 ANI 全局帧索引。

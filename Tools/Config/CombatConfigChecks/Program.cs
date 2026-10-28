@@ -151,6 +151,9 @@ internal static class Program
                 if (skill.ImpactClipId.HasValue)
                     Require(layers.ReadSkill(skill.Id, skill.ImpactClipId.Value) < layerPresentation.FeedbackRenderQueue,
                         $"TbSkill {skill.Id}: missing impact render binding.");
+                if (skill.CastClipId.HasValue)
+                    Require(layers.ReadSkill(skill.Id, skill.CastClipId.Value) < layerPresentation.FeedbackRenderQueue,
+                        $"TbSkill {skill.Id}: missing caster render binding.");
                 foreach (int clipId in skill.AreaClipIds)
                     Require(layers.ReadSkill(skill.Id, clipId) < layerPresentation.FeedbackRenderQueue,
                         $"TbSkill {skill.Id}, clip {clipId}: missing area render binding.");
@@ -187,6 +190,11 @@ internal static class Program
         foreach (var skill in tables.TbSkill.DataList)
         {
             Require(!skill.CombatProfileId.HasValue || skill.CombatProfileId_Ref != null, $"TbSkill {skill.Id}: missing combat profile.");
+            if (skill.CastClipId.HasValue)
+                Require(skill.CastClipId_Ref?.Action == EAnimationAction.CastEffect && !skill.CastClipId_Ref.Loop &&
+                    skill.CastVisualOffsetXPixels.HasValue && float.IsFinite(skill.CastVisualOffsetXPixels.Value) &&
+                    skill.CastVisualOffsetYPixels.HasValue && float.IsFinite(skill.CastVisualOffsetYPixels.Value) &&
+                    skill.CastVisualScalePermille > 0, $"TbSkill {skill.Id}: invalid caster effect or placement.");
             switch (skill.CombatProfileId_Ref?.DeliveryType)
             {
                 case ESkillDeliveryType.Projectile:
@@ -245,9 +253,9 @@ internal static class Program
             "Approved projectile skill mapping changed.");
         Require(targetAreaSkillIds.All(id => tables.TbSkill.Get(id).CombatProfileId_Ref?.DeliveryType == ESkillDeliveryType.TargetArea),
             "Approved target-area skill mapping changed.");
-        Require(tables.TbAnimationClip.DataList.Where(clip => clip.FlipX).Select(clip => clip.Id)
-                .SequenceEqual(new[] { 30002 }),
-            "Only TbAnimationClip 30002 / skill_1_f may force horizontal mirroring.");
+        Require(tables.TbAnimationClip.DataList.Where(clip => clip.FlipX).Select(clip => clip.Id).OrderBy(id => id)
+                .SequenceEqual(new[] { 30002, 30042, 30051, 30066, 30067, 30077 }),
+            "TbAnimationClip horizontal mirroring must match the reviewed skill_1/27/32/44/50 flight clips.");
 
         var stage = tables.TbStage.Get(1);
         Require(stage.MapId_Ref != null && stage.StageRuleId_Ref != null && stage.CombatRulesId_Ref != null &&

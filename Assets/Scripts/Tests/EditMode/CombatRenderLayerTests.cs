@@ -19,7 +19,7 @@ namespace Roguelike.Tests
     /// <summary>真实 Luban、ANI 与隔离 Excel 副本验证逐片段层级、材质隔离、缺失拒绝及受保护导出。</summary>
     public sealed class CombatRenderLayerTests
     {
-        /// <summary>护体罡环地面/光柱在模型下而落剑在上；复用阵纹纹理的另一技能保留自己的独立队列。</summary>
+        /// <summary>当前护体环在模型下、落雷命中在模型上；复用同一已审核护环的两种技能仍保留独立材质与队列。</summary>
         /// <remarks>只创建测试拥有的内存材质和网格，using 统一释放，不保存资产。</remarks>
         [Test]
         public void AuraPartsStraddleModelsAndSharedTexturesKeepIndependentMaterials()
@@ -34,12 +34,10 @@ namespace Roguelike.Tests
             Assert.That(assets.Materials[move.MaterialIndex].renderQueue, Is.EqualTo(modelQueue));
             Assert.That(assets.Materials[model.HitFlashMaterialIndex].renderQueue, Is.EqualTo(modelQueue));
 
-            var strike = assets.Read(20043, 30063);
-            var column = assets.Read(20043, 30064);
-            var ground = assets.Read(20043, 30065);
-            var otherGround = assets.Read(20037, 30065);
+            var strike = assets.Read(20050, tables.TbSkill.Get(20050).AreaClipIds.Single());
+            var ground = assets.Read(20043, tables.TbSkill.Get(20043).AreaClipIds.Single());
+            var otherGround = assets.Read(20037, tables.TbSkill.Get(20037).AreaClipIds.Single());
             Assert.That(assets.Materials[strike.MaterialIndex].renderQueue, Is.GreaterThan(modelQueue));
-            Assert.That(assets.Materials[column.MaterialIndex].renderQueue, Is.LessThan(modelQueue));
             Assert.That(assets.Materials[ground.MaterialIndex].renderQueue, Is.LessThan(modelQueue));
             Assert.That(ground.MaterialIndex, Is.Not.EqualTo(otherGround.MaterialIndex));
             Assert.That(assets.Materials[ground.MaterialIndex].mainTexture,
@@ -63,7 +61,7 @@ namespace Roguelike.Tests
             var definition = CombatRunDefinition.Create(tables, tables.TbTribulationSlice.Get(101).StageId);
             definition.Presentation.RenderConfigIds_Ref.RemoveAll(row => modelMissing
                 ? row.VisualSetId == definition.Character.VisualSetId
-                : row.SkillId == 20043 && row.ClipId == 30065);
+                : row.SkillId == 20043 && row.ClipId == tables.TbSkill.Get(20043).AreaClipIds.Single());
             var source = new CombatVisualTests.Files(tables);
             Assert.Throws<InvalidOperationException>(() => CombatVisualResources.LoadAsync(definition, source, CancellationToken.None).GetAwaiter().GetResult());
             Assert.That(source.ActiveHandles, Is.Zero);

@@ -32,6 +32,7 @@ namespace Roguelike.Features.Combat.Ecs
         public NativeParallelMultiHashMap<int2, int> Grid;
         public NativeList<CombatDamageRequest> Requests;
         public NativeList<CombatImpactEvent> Impacts;
+        public NativeList<CombatCastEvent> Casts;
         public NativeList<CombatAreaEvent> Areas;
         public NativeList<CombatPersistentArea> PersistentAreas;
         public NativeList<CombatDeathEvent> Deaths;
@@ -239,7 +240,7 @@ namespace Roguelike.Features.Combat.Ecs
 
         /// <summary>正式玩家逐把推进冷却；按 TbSkillCombat 发射阵型、瞬时范围或持续区域。</summary>
         /// <param name="counters">本局攻击、弹丸、范围释放和唯一序号计数。</param>
-        /// <remarks>全部武器共享当前玩家属性快照，但冷却、投递参数和表现 ID 独立读取各自 TbSkill。</remarks>
+        /// <remarks>全部武器共享当前玩家属性快照，但冷却、投递参数和表现 ID 独立读取各自 TbSkill；实际释放只追加一次施法事件，与散射弹丸数无关，不改变攻击序号或移动。</remarks>
         private void CollectPlayerWeapons(ref CombatCounters counters)
         {
             CombatUnit player = UnitStates[0];
@@ -265,6 +266,8 @@ namespace Roguelike.Features.Combat.Ecs
                     else
                         CastArea(weapon.FollowsOwner ? player.Position + player.BodyOffset : target.Position + target.BodyOffset,
                             weapon, attack, player.Target.Lifetime, ref counters);
+                    Casts.Add(new CombatCastEvent { SkillId = weapon.SkillId, CasterSlot = 0,
+                        CasterLifetime = player.Target.Lifetime, AttackSequence = attack.Sequence, Tick = counters.Tick + 1 });
                     weapon.Attack = attack;
                     weapon.Cooldown = weapon.Interval;
                     counters.Attacks++;
@@ -474,7 +477,7 @@ namespace Roguelike.Features.Combat.Ecs
         /// <summary>先推进已有近战动作；冷却就绪且目标合法时起手并锁定，弹丸仍复用空槽立即发射。</summary>
         /// <param name="slot">本局固定单位槽位。</param>
         /// <param name="counters">攻击与池统计。</param>
-        /// <remarks>只生成请求或弹丸，不改变目标生命。</remarks>
+        /// <remarks>只生成请求或弹丸，不改变目标生命；兼容玩家入口在成功发射的同 tick 写入随身施法事件，不引入前摇。</remarks>
         private void CollectAttack(int slot, ref CombatCounters counters)
         {
             var unit = UnitStates[slot];
@@ -545,6 +548,8 @@ namespace Roguelike.Features.Combat.Ecs
                         break;
                     }
                     if (!spawned) throw new InvalidOperationException("Combat projectile pool capacity invariant failed.");
+                    if (slot == 0) Casts.Add(new CombatCastEvent { SkillId = unit.SkillId, CasterSlot = slot,
+                        CasterLifetime = unit.Target.Lifetime, AttackSequence = attack.Sequence, Tick = counters.Tick + 1 });
                 }
                 counters.Attacks++;
                 unit.Attack = attack;

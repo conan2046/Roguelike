@@ -337,6 +337,10 @@ namespace Roguelike.Features.Combat.Run
                 "TbSkill: unresolved player skill.");
             var combat = skill.CombatProfileId_Ref;
             CombatSkillRules.Validate(combat);
+            Require(!skill.CastClipId.HasValue || (skill.CastClipId_Ref?.Action == EAnimationAction.CastEffect &&
+                    !skill.CastClipId_Ref.Loop && skill.CastVisualOffsetXPixels.HasValue &&
+                    skill.CastVisualOffsetYPixels.HasValue && skill.CastVisualScalePermille > 0),
+                $"TbSkill {skill.Id}: incomplete caster visual fields.");
             Require(combat.BaseIntervalMilli > 0 && combat.RangePixels >= 0,
                 $"TbSkillCombat {combat.Id}: invalid common fields.");
             if (combat.DeliveryType == ESkillDeliveryType.Projectile)

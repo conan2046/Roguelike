@@ -92,6 +92,13 @@ namespace Roguelike.Features.Combat.Ecs
         public float RadiusMultiplier;
     }
 
+    /// <summary>实际技能释放的单帧表现事件；同次散射只写一次，不占用新的伤害序号，施法者槽与生命周期防止复用污染。</summary>
+    public struct CombatCastEvent
+    {
+        public int SkillId, CasterSlot;
+        public ulong AttackSequence, Tick, CasterLifetime;
+    }
+
     /// <summary>范围技能触发时写入的单帧表现事件；Radius 保存出生时实际判定半径，表现不回读后续升级状态。</summary>
     public struct CombatAreaEvent
     {

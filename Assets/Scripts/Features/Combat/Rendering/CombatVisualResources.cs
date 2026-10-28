@@ -182,7 +182,7 @@ namespace Roguelike.Features.Combat.Rendering
                 shader, hitFlashShader, hitFlashColor, filter, renderQueue, token);
         }
 
-        /// <summary>按 TbSkill 的投递类型加载已确认的飞行、命中或目标位置片段。</summary>
+        /// <summary>按 TbSkill 的显式引用加载随身施法及飞行、命中或目标位置片段，不根据资源后缀推断用途。</summary>
         /// <param name="skill">正式初始或可解锁技能。</param>
         /// <param name="rules">提供世界像素比例的 TbCombatRules。</param>
         /// <param name="presentation">提供 ANI 时间单位的 TbCombatPresentation。</param>
@@ -204,6 +204,18 @@ namespace Roguelike.Features.Combat.Rendering
             // 避免"视觉缩放、判定不变"或"编辑器预览与运行时不一致"。
             float scale = rules.WorldUnitsPerPixel * skill.VisualSetId_Ref.ScalePermille / 1000f;
             CombatMath.Positive(scale);
+            if (skill.CastClipId.HasValue)
+            {
+                if (skill.CastClipId_Ref?.Action != EAnimationAction.CastEffect || skill.CastClipId_Ref.Loop ||
+                    !skill.CastVisualOffsetXPixels.HasValue || !skill.CastVisualOffsetYPixels.HasValue ||
+                    !skill.CastVisualScale.HasValue)
+                    throw new InvalidOperationException($"TbSkill {skill.Id}: incomplete caster visual configuration.");
+                CombatMath.NonNegative(Math.Abs((double)skill.CastVisualOffsetXPixels.Value));
+                CombatMath.NonNegative(Math.Abs((double)skill.CastVisualOffsetYPixels.Value));
+                CombatMath.Positive(skill.CastVisualScale.Value);
+                await LoadClipAsync(skill.Id, skill.CastClipId_Ref, scale, presentation, resources, shader,
+                    hitFlashShader, hitFlashColor, filter, renderCatalog.ReadSkill(skill.Id, skill.CastClipId.Value), token);
+            }
             if (skill.CombatProfileId_Ref.DeliveryType == ESkillDeliveryType.Projectile)
             {
                 if (skill.ProjectileClipId_Ref?.Action != EAnimationAction.Projectile ||

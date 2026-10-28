@@ -44,6 +44,9 @@ namespace Roguelike.Features.Combat.Rendering
         private readonly RenderMeshDescription description;
         private readonly List<ImpactVisual> impacts = new List<ImpactVisual>();
         private readonly List<AreaVisual> areas = new List<AreaVisual>();
+        private readonly List<CastVisual> casts = new List<CastVisual>();
+        private ulong lastCastSequence;
+        private ulong lastCastCasterLifetime;
         private readonly HashSet<(ulong, ulong)> seenImpacts = new HashSet<(ulong, ulong)>();
         private readonly HashSet<ulong> seenAreas = new HashSet<ulong>();
         private bool disposed;
@@ -51,6 +54,17 @@ namespace Roguelike.Features.Combat.Rendering
         public int VisibleProjectileCount { get; private set; }
         public int VisibleImpactCount { get; private set; }
         public int VisibleAreaCount { get; private set; }
+        public int VisibleCastCount { get; private set; }
+
+        /// <summary>一次实际释放的随身施法层；身份校验后每帧跟随施法者，结束保留实体供后续释放复用。</summary>
+        private sealed class CastVisual
+        {
+            public Entity Entity;
+            public int SkillId, ClipId, CasterSlot;
+            public ulong StartTick, CasterLifetime;
+            public float2 Offset;
+            public bool Active;
+        }
 
         /// <summary>命中 ANI 的池化播放状态；用槽位和生命周期跟随同一目标，实体只在池扩容时创建。</summary>
         private sealed class ImpactVisual
@@ -168,6 +182,8 @@ namespace Roguelike.Features.Combat.Rendering
                 seenAreas.Clear();
                 foreach (var impact in impacts) HideImpact(impact);
                 foreach (var area in areas) HideArea(area);
+                lastCastSequence = 0;
+                foreach (var cast in casts) HideCast(cast);
             }
             lastTick = tick;
             for (int slot = 0; slot < players.Length; slot++)
@@ -205,6 +221,7 @@ namespace Roguelike.Features.Combat.Rendering
             using (SkillMarker.Auto())
             {
                 SynchronizeProjectiles();
+                SynchronizeCasts(tick, units);
                 SynchronizeImpacts(tick, units);
                 SynchronizeAreas(tick, units);
             }
@@ -308,6 +325,72 @@ namespace Roguelike.Features.Combat.Rendering
             }
         }
 
+        /// <summary>消费一次实际释放事件并推进随身层，不依赖弹丸是否仍然存活。</summary>
+        /// <param name="tick">本次同步的已完成模拟 tick，暂停时保持不变。</param>
+        /// <param name="units">同帧单位只读借用；不跨帧保存，槽复用通过生命周期拒绝。</param>
+        /// <remarks>片段、根节点局部偏移与缩放来自 TbSkill.castClipId/castVisualOffset/castVisualScalePermille。每次释放只播一层，不改变移动或伤害；时长取正式 ANI，结束回池，死亡立即隐藏。</remarks>
+        private void SynchronizeCasts(ulong tick, NativeArray<CombatUnit>.ReadOnly units)
+        {
+            // 重开后可能已推进到与上次相同的 tick；用施法者代次重置游标，不能只靠 tick 回退。
+            if (units.Length > 0 && units[0].Target.Lifetime != lastCastCasterLifetime)
+            {
+                lastCastCasterLifetime = units[0].Target.Lifetime;
+                lastCastSequence = 0;
+                foreach (CastVisual visual in casts) HideCast(visual);
+            }
+            for (int index = 0; index < session.CastCount; index++)
+            {
+                CombatCastEvent castEvent = session.ReadCast(index);
+                if ((uint)castEvent.CasterSlot >= (uint)units.Length ||
+                    units[castEvent.CasterSlot].Target.Lifetime != castEvent.CasterLifetime) continue;
+                if (castEvent.AttackSequence <= lastCastSequence) continue;
+                lastCastSequence = castEvent.AttackSequence;
+                if (!skills.TryGetValue(castEvent.SkillId, out SkillConfig skill) || !skill.CastClipId.HasValue) continue;
+                CastVisual visual = AcquireCast();
+                visual.Active = true;
+                visual.SkillId = skill.Id;
+                visual.ClipId = skill.CastClipId.Value;
+                visual.StartTick = castEvent.Tick;
+                visual.CasterSlot = castEvent.CasterSlot;
+                visual.CasterLifetime = castEvent.CasterLifetime;
+                visual.Offset = new float2(skill.CastVisualOffsetXPixels.Value,
+                    skill.CastVisualOffsetYPixels.Value) * worldUnitsPerPixel;
+            }
+            VisibleCastCount = 0;
+            foreach (CastVisual visual in casts)
+            {
+                if (!visual.Active) continue;
+                if ((uint)visual.CasterSlot >= (uint)units.Length ||
+                    units[visual.CasterSlot].Target.Lifetime != visual.CasterLifetime ||
+                    units[visual.CasterSlot].Target.Health <= 0)
+                { HideCast(visual); continue; }
+                CombatVisualResources.Clip clip = resources.Read(visual.SkillId, visual.ClipId);
+                double age = (tick - visual.StartTick) * session.StepSeconds;
+                if (age >= clip.Animation.DurationSeconds(0)) { HideCast(visual); continue; }
+                manager.SetComponentData(visual.Entity, LocalTransform.FromPositionRotationScale(
+                    new float3(units[visual.CasterSlot].Position + visual.Offset, 0), quaternion.identity,
+                    skills[visual.SkillId].CastVisualScale.Value));
+                ApplyFrame(visual.Entity, clip, clip.Animation.Sample(0, age), clip.FlipX);
+                SetVisible(visual.Entity, true);
+                VisibleCastCount++;
+            }
+        }
+
+        /// <summary>取得空闲随身层实体，没有空槽时按真实并发扩容一个。</summary>
+        /// <returns>可写入本次释放身份的池槽。</returns>
+        /// <remarks>新实体只存在于当前 World，GPU 资源由共享集合拥有；Dispose 销毁实体，不保存资产。</remarks>
+        private CastVisual AcquireCast()
+        {
+            foreach (CastVisual visual in casts) if (!visual.Active) return visual;
+            Entity entity = manager.CreateEntity(typeof(LocalTransform), typeof(LocalToWorld));
+            RenderMeshUtility.AddComponents(entity, manager, description, meshArray,
+                MaterialMeshInfo.FromRenderMeshArrayIndices(0, 0));
+            manager.AddComponent<DisableRendering>(entity);
+            var created = new CastVisual { Entity = entity };
+            casts.Add(created);
+            return created;
+        }
+
         /// <summary>消费本帧首次接触事件并推进所有仍在播放的非循环命中 ANI。</summary>
         /// <param name="tick">CombatSession 已完成的模拟 tick。</param>
         /// <param name="units">当前同步帧的权威单位只读借用；通过事件槽位和生命周期确认跟随目标。</param>
@@ -390,7 +473,7 @@ namespace Roguelike.Features.Combat.Rendering
         /// <summary>消费目标位置释放事件，并让一个技能配置的全部 Area 片段在同一位置同时播放。</summary>
         /// <param name="tick">CombatSession 已完成的模拟 tick。</param>
         /// <param name="units">当前同步帧单位借用，用于读取跟随拥有者。</param>
-        /// <remarks>同一攻击序号只创建一次表现；按事件实际半径同步星级/被动范围缩放，每段结束后独立回池。</remarks>
+        /// <remarks>同一攻击序号只创建一次表现；按事件实际半径同步星级/被动范围缩放，每段结束后独立回池。跟随施法者的地面层锚定角色根脚点加 TbSkill.areaVisualOffset，不叠加身体碰撞中心；判定位置仍由模拟事件拥有。</remarks>
         private void SynchronizeAreas(ulong tick, NativeArray<CombatUnit>.ReadOnly units)
         {
             for (int index = 0; index < session.AreaCount; index++)
@@ -436,7 +519,7 @@ namespace Roguelike.Features.Combat.Rendering
                     if (owner.Target.Health <= 0 || owner.Target.Lifetime != visual.OwnerLifetime)
                     { HideArea(visual); continue; }
                     LocalTransform transform = manager.GetComponentData<LocalTransform>(visual.Entity);
-                    transform.Position = new float3(owner.Position + owner.BodyOffset + visual.Offset, 0);
+                    transform.Position = new float3(owner.Position + visual.Offset, 0);
                     manager.SetComponentData(visual.Entity, transform);
                 }
                 double age = (tick - visual.StartTick) * session.StepSeconds;
@@ -496,6 +579,14 @@ namespace Roguelike.Features.Combat.Rendering
             if (world.IsCreated && manager.Exists(visual.Entity)) SetVisible(visual.Entity, false);
         }
 
+        /// <summary>结束随身施法层并隐藏实体，后续施法可以复用同一池槽。</summary>
+        /// <param name="visual">本绑定拥有的随身层池槽。</param>
+        private void HideCast(CastVisual visual)
+        {
+            visual.Active = false;
+            if (world.IsCreated && manager.Exists(visual.Entity)) SetVisible(visual.Entity, false);
+        }
+
         /// <summary>结束一个目标位置片段并保留实体，供后续任意 Area 片段复用。</summary>
         /// <param name="visual">当前范围表现池槽。</param>
         private void HideArea(AreaVisual visual)
@@ -528,6 +619,9 @@ namespace Roguelike.Features.Combat.Rendering
                 if (manager.Exists(impact.Entity)) manager.DestroyEntity(impact.Entity);
             foreach (var area in areas)
                 if (manager.Exists(area.Entity)) manager.DestroyEntity(area.Entity);
+            foreach (var cast in casts)
+                if (manager.Exists(cast.Entity)) manager.DestroyEntity(cast.Entity);
+            casts.Clear(); lastCastSequence = 0;
             impacts.Clear(); seenImpacts.Clear(); areas.Clear(); seenAreas.Clear();
         }
     }

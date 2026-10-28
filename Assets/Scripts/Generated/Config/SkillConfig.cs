@@ -43,6 +43,11 @@ public sealed partial class SkillConfig : Luban.BeanBase
         if(_buf.ReadBool()){ AreaVisualOffsetXPixels = _buf.ReadFloat(); } else { AreaVisualOffsetXPixels = null; }
         if(_buf.ReadBool()){ AreaVisualOffsetYPixels = _buf.ReadFloat(); } else { AreaVisualOffsetYPixels = null; }
         if(_buf.ReadBool()){ AreaVisualScalePermille = _buf.ReadInt(); } else { AreaVisualScalePermille = null; }
+        if(_buf.ReadBool()){ CastClipId = _buf.ReadInt(); } else { CastClipId = null; }
+        CastClipId_Ref = null;
+        if(_buf.ReadBool()){ CastVisualOffsetXPixels = _buf.ReadFloat(); } else { CastVisualOffsetXPixels = null; }
+        if(_buf.ReadBool()){ CastVisualOffsetYPixels = _buf.ReadFloat(); } else { CastVisualOffsetYPixels = null; }
+        if(_buf.ReadBool()){ CastVisualScalePermille = _buf.ReadInt(); } else { CastVisualScalePermille = null; }
     }
 
     public static SkillConfig DeserializeSkillConfig(ByteBuf _buf)
@@ -135,6 +140,23 @@ public sealed partial class SkillConfig : Luban.BeanBase
     /// 范围特效表现相对缩放（千分比）；由技能预制体“范围特效表现”节点统一 Scale 导出。
     /// </summary>
     public readonly int? AreaVisualScalePermille;
+    /// <summary>
+    /// 随身施法片段（不阻塞发射）
+    /// </summary>
+    public readonly int? CastClipId;
+    public AnimationClipConfig CastClipId_Ref;
+    /// <summary>
+    /// 随身层相对施法者根节点X像素偏移
+    /// </summary>
+    public readonly float? CastVisualOffsetXPixels;
+    /// <summary>
+    /// 随身层相对施法者根节点Y像素偏移
+    /// </summary>
+    public readonly float? CastVisualOffsetYPixels;
+    /// <summary>
+    /// 随身层视觉缩放千分比
+    /// </summary>
+    public readonly int? CastVisualScalePermille;
    
     public const int __ID__ = -844226349;
     public override int GetTypeId() => __ID__;
@@ -148,6 +170,7 @@ public sealed partial class SkillConfig : Luban.BeanBase
         AreaClipIds_Ref = new System.Collections.Generic.List<AnimationClipConfig>();
         foreach (var _v in AreaClipIds) { AreaClipIds_Ref.Add(tables.TbAnimationClip.GetOrDefault(_v)); }
 
+        CastClipId_Ref = CastClipId!= null ? tables.TbAnimationClip.GetOrDefault(CastClipId.Value) : null;
     }
 
     public override string ToString()
@@ -173,6 +196,10 @@ public sealed partial class SkillConfig : Luban.BeanBase
         + "areaVisualOffsetXPixels:" + AreaVisualOffsetXPixels + ","
         + "areaVisualOffsetYPixels:" + AreaVisualOffsetYPixels + ","
         + "areaVisualScalePermille:" + AreaVisualScalePermille + ","
+        + "castClipId:" + CastClipId + ","
+        + "castVisualOffsetXPixels:" + CastVisualOffsetXPixels + ","
+        + "castVisualOffsetYPixels:" + CastVisualOffsetYPixels + ","
+        + "castVisualScalePermille:" + CastVisualScalePermille + ","
         + "}";
     }
 }

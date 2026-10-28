@@ -38,6 +38,8 @@ namespace cfg
     /// <summary>SkillConfig 的比例参数换算入口；像素字段由 Luban 直接提供，缩放仍使用千分比协议。</summary>
     public sealed partial class SkillConfig
     {
+        /// <summary>随身施法层相对缩放，读取 TbSkill.castVisualScalePermille 并按统一千分比协议还原。</summary>
+        public float? CastVisualScale => CastVisualScalePermille.HasValue ? ConfigNumber.Decode(CastVisualScalePermille.Value) : (float?)null;
         /// <summary>弹丸表现相对缩放；由千分比还原。</summary>
         public float? ProjectileVisualScale => ProjectileVisualScalePermille.HasValue ? ConfigNumber.Decode(ProjectileVisualScalePermille.Value) : (float?)null;
         /// <summary>命中特效表现相对缩放；由千分比还原。</summary>

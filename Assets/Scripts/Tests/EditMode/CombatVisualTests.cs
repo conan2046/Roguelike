@@ -285,11 +285,11 @@ namespace Roguelike.Tests
         public void SharedResourcesLoadOnceAndDispose()
         {
             var tables = LoadTables(); var source = new Files(tables);
-            var assets = CombatVisualResources.LoadAsync(tables.TbPerformanceScenario.Get(5), source, CancellationToken.None).GetAwaiter().GetResult();
-            Assert.That(source.Loads, Is.EqualTo(14));
+            using var assets = CombatVisualResources.LoadAsync(tables.TbPerformanceScenario.Get(5), source, CancellationToken.None).GetAwaiter().GetResult();
+            Assert.That(source.Loads, Is.EqualTo(16));
             Assert.That(source.ActiveHandles, Is.Zero);
-            Assert.That(assets.ClipCount, Is.EqualTo(7));
-            Assert.That(assets.TextureCount, Is.EqualTo(7));
+            Assert.That(assets.ClipCount, Is.EqualTo(8));
+            Assert.That(assets.TextureCount, Is.EqualTo(8));
             Assert.That(assets.Materials.Length, Is.EqualTo(assets.TextureCount * 2));
             Assert.That(assets.Meshes.Length, Is.GreaterThan(100));
             var mesh = assets.Meshes[0]; var material = assets.Materials[0]; var texture = material.mainTexture;
@@ -313,6 +313,13 @@ namespace Roguelike.Tests
                 Is.EqualTo(renderCatalog.ReadModel(definition.Character.VisualSetId)));
             foreach (var skill in definition.AvailableSkills)
             {
+                if (skill.CastClipId.HasValue)
+                {
+                    var cast = assets.Read(skill.Id, skill.CastClipId.Value);
+                    Assert.That(cast.Animation.ActionCount, Is.GreaterThan(0));
+                    Assert.That(assets.Materials[cast.MaterialIndex].renderQueue,
+                        Is.EqualTo(renderCatalog.ReadSkill(skill.Id, skill.CastClipId.Value)));
+                }
                 if (skill.ProjectileClipId.HasValue)
                 {
                     Assert.That(assets.Read(skill.Id, skill.ProjectileClipId.Value).Animation.ActionCount, Is.GreaterThan(0));
@@ -400,6 +407,24 @@ namespace Roguelike.Tests
             float[] actualScales = spawnedAreaEntities.Select(entity => world.EntityManager.GetComponentData<Unity.Transforms.LocalTransform>(entity).Scale).OrderBy(value => value).ToArray();
             float[] expectedScales = Enumerable.Range(1, layers).SelectMany(layer => Enumerable.Repeat((float)(growthRange * layer / layers), selectedSkill.AreaClipIds.Count)).OrderBy(value => value).ToArray();
             Assert.That(actualScales, Is.EqualTo(expectedScales).Within(1e-6));
+
+            // 身体中心用于结算，不是脚下护环的视觉锚点；升级缩放也不能放大身体偏移。
+            if (selectedSkill.CombatProfileId_Ref.AreaFollowsOwner)
+            {
+                CombatUnit owner = session.ReadUnit(0);
+                owner.Position = new float2(1.25f, -0.75f);
+                owner.BodyOffset = new float2(0.35f, 1.5f);
+                world.EntityManager.SetComponentData(session.UnitEntity(0), owner);
+                visuals.Synchronize();
+                float2 offset = new float2(selectedSkill.AreaVisualOffsetXPixels.Value,
+                    selectedSkill.AreaVisualOffsetYPixels.Value) * definition.CombatRules.WorldUnitsPerPixel;
+                foreach (Entity entity in spawnedAreaEntities)
+                {
+                    var transform = world.EntityManager.GetComponentData<Unity.Transforms.LocalTransform>(entity);
+                    float multiplier = transform.Scale / selectedSkill.AreaVisualScale.Value;
+                    Assert.That(math.distance(transform.Position.xy, owner.Position + offset * multiplier), Is.LessThan(1e-5f));
+                }
+            }
 
             monster = session.ReadUnit(slot);
             monster.Target.Health = 0;
@@ -498,6 +523,9 @@ namespace Roguelike.Tests
                 using var entitiesAfterImpact = world.EntityManager.GetAllEntities(Unity.Collections.Allocator.Temp);
                 Entity[] impactEntities = entitiesAfterImpact.ToArray().Where(entity => !priorEntities.Contains(entity) &&
                     world.EntityManager.HasComponent<Unity.Transforms.LocalTransform>(entity) &&
+                    world.EntityManager.HasComponent<MaterialMeshInfo>(entity) &&
+                    MaterialMeshInfo.StaticIndexToArrayIndex(world.EntityManager.GetComponentData<MaterialMeshInfo>(entity).Material) ==
+                        assets.Read(skill.Id, skill.ImpactClipId.Value).MaterialIndex &&
                     !world.EntityManager.HasComponent<DisableRendering>(entity)).ToArray();
                 Assert.That(impactEntities.Length, Is.GreaterThan(0));
                 var beforeMove = impactEntities.Select(entity => world.EntityManager.GetComponentData<Unity.Transforms.LocalTransform>(entity)).ToArray();

@@ -181,12 +181,17 @@ namespace Roguelike.Tests
             b.WriteBool(source.AreaVisualOffsetXPixels.HasValue); if (source.AreaVisualOffsetXPixels.HasValue) b.WriteFloat(source.AreaVisualOffsetXPixels.Value);
             b.WriteBool(source.AreaVisualOffsetYPixels.HasValue); if (source.AreaVisualOffsetYPixels.HasValue) b.WriteFloat(source.AreaVisualOffsetYPixels.Value);
             b.WriteBool(source.AreaVisualScalePermille.HasValue); if (source.AreaVisualScalePermille.HasValue) b.WriteInt(source.AreaVisualScalePermille.Value);
+            b.WriteBool(source.CastClipId.HasValue); if (source.CastClipId.HasValue) b.WriteInt(source.CastClipId.Value);
+            b.WriteBool(source.CastVisualOffsetXPixels.HasValue); if (source.CastVisualOffsetXPixels.HasValue) b.WriteFloat(source.CastVisualOffsetXPixels.Value);
+            b.WriteBool(source.CastVisualOffsetYPixels.HasValue); if (source.CastVisualOffsetYPixels.HasValue) b.WriteFloat(source.CastVisualOffsetYPixels.Value);
+            b.WriteBool(source.CastVisualScalePermille.HasValue); if (source.CastVisualScalePermille.HasValue) b.WriteInt(source.CastVisualScalePermille.Value);
             return new SkillConfig(b)
             {
                 CombatProfileId_Ref = source.CombatProfileId_Ref,
                 VisualSetId_Ref = source.VisualSetId_Ref,
                 ProjectileClipId_Ref = source.ProjectileClipId_Ref,
                 ImpactClipId_Ref = source.ImpactClipId_Ref,
+                CastClipId_Ref = source.CastClipId_Ref,
                 AreaClipIds_Ref = source.AreaClipIds_Ref
             };
         }

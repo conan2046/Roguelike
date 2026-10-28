@@ -69,6 +69,10 @@ namespace cfg
         /// 目标位置范围表现
         /// </summary>
         Area = 13,
+        /// <summary>
+        /// 随身施法特效：跟随施法者，不阻塞发射
+        /// </summary>
+        CastEffect = 14,
     }
 
 } 
