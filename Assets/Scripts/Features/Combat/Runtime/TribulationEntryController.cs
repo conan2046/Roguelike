@@ -11,7 +11,7 @@ using UnityEngine.EventSystems;
 namespace Roguelike.Features.Combat.Runtime
 {
     /// <summary>切片入口所有者：正式选角、唯一战斗运行器、返回及退出取消统一管理。</summary>
-    public sealed class TribulationEntryController : MonoBehaviour
+    public sealed partial class TribulationEntryController : MonoBehaviour
     {
         private Tables tables;
         private IResourceService resources;
@@ -27,10 +27,11 @@ namespace Roguelike.Features.Combat.Runtime
 
         /// <summary>配置/资源服务初始化后读取唯一入口表并实例化正式选角Prefab。</summary>
         /// <param name="tables">当前Luban表。</param><param name="resources">组合根资源服务。</param><param name="token">应用关闭令牌。</param>
+        /// <param name="profileStore">显式玩家或隔离Profile；为空时不访问存档，只展示非持久演示。</param>
         /// <returns>选角按钮可以交互时完成。</returns>
         /// <remarks>持有Prefab句柄与组合取消源；部分失败主动关闭；不更改场景资产。</remarks>
         /// <exception cref="InvalidOperationException">入口/Prefab/绑定缺失或重复初始化。</exception><exception cref="OperationCanceledException">退出取消。</exception>
-        public async Task InitializeAsync(Tables tables, IResourceService resources, CancellationToken token)
+        public async Task InitializeAsync(Tables tables, IResourceService resources, CancellationToken token, Run.BuildFeedbackProfileStore profileStore = null)
         {
             if (linked != null || closed) throw new InvalidOperationException("Tribulation entry cannot initialize twice.");
             this.tables = tables; this.resources = resources;
@@ -55,6 +56,7 @@ namespace Roguelike.Features.Combat.Runtime
                     lobby.RoleButtonLabels[i].text = entry.ChooseRoleText;
                     lobby.RoleButtons[i].onClick.AddListener(() => RequestRole(index));
                 }
+                InitializeFeedbackLobby(profileStore);
                 if (EventSystem.current == null)
                 {
                     ownedEventSystem = new GameObject("Tribulation input", typeof(EventSystem), typeof(StandaloneInputModule));
@@ -86,7 +88,7 @@ namespace Roguelike.Features.Combat.Runtime
                 var root = new GameObject("[Roguelike.Tribulation.Run]"); root.transform.SetParent(transform, false);
                 ActiveRunner = root.AddComponent<CombatRuntimeRunner>();
                 ActiveRunner.ReturnToLobby = ReturnToLobby;
-                await ActiveRunner.InitializeAsync(definition, resources, new UnityCombatInput(definition.Presentation), loadToken);
+                await ActiveRunner.InitializeAsync(definition, resources, new UnityCombatInput(definition.Presentation), loadToken, profileStoreForFeedback);
                 loadToken.ThrowIfCancellationRequested(); lobbyRoot.SetActive(false);
             }
             catch (OperationCanceledException) { ReleaseRunner(); }
@@ -103,7 +105,9 @@ namespace Roguelike.Features.Combat.Runtime
         public void ReturnToLobby()
         {
             if (closed || busy) return;
+            if (ActiveRunner != null && !ActiveRunner.TryFinalizeProfile()) return;
             ReleaseRunner(); lobbyRoot.SetActive(true); lobby.ErrorText.text = string.Empty; SetButtons(true);
+            RefreshFeedbackLobby();
         }
 
         /// <summary>关闭唯一战斗运行器并安排销毁其所有者节点。</summary>

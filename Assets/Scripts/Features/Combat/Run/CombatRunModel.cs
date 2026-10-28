@@ -117,10 +117,12 @@ namespace Roguelike.Features.Combat.Run
 
         /// <summary>从已经完成跨表验证的定义创建第一代单局。</summary>
         /// <param name="definition">由 TbStage 聚合的只读正式关卡定义。</param>
+        /// <param name="enabledUnlockedContents">开局固定的已解锁且已启用内容快照；不在模型内访问存档。</param>
         /// <exception cref="ArgumentNullException">定义为空。</exception>
-        public CombatRunModel(CombatRunDefinition definition)
+        public CombatRunModel(CombatRunDefinition definition, IEnumerable<int> enabledUnlockedContents = null)
         {
             this.definition = definition ?? throw new ArgumentNullException(nameof(definition));
+            enabledContents = new HashSet<int>(enabledUnlockedContents ?? Array.Empty<int>());
             RunGeneration = 1;
             ResetRunState();
         }
@@ -268,6 +270,7 @@ namespace Roguelike.Features.Combat.Run
             int rank = GetUpgradeRank(option.Id) + 1;
             ApplyUpgrade(option, rank);
             upgradeRanks[option.Id] = rank;
+            if (definition.DraftPolicy != null) RecordDraftDecision("choose", 0, option.Id);
             PendingLevelUps--;
             currentChoices = Array.Empty<UpgradeOptionConfig>();
             if (PendingLevelUps > 0) ContinueUpgradeQueue();
@@ -377,6 +380,7 @@ namespace Roguelike.Features.Combat.Run
         /// <exception cref="InvalidOperationException">运行时遇到未验证的后备链循环或非法权重。</exception>
         private bool TryBuildUpgradeChoices(UpgradePoolConfig rootPool = null)
         {
+            if (definition.DraftPolicy != null && rootPool == null) return TryBuildDraftChoices();
             var visited = new HashSet<int>();
             UpgradePoolConfig pool = rootPool ?? definition.UpgradePool;
             while (pool != null)
@@ -384,7 +388,8 @@ namespace Roguelike.Features.Combat.Run
                 if (!visited.Add(pool.Id))
                     throw new InvalidOperationException($"TbUpgradePool {pool.Id}: fallback cycle detected at runtime.");
                 var remaining = pool.Entries
-                    .Where(entry => entry?.OptionId_Ref != null && IsUpgradeEligible(entry.OptionId_Ref))
+                    .Where(entry => entry?.OptionId_Ref != null && IsUpgradeEligible(entry.OptionId_Ref) &&
+                        (rootPool == null || entry.OptionId_Ref.Type != EUpgradeOptionType.MechanismModifier))
                     .OrderBy(entry => entry.OptionId)
                     .ToList();
                 UpgradeOfferAction action = UpgradeOfferPolicy.Resolve(pool.ExhaustionPolicy, pool.DrawCount,
@@ -426,6 +431,8 @@ namespace Roguelike.Features.Combat.Run
         /// <returns>当前面板可以选择时返回 true。</returns>
         private bool IsUpgradeEligible(UpgradeOptionConfig option)
         {
+            if (!IsDraftEligible(option, out _)) return false;
+            if (option.Type == EUpgradeOptionType.MechanismModifier) return GetUpgradeRank(option.Id) < option.MaxRank;
             if (option.Type == EUpgradeOptionType.RunWeapon) return Build != null && Build.CanUpgrade(option.RunWeaponId_Ref);
             if (option.Type == EUpgradeOptionType.RunPassive) return Build != null && Build.CanUpgrade(option.RunPassiveId_Ref);
             if (GetUpgradeRank(option.Id) >= option.MaxRank) return false;
@@ -438,9 +445,15 @@ namespace Roguelike.Features.Combat.Run
         /// <summary>按配置类型应用构筑升级、技能解锁、属性来源或立即恢复。</summary>
         /// <param name="option">当前面板已验证的选项。</param>
         /// <param name="rank">应用后的新阶数。</param>
-        /// <remarks>武器读取 TbRunWeapon.ranks；被动读取 TbRunPassive.ranks 并替换同源效果；旧属性卡读取 TbUpgradeOption.modifiers，均按配置操作进入聚合器。</remarks>
+        /// <remarks>武器读取 TbRunWeapon.ranks，被动读取 TbRunPassive.ranks 并替换同源效果；职业修饰只记录 TbMechanismCard 身份，由协调器消费，不占槽。旧属性卡读取 TbUpgradeOption.modifiers。</remarks>
         private void ApplyUpgrade(UpgradeOptionConfig option, int rank)
         {
+            if (option.Type == EUpgradeOptionType.MechanismModifier)
+            {
+                selectedMechanisms.Add(definition.MechanismCards[option.Id].Id);
+                if (!FirstModifierMilli.HasValue) FirstModifierMilli = ElapsedMilli;
+                return;
+            }
             if (option.Type == EUpgradeOptionType.RunWeapon)
             {
                 Build.Upgrade(option.RunWeaponId_Ref);
@@ -552,6 +565,7 @@ namespace Roguelike.Features.Combat.Run
             currentChoices = Array.Empty<UpgradeOptionConfig>();
             attributes = new CombatAttributes(definition.Character.AttributeProfileId_Ref);
             Build = definition.BuildConfig == null ? null : new CombatBuildState(definition.BuildConfig);
+            ResetDraft();
             CurrentHealth = MaxHealth;
             foreach (var skill in definition.InitialSkills) activeSkills.Add(skill.Id, skill);
             if (Build != null) SynchronizeBuildSkills();

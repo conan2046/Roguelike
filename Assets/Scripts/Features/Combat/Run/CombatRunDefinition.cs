@@ -104,6 +104,7 @@ namespace Roguelike.Features.Combat.Run
             definition.ValidateExperience();
 
             Require(definition.UpgradePool != null, $"TbStageRule {definition.Rule.Id}: unresolved upgrade pool.");
+            definition.InitializeDraft(tables);
             definition.UpgradePools = definition.CollectUpgradePools();
             definition.UpgradeOptions = definition.UpgradePools
                 .SelectMany(pool => pool.Entries)
@@ -298,6 +299,12 @@ namespace Roguelike.Features.Combat.Run
                         $"TbUpgradeOption {option.Id}: invalid attribute modifier.");
                 switch (option.Type)
                 {
+                    case EUpgradeOptionType.MechanismModifier:
+                        Require(MechanismCards.ContainsKey(option.Id) && option.MaxRank == 1 &&
+                            !option.RunWeaponId.HasValue && !option.RunPassiveId.HasValue && !option.TargetSkillId.HasValue &&
+                            option.Modifiers.Count == 0 && !option.HealMilli.HasValue,
+                            $"TbUpgradeOption {option.Id}: invalid mechanism modifier payload.");
+                        break;
                     case EUpgradeOptionType.RunWeapon:
                         Require(BuildConfig != null && option.RunWeaponId_Ref != null &&
                                 BuildConfig.WeaponIds.Contains(option.RunWeaponId.Value) &&

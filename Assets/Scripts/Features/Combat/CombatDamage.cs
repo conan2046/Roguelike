@@ -9,6 +9,9 @@ namespace Roguelike.Features.Combat
         public double Attack, Hit, Critical;
         public ulong AttackerLifetime, Sequence;
         public int Faction;
+        public int SkillId;
+        public CombatDamageSource Source;
+        public bool SuppressMechanismRewards;
 
         /// <summary>生成攻击时快照有效攻击和已乘参数的对抗值。</summary>
         /// <param name="attributes">从 TbAttributeProfile 创建的最终属性。</param>
@@ -175,7 +178,10 @@ namespace Roguelike.Features.Combat
             CombatMath.NonNegative(until);
             target.Health -= loss;
             if (loss > 0 && target.IsPlayer) target.InvulnerableUntil = until;
-            if (loss > 0 && target.Health > 0) target.Guard.RecordEffectiveHit(time);
+            if (loss > 0 && target.Health > 0) target.Guard.RecordEffectiveHit(time,
+                !attack.SuppressMechanismRewards && attack.AttackerLifetime != target.Lifetime &&
+                attack.Source != CombatDamageSource.Environment && attack.Source != CombatDamageSource.Counter &&
+                attack.Source != CombatDamageSource.DomainPulse && attack.Source != CombatDamageSource.DomainDetonation);
             return new DamageResult { Outcome = critical ? DamageOutcome.Critical : DamageOutcome.Hit,
                 Damage = damage, HealthLost = loss, Killed = target.Health == 0 };
         }

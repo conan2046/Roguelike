@@ -27,6 +27,7 @@ namespace Roguelike.Features.Combat.Runtime
 #endif
         private CombatTilemapBackground mapBackground;
         private CombatUiRuntime ui;
+        private CombatBuildFeedbackUi buildFeedbackUi;
         private ICombatInput input;
         private World world;
         private bool started, closed, settingsApplied;
@@ -99,13 +100,14 @@ namespace Roguelike.Features.Combat.Runtime
         /// <param name="resources">生命周期长于本入口的统一资源服务。</param>
         /// <param name="input">由 TbCombatPresentation 构造的设备输入适配器。</param>
         /// <param name="token">组合根退出令牌。</param>
+        /// <param name="profileStore">组合根显式提供的玩家或隔离Profile；为空时仅演示且不访问任何存档。</param>
         /// <returns>战斗、美术、相机及正式 UI 全部就绪的任务。</returns>
         /// <remarks>失败或取消时按 UI、表现、会话、World、共享美术顺序回收，不保存场景。</remarks>
         /// <exception cref="InvalidOperationException">重复初始化、UI缺配或Prefab无效。</exception>
         /// <exception cref="ArgumentNullException">正式定义或输入适配器为空。</exception>
         /// <exception cref="OperationCanceledException">初始化被取消。</exception>
         public async Task InitializeAsync(CombatRunDefinition definition, IResourceService resources,
-            ICombatInput input, CancellationToken token)
+            ICombatInput input, CancellationToken token, BuildFeedbackProfileStore profileStore = null)
         {
             BeginInitialization();
             using var linked = CancellationTokenSource.CreateLinkedTokenSource(token, lifetime.Token);
@@ -123,7 +125,7 @@ namespace Roguelike.Features.Combat.Runtime
                 CreateWorld();
                 Session = await CombatSessionFactory.CreateAsync(world, definition, resources, linked.Token);
                 linked.Token.ThrowIfCancellationRequested();
-                RunModel = new CombatRunModel(definition);
+                RunModel = new CombatRunModel(definition, profileStore?.EnabledIds);
                 Coordinator = new CombatRunCoordinator(RunModel, Session);
                 visuals = new CombatEntityVisuals(world, Session, definition, assets);
                 feedback = await CombatFeedbackVisuals.CreateAsync(world, Session, definition, resources, linked.Token);
@@ -134,6 +136,8 @@ namespace Roguelike.Features.Combat.Runtime
 #endif
                 ui = await CombatUiRuntime.CreateAsync(definition, resources, transform, ViewCamera,
                     ChooseUpgrade, Restart, linked.Token, ClaimChest);
+                if (definition.DraftPolicy != null)
+                    buildFeedbackUi = await CombatBuildFeedbackUi.CreateAsync(Coordinator, profileStore, resources, ViewCamera, linked.Token);
                 if (definition.Tribulation != null)
                 {
                     tribulationUi = await CombatTribulationUi.CreateAsync(Coordinator, resources, transform, ViewCamera, ReturnToLobby, linked.Token);
@@ -350,6 +354,7 @@ namespace Roguelike.Features.Combat.Runtime
         public bool Restart()
         {
             if (!Ready) return false;
+            if (!TryFinalizeProfile()) return false;
             if (Coordinator != null)
             {
                 if (!Coordinator.Restart()) return false;
@@ -409,6 +414,7 @@ namespace Roguelike.Features.Combat.Runtime
                 status = RunModel.State.ToString();
                 ui?.Refresh(RunModel, Coordinator, Session);
                 tribulationUi?.Refresh();
+                buildFeedbackUi?.Refresh(Time.unscaledTimeAsDouble);
                 tribulationMarkers?.Synchronize();
                 return;
             }
@@ -461,6 +467,7 @@ namespace Roguelike.Features.Combat.Runtime
         private void ReleaseOwnedObjects()
         {
             Ready = false;
+            buildFeedbackUi?.Dispose(); buildFeedbackUi = null;
             Coordinator?.TerminateTribulation();
             tribulationMarkers?.Dispose(); tribulationMarkers = null;
             tribulationUi?.Dispose(); tribulationUi = null;

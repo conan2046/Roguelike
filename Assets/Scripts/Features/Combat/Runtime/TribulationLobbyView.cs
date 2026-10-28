@@ -9,5 +9,7 @@ namespace Roguelike.Features.Combat.Runtime
         public Text TitleText, IntroText, ErrorText;
         public Button[] RoleButtons;
         public Text[] RoleNames, RoleDescriptions, RoleButtonLabels;
+        public Text[] GoalDescriptions, ContentLabels;
+        public Toggle[] ContentToggles;
     }
 }

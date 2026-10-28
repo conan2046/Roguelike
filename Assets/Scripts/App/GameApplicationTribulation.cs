@@ -1,8 +1,10 @@
 using System.Threading;
 using System.Threading.Tasks;
+using System.Linq;
 using Roguelike.Core;
 using Roguelike.Core.Features;
 using Roguelike.Features.Combat.Runtime;
+using Roguelike.Features.Combat.Run;
 using UnityEngine;
 
 namespace Roguelike.App
@@ -28,7 +30,9 @@ namespace Roguelike.App
                 cancellationToken.ThrowIfCancellationRequested();
                 var root = new GameObject("[Roguelike.Tribulation]"); root.transform.SetParent(owner.transform, false);
                 owner.tribulationEntry = root.AddComponent<TribulationEntryController>();
-                await owner.tribulationEntry.InitializeAsync(services.Config.Tables, services.Resources, cancellationToken);
+                var profileConfig = services.Config.Tables.TbBuildFeedbackUi.DataList.Single();
+                var profile = new BuildFeedbackProfileStore(Application.persistentDataPath, profileConfig);
+                await owner.tribulationEntry.InitializeAsync(services.Config.Tables, services.Resources, cancellationToken, profile);
             }
         }
     }

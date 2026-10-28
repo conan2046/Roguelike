@@ -9,6 +9,8 @@ namespace Roguelike.Features.Combat
         public int ChargeHits, Charge;
         public double DurationSeconds, DamageTakenMultiplier, UntilSeconds;
         public ulong Activations;
+        public int EligibleChargeHits;
+        public bool ActivationRewardEligible;
 
         /// <summary>选定铁壁职业后从职业表复制必要参数；每次新单局重新创建。</summary>
         /// <param name="config">TbTribulationSignature的Guard行。</param>
@@ -29,12 +31,16 @@ namespace Roguelike.Features.Combat
 
         /// <summary>仅实际扣血且存活后蓄能；保护期间不蓄能、不刷新，达到阈值才产生一次反击信号。</summary>
         /// <param name="time">本次实际受击模拟秒数。</param>
+        /// <param name="rewardEligible">真实敌人攻击且不是自伤、环境或反射回流时为真；只控制新增修饰与目标收益。</param>
         /// <remarks>修改本目标纯值状态；Activations由协调器消费，不创建表现或直接伤害其他单位。</remarks>
-        public void RecordEffectiveHit(double time)
+        public void RecordEffectiveHit(double time, bool rewardEligible = true)
         {
             if (ChargeHits <= 0 || IsActive(time)) return;
             Charge++;
+            if (rewardEligible) EligibleChargeHits++;
             if (Charge < ChargeHits) return;
+            ActivationRewardEligible = EligibleChargeHits == ChargeHits;
+            EligibleChargeHits = 0;
             Charge = 0; UntilSeconds = time + DurationSeconds; Activations++;
         }
     }

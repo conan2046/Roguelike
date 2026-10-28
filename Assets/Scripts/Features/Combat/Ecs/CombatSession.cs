@@ -31,6 +31,7 @@ namespace Roguelike.Features.Combat.Ecs
         private NativeList<CombatDamageRequest> requests;
         private NativeList<CombatImpactEvent> impacts;
         private NativeList<CombatCastEvent> casts;
+        private NativeList<CombatLifeDamageEvent> lifeDamage;
         private NativeList<CombatAreaEvent> areas;
         private NativeList<CombatPersistentArea> persistentAreas;
         private NativeList<CombatDeathEvent> deaths;
@@ -201,6 +202,7 @@ namespace Roguelike.Features.Combat.Ecs
                     Allocator.Persistent);
                 impacts = new NativeList<CombatImpactEvent>(Allocator.Persistent);
                 casts = new NativeList<CombatCastEvent>(Allocator.Persistent);
+                lifeDamage = new NativeList<CombatLifeDamageEvent>(Allocator.Persistent);
                 areas = new NativeList<CombatAreaEvent>(Allocator.Persistent);
                 persistentAreas = new NativeList<CombatPersistentArea>(Allocator.Persistent);
                 deaths = new NativeList<CombatDeathEvent>(Allocator.Persistent);
@@ -223,6 +225,7 @@ namespace Roguelike.Features.Combat.Ecs
             if (!math.all(math.isfinite(movement))) throw new InvalidOperationException("Combat input must be finite.");
             impacts.Clear();
             casts.Clear();
+            lifeDamage.Clear();
             areas.Clear();
             deaths.Clear();
             if (Paused || Statistics.PlayerDead) return 0;
@@ -240,6 +243,12 @@ namespace Roguelike.Features.Combat.Ecs
                     Grid = grid, Requests = requests, Rules = damageRules, Input = movement,
                     Impacts = impacts,
                     Casts = casts,
+                    LifeDamage = lifeDamage,
+                    RecordLifeDamage = settings.TrackBuildFeedback,
+                    OverridePlayerMovement = feedbackMovementConfigured,
+                    PlayerBaseMoveSpeed = feedbackBaseMoveSpeed,
+                    PlayerMoveMultiplier = feedbackMoveMultiplier,
+                    PlayerMoveUntilTick = feedbackMoveUntilTick,
                     Areas = areas,
                     PersistentAreas = persistentAreas,
                     Deaths = deaths,
@@ -278,6 +287,7 @@ namespace Roguelike.Features.Combat.Ecs
         {
             EnsureAlive();
             ulong nextLifetime = counters[0].NextLifetime;
+            feedbackMovementConfigured = false;
             for (int slot = 0; slot < units.Length; slot++)
             {
                 var unit = templates[slot];
@@ -303,6 +313,7 @@ namespace Roguelike.Features.Combat.Ecs
             nextSpawnTick = timedSpawn ? SpawnDelayTicks(settings.SpawnIntervalSeconds) : 0;
             WaveNumber = 0; SpawnedInWave = 0; SpawnedMonsters = 0;
             grid.Clear(); requests.Clear(); impacts.Clear(); areas.Clear(); persistentAreas.Clear();
+            lifeDamage.Clear();
             casts.Clear();
             deaths.Clear();
             Paused = false;
@@ -1025,6 +1036,7 @@ private CombatUnit BuildUnit(AttributeProfileConfig profile, SkillConfig skillCo
             if (requests.IsCreated) requests.Dispose();
             if (impacts.IsCreated) impacts.Dispose();
             if (casts.IsCreated) casts.Dispose();
+            if (lifeDamage.IsCreated) lifeDamage.Dispose();
             if (areas.IsCreated) areas.Dispose();
             if (persistentAreas.IsCreated) persistentAreas.Dispose();
             if (deaths.IsCreated) deaths.Dispose();

@@ -33,6 +33,11 @@ namespace Roguelike.Features.Combat.Ecs
         public NativeList<CombatDamageRequest> Requests;
         public NativeList<CombatImpactEvent> Impacts;
         public NativeList<CombatCastEvent> Casts;
+        public NativeList<CombatLifeDamageEvent> LifeDamage;
+        public bool RecordLifeDamage;
+        public bool OverridePlayerMovement;
+        public float PlayerBaseMoveSpeed, PlayerMoveMultiplier;
+        public ulong PlayerMoveUntilTick;
         public NativeList<CombatAreaEvent> Areas;
         public NativeList<CombatPersistentArea> PersistentAreas;
         public NativeList<CombatDeathEvent> Deaths;
@@ -51,6 +56,12 @@ namespace Roguelike.Features.Combat.Ecs
             var counters = Counters[0];
             if (counters.PlayerDead) return;
             for (int slot = 0; slot < Units.Length; slot++) UnitStates[slot] = UnitData[Units[slot]];
+            if (OverridePlayerMovement)
+            {
+                var player = UnitStates[0];
+                player.MoveSpeed = PlayerBaseMoveSpeed * (counters.Tick < PlayerMoveUntilTick ? PlayerMoveMultiplier : 1f);
+                UnitStates[0] = player;
+            }
             bool burst = true;
             MarkManagedExecution(ref burst);
             counters.UsedBurst = burst;
@@ -257,6 +268,8 @@ namespace Roguelike.Features.Combat.Ecs
                     AttackSnapshot attack = weapon.Attack;
                     attack.Sequence = ++counters.NextAttack;
                     attack.AttackerLifetime = player.Target.Lifetime;
+                    attack.SkillId = weapon.SkillId;
+                    attack.Source = CombatDamageSource.Weapon;
                     if (weapon.Delivery == ESkillDeliveryType.Projectile)
                         SpawnPlayerProjectile(player, target, weapon, attack, ref counters);
                     else if (weapon.AreaDuration > 0)
@@ -506,6 +519,8 @@ namespace Roguelike.Features.Combat.Ecs
                 var attack = unit.Attack;
                 attack.Sequence = ++counters.NextAttack;
                 attack.AttackerLifetime = unit.Target.Lifetime;
+                attack.SkillId = unit.SkillId;
+                attack.Source = slot == 0 ? CombatDamageSource.Weapon : CombatDamageSource.Enemy;
                 if (unit.Delivery == ESkillDeliveryType.Melee)
                 {
                     unit.PendingAttack = attack;
@@ -757,6 +772,11 @@ namespace Roguelike.Features.Combat.Ecs
             {
                 counters.DamageEvents++;
                 counters.HealthLost += result.HealthLost;
+                if (RecordLifeDamage) LifeDamage.Add(new CombatLifeDamageEvent { EventId = (ulong)counters.DamageEvents,
+                    RootCastId = request.Attack.Sequence, OwnerId = request.Attack.AttackerLifetime,
+                    TargetId = request.TargetLifetime, Tick = counters.Tick + 1, SkillId = request.Attack.SkillId,
+                    HealthLost = result.HealthLost, RemainingHealth = unit.Target.Health, Source = request.Attack.Source, PlayerTarget = unit.Target.IsPlayer,
+                    RewardEligible = !request.Attack.SuppressMechanismRewards });
                 if (RestorePlayer && unit.Target.IsPlayer) unit.Target.Heal(unit.Target.MaxHealth);
             }
             if (result.Killed)

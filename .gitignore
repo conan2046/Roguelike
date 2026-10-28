@@ -18,6 +18,7 @@ UserSettings/
 .idea/
 *.csproj
 !/Tools/Config/CombatConfigChecks/CombatConfigChecks.csproj
+!/Tools/ProfileProbe/ProfileProbe.csproj
 /Tools/Config/CombatConfigChecks/bin/
 *.sln
 *.slnx

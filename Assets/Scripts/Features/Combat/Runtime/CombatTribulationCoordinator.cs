@@ -63,7 +63,7 @@ namespace Roguelike.Features.Combat.Runtime
 
         /// <summary>真实固定步结束后，投递职业伤害与已到期落雷；所有死亡交给同帧ConsumeCombatEvents处理一次。</summary>
         /// <param name="milliseconds">实际固定tick换算后的毫秒，暂停不调用。</param>
-        /// <remarks>范围、时限、倍率、环境阵营和表现引用全部消费TbTribulationRule/Signature；先结算实际命中再判断试炼截止。</remarks>
+        /// <remarks>范围、时限、倍率、环境阵营和表现引用消费TbTribulationRule/Signature。先提交阶段雷击及清阵，再消费尚有效的单调域事件；已经提交伤害不回滚。反击修饰读取TbMechanismCard，环境蓄能保留基准行为但不能产生新增卡或目标收益。</remarks>
         private void AdvanceTribulation(int milliseconds)
         {
             if (Tribulation == null || milliseconds <= 0 || session.Statistics.PlayerDead) return;
@@ -77,12 +77,10 @@ namespace Roguelike.Features.Combat.Runtime
                 if (unit.IsBoss && unit.Target.Health > 0) bossHealth = (int)(unit.Target.Health * 1000d / unit.Target.MaxHealth);
             }
             Tribulation.Advance(milliseconds, x, y, bossHealth);
+            BuildFeedback.RecordBossPhase(Tribulation.BossPhase);
             if (Domains != null)
             {
                 Domains.Advance(milliseconds, x, y);
-                foreach (var pulse in Domains.Pulses)
-                    session.ApplyConfiguredArea(new float2((float)pulse.XPixels, (float)pulse.YPixels) * scale,
-                        (float)pulse.RadiusPixels * scale, player.Attack, 0, pulse.DamagePermille, pulse.DamagePermille, signature.DomainSkillId_Ref);
             }
             foreach (var strike in Tribulation.DueStrikes)
             {
@@ -94,12 +92,26 @@ namespace Roguelike.Features.Combat.Runtime
                 if (strike.ClearsDomains) Domains?.ClearIntersecting(strike.XPixels, strike.YPixels, strike.RadiusPixels);
             }
             player = session.ReadUnit(0);
+            if (Domains != null && player.Target.Health > 0)
+                foreach (var pulse in Domains.Pulses)
+                {
+                    // 阵域事件按本局单调序号消费，重复通知不能再投递伤害或刷新交织。
+                    if (pulse.EventId <= lastConsumedDomainEvent) continue;
+                    lastConsumedDomainEvent = pulse.EventId;
+                    var result = session.ApplyConfiguredArea(new float2((float)pulse.XPixels, (float)pulse.YPixels) * scale,
+                        (float)pulse.RadiusPixels * scale, player.Attack, 0, pulse.DamagePermille, pulse.DamagePermille,
+                        signature.DomainSkillId_Ref, pulse.Explosion ? CombatDamageSource.DomainDetonation : CombatDamageSource.DomainPulse, true);
+                    if (pulse.Explosion) AcceptDetonation(result.CastId, result.EnemyHits);
+                }
             if (signature.Kind == ETribulationSignature.Guard && player.Target.Health > 0)
             {
                 while (consumedGuardActivations < player.Target.Guard.Activations)
                 {
-                    session.ApplyConfiguredArea(player.Position, signature.CounterRadiusPixels * scale, player.Attack,
-                        0, signature.CounterDamagePermille, signature.CounterDamagePermille, signature.CounterSkillId_Ref);
+                    bool eligible = player.Target.Guard.ActivationRewardEligible;
+                    var result = session.ApplyConfiguredArea(player.Position, CounterRadiusPixels * scale, player.Attack,
+                        0, signature.CounterDamagePermille, signature.CounterDamagePermille, signature.CounterSkillId_Ref,
+                        CombatDamageSource.Counter, eligible, signature.CounterRadiusPixels * scale);
+                    BuildFeedback.RecordMechanismCast(result.CastId, CombatDamageSource.Counter, result.EnemyHits, eligible);
                     consumedGuardActivations++;
                 }
             }

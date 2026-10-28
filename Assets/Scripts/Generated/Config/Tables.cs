@@ -169,6 +169,26 @@ public partial class Tables
     /// 模型与技能片段独立渲染层级
     /// </summary>
     public TbCombatRender TbCombatRender {get; }
+    /// <summary>
+    /// 构筑反馈P0
+    /// </summary>
+    public TbDraftPolicy TbDraftPolicy {get; }
+    /// <summary>
+    /// 构筑反馈P0
+    /// </summary>
+    public TbUpgradeRule TbUpgradeRule {get; }
+    /// <summary>
+    /// 构筑反馈P0
+    /// </summary>
+    public TbMechanismCard TbMechanismCard {get; }
+    /// <summary>
+    /// 构筑反馈P0
+    /// </summary>
+    public TbContentGoal TbContentGoal {get; }
+    /// <summary>
+    /// 构筑反馈P0
+    /// </summary>
+    public TbBuildFeedbackUi TbBuildFeedbackUi {get; }
 
     public Tables(System.Func<string, ByteBuf> loader)
     {
@@ -211,6 +231,11 @@ public partial class Tables
         TbTribulationRefinement = new TbTribulationRefinement(loader("tbtribulationrefinement"));
         TbTribulationUi = new TbTribulationUi(loader("tbtribulationui"));
         TbCombatRender = new TbCombatRender(loader("tbcombatrender"));
+        TbDraftPolicy = new TbDraftPolicy(loader("tbdraftpolicy"));
+        TbUpgradeRule = new TbUpgradeRule(loader("tbupgraderule"));
+        TbMechanismCard = new TbMechanismCard(loader("tbmechanismcard"));
+        TbContentGoal = new TbContentGoal(loader("tbcontentgoal"));
+        TbBuildFeedbackUi = new TbBuildFeedbackUi(loader("tbbuildfeedbackui"));
         ResolveRef();
     }
     
@@ -255,6 +280,11 @@ public partial class Tables
         TbTribulationRefinement.ResolveRef(this);
         TbTribulationUi.ResolveRef(this);
         TbCombatRender.ResolveRef(this);
+        TbDraftPolicy.ResolveRef(this);
+        TbUpgradeRule.ResolveRef(this);
+        TbMechanismCard.ResolveRef(this);
+        TbContentGoal.ResolveRef(this);
+        TbBuildFeedbackUi.ResolveRef(this);
     }
 }
 

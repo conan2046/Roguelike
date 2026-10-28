@@ -45,6 +45,7 @@ namespace Roguelike.Features.Combat.Runtime
                 throw new InvalidOperationException("Formal run model and ECS player do not share the same initial configuration.");
             if (model.Build != null) session.ApplyWeaponUpgrades(model.Build.CaptureWeapons(), model.AttributeSnapshot);
             InitializeTribulation();
+            InitializeBuildFeedback();
         }
 
         /// <summary>每渲染帧先推进 ECS 固定 tick，再按真实执行 tick 推进单局时钟并消费全部事件。</summary>
@@ -64,9 +65,12 @@ namespace Roguelike.Features.Combat.Runtime
             }
 
             session.Paused = false;
+            ApplyFeedbackMovement();
             int steps = session.Advance(elapsedSeconds, movement);
             int deltaMilli = ConvertTicksToMilliseconds(steps);
+            BuildFeedback.AdvanceClock(deltaMilli);
             AdvanceTribulation(deltaMilli);
+            ConsumeBuildFeedback();
             ConsumeCombatEvents();
             if (!IsSimulationActive(model.State))
             {
@@ -131,6 +135,7 @@ namespace Roguelike.Features.Combat.Runtime
             session.SynchronizePlayerSkills(model.ActiveSkills.Keys, model.Build?.CaptureWeapons());
             if (model.Build != null) session.ApplyWeaponUpgrades(model.Build.CaptureWeapons(), model.AttributeSnapshot);
             InitializeTribulation();
+            InitializeBuildFeedback();
             return true;
         }
 

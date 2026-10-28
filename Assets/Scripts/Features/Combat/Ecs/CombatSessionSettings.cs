@@ -36,6 +36,7 @@ namespace Roguelike.Features.Combat.Ecs
         public bool RestorePlayerAfterDamage { get; private set; }
         public bool StationaryInput { get; private set; }
         public bool IsFormalRun { get; private set; }
+        public bool TrackBuildFeedback { get; private set; }
 
         /// <summary>隐藏构造入口，确保设置只能从已解析的 Luban 配置创建。</summary>
         private CombatSessionSettings()
@@ -110,7 +111,8 @@ namespace Roguelike.Features.Combat.Ecs
                 ReplenishOnDeath = false,
                 RestorePlayerAfterDamage = false,
                 StationaryInput = false,
-                IsFormalRun = true
+                IsFormalRun = true,
+                TrackBuildFeedback = definition.DraftPolicy != null
             };
             settings.monstersById = monsters.ToDictionary(item => item.Id);
             return settings;

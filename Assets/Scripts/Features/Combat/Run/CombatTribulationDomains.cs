@@ -1,21 +1,31 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using cfg;
 
 namespace Roguelike.Features.Combat.Run
 {
+    /// <summary>阵域终止的技术原因，清阵／过期／容量回收不参与玩家引爆收益。</summary>
+    public enum DomainTerminationReason { Detonated, Expired, BossClear, OwnerRemoved, Capacity }
     /// <summary>周天阵域一次真实伤害请求；范围与倍率来自TbTribulationSignature，调用方交给正式会话结算。</summary>
     public readonly struct TribulationDomainPulse
     {
         public readonly double XPixels, YPixels, RadiusPixels;
         public readonly int DamagePermille;
         public readonly bool Explosion;
+        public readonly ulong EventId;
+        public readonly long SettlementMilli;
+        public readonly CombatTribulationDomains.Domain[] Participants;
 
         /// <summary>从已验证职业规则创建一次脉冲或重叠引爆。</summary>
         /// <param name="x">中心横像素。</param><param name="y">中心纵像素。</param><param name="radius">判定半径。</param>
         /// <param name="damage">源表伤害千分比。</param><param name="explosion">是否属于重叠引爆。</param>
-        public TribulationDomainPulse(double x, double y, double radius, int damage, bool explosion)
-        { XPixels = x; YPixels = y; RadiusPixels = radius; DamagePermille = damage; Explosion = explosion; }
+        /// <param name="eventId">本局阵域事件序号。</param><param name="settlementMilli">计划结算的模拟时点。</param>
+        /// <param name="participants">本事件参与的阵域身份与位置快照，不依赖存活列表。</param>
+        public TribulationDomainPulse(double x, double y, double radius, int damage, bool explosion,
+            ulong eventId = 0, long settlementMilli = 0, CombatTribulationDomains.Domain[] participants = null)
+        { XPixels = x; YPixels = y; RadiusPixels = radius; DamagePermille = damage; Explosion = explosion;
+            EventId = eventId; SettlementMilli = settlementMilli; Participants = participants ?? Array.Empty<CombatTribulationDomains.Domain>(); }
     }
 
     /// <summary>按源表移动距离留阵，维护阵域寿命、脉冲及重叠消耗；只使用逻辑像素与模拟毫秒。</summary>
@@ -37,6 +47,10 @@ namespace Roguelike.Features.Combat.Run
         private double anchorX, anchorY;
         private bool initialized;
         private ulong sequence;
+        private ulong eventSequence;
+        private readonly Dictionary<ulong, DomainTerminationReason> terminations = new Dictionary<ulong, DomainTerminationReason>();
+        public IReadOnlyDictionary<ulong, DomainTerminationReason> Terminations => terminations;
+        public double MoveProgressPixels { get; private set; }
         public long ElapsedMilli { get; private set; }
         public ulong ExplosionCount { get; private set; }
         public IReadOnlyList<Domain> Domains => domains;
@@ -62,12 +76,14 @@ public void Advance(int milliseconds, double xPixels, double yPixels)
             if (milliseconds < 0 || double.IsNaN(xPixels) || double.IsNaN(yPixels) || double.IsInfinity(xPixels) || double.IsInfinity(yPixels))
                 throw new ArgumentOutOfRangeException(nameof(milliseconds));
             pulses.Clear();
+            terminations.Clear();
             if (!initialized) { anchorX = xPixels; anchorY = yPixels; initialized = true; }
             if (milliseconds == 0) return;
             ElapsedMilli = checked(ElapsedMilli + milliseconds);
             CollectDuePulses();
             for (int i = domains.Count - 1; i >= 0; i--)
-                if (ElapsedMilli - domains[i].BornMilli >= config.DomainDurationMilli) domains.RemoveAt(i);
+                if (ElapsedMilli - domains[i].BornMilli >= config.DomainDurationMilli)
+                { terminations[domains[i].Id] = DomainTerminationReason.Expired; domains.RemoveAt(i); }
             double dx = xPixels - anchorX, dy = yPixels - anchorY;
             double distance = Math.Sqrt(dx * dx + dy * dy);
             while (distance >= config.DomainStepPixels)
@@ -77,6 +93,7 @@ public void Advance(int milliseconds, double xPixels, double yPixels)
                 AddDomain(anchorX, anchorY);
                 dx = xPixels - anchorX; dy = yPixels - anchorY; distance = Math.Sqrt(dx * dx + dy * dy);
             }
+            MoveProgressPixels = distance;
             CollectDuePulses();
         }
 
@@ -87,7 +104,8 @@ public void Advance(int milliseconds, double xPixels, double yPixels)
             foreach (var domain in domains)
                 while (domain.NextPulseMilli <= ElapsedMilli && domain.NextPulseMilli - domain.BornMilli < config.DomainDurationMilli)
                 {
-                    pulses.Add(new TribulationDomainPulse(domain.XPixels, domain.YPixels, config.DomainRadiusPixels, config.DomainDamagePermille, false));
+                    pulses.Add(new TribulationDomainPulse(domain.XPixels, domain.YPixels, config.DomainRadiusPixels, config.DomainDamagePermille,
+                        false, ++eventSequence, domain.NextPulseMilli, new[] { domain }));
                     domain.NextPulseMilli += config.DomainPulseMilli;
                 }
         }
@@ -98,7 +116,8 @@ public void Advance(int milliseconds, double xPixels, double yPixels)
         /// <remarks>达到容量时先回收最旧阵域。引爆只发正式伤害请求，不直接改变目标生命。</remarks>
         private void AddDomain(double x, double y)
         {
-            if (domains.Count == config.MaxDomains) domains.RemoveAt(0);
+            if (domains.Count == config.MaxDomains)
+            { terminations[domains[0].Id] = DomainTerminationReason.Capacity; domains.RemoveAt(0); }
             var created = new Domain { Id = ++sequence, XPixels = x, YPixels = y, BornMilli = ElapsedMilli, NextPulseMilli = ElapsedMilli };
             domains.Add(created); overlaps.Clear();
             double reach = config.DomainRadiusPixels * 2d;
@@ -108,28 +127,42 @@ public void Advance(int milliseconds, double xPixels, double yPixels)
                 if (dx * dx + dy * dy <= reach * reach) overlaps.Add(domain);
             }
             if (overlaps.Count < config.OverlapCount) return;
-            foreach (var domain in overlaps) domains.Remove(domain);
-            pulses.Add(new TribulationDomainPulse(x, y, config.OverlapRadiusPixels, config.OverlapDamagePermille, true));
+            foreach (var domain in overlaps) { domains.Remove(domain); terminations[domain.Id] = DomainTerminationReason.Detonated; }
+            pulses.Add(new TribulationDomainPulse(x, y, config.OverlapRadiusPixels, config.OverlapDamagePermille,
+                true, ++eventSequence, ElapsedMilli, overlaps.ToArray()));
             ExplosionCount++;
         }
 
         /// <summary>Boss破阵雷击结算时移除与真实命中圆相交的阵域。</summary>
         /// <param name="xPixels">雷击中心横像素。</param><param name="yPixels">雷击中心纵像素。</param><param name="radiusPixels">表内雷击半径。</param>
-        /// <returns>被清除的实际阵域数量。</returns><remarks>只移除阵域，不追溯撤回已经结算的脉冲伤害。</remarks>
+        /// <returns>被清除的不同阵域数量。</returns><remarks>先于本步待提交域事件消费调用；取消命中清阵范围的待提交脉冲／引爆，不追溯已提交伤害。</remarks>
         public int ClearIntersecting(double xPixels, double yPixels, double radiusPixels)
         {
-            int removed = 0; double reach = radiusPixels + config.DomainRadiusPixels;
+            var removed = new HashSet<ulong>(); double reach = radiusPixels + config.DomainRadiusPixels;
             for (int i = domains.Count - 1; i >= 0; i--)
             {
                 double dx = xPixels - domains[i].XPixels, dy = yPixels - domains[i].YPixels;
                 if (dx * dx + dy * dy > reach * reach) continue;
-                domains.RemoveAt(i); removed++;
+                removed.Add(domains[i].Id); terminations[domains[i].Id] = DomainTerminationReason.BossClear; domains.RemoveAt(i);
             }
-            return removed;
+            for (int i = pulses.Count - 1; i >= 0; i--)
+            {
+                var pulse = pulses[i];
+                if (!pulse.Participants.Any(d => (xPixels-d.XPixels)*(xPixels-d.XPixels) +
+                    (yPixels-d.YPixels)*(yPixels-d.YPixels) <= reach*reach)) continue;
+                foreach (var d in pulse.Participants) { removed.Add(d.Id); terminations[d.Id] = DomainTerminationReason.BossClear; }
+                if (pulse.Explosion) ExplosionCount--;
+                pulses.RemoveAt(i);
+            }
+            return removed.Count;
         }
 
         /// <summary>结算、重开或退出时清空本代次阵域和借用队列。</summary>
         /// <remarks>没有Unity资源或异步任务；下一代单局创建新的模型，不复用旧位置锚点。</remarks>
-        public void Clear() { domains.Clear(); pulses.Clear(); overlaps.Clear(); }
+        public void Clear()
+        {
+            foreach (var domain in domains) terminations[domain.Id] = DomainTerminationReason.OwnerRemoved;
+            domains.Clear(); pulses.Clear(); overlaps.Clear(); MoveProgressPixels = 0;
+        }
     }
 }

@@ -36,6 +36,10 @@ namespace cfg
         /// 获得被动或升级
         /// </summary>
         RunPassive = 5,
+        /// <summary>
+        /// 单级职业机制修饰
+        /// </summary>
+        MechanismModifier = 6,
     }
 
 } 

@@ -406,7 +406,7 @@ internal static class Program
             Roguelike.Features.Combat.Run.CombatBuildState.Validate(build, build.CharacterId ?? stage.InitialCharacterId);
         Require(stage.RunBuildId_Ref != null && stageRule.UpgradePoolId_Ref.Entries.All(entry =>
                 entry.OptionId_Ref.Type == EUpgradeOptionType.RunWeapon || entry.OptionId_Ref.Type == EUpgradeOptionType.RunPassive ||
-                entry.OptionId_Ref.Type == EUpgradeOptionType.Heal), "Formal build pool contains a slot-bypassing legacy option.");
+                entry.OptionId_Ref.Type == EUpgradeOptionType.Heal || entry.OptionId_Ref.Type == EUpgradeOptionType.MechanismModifier), "Formal build pool contains a slot-bypassing legacy option.");
         foreach (var option in tables.TbUpgradeOption.DataList)
         {
             Require(Enum.IsDefined(option.Type) && option.MaxRank > 0 &&
@@ -416,6 +416,12 @@ internal static class Program
                 $"TbUpgradeOption {option.Id}: invalid attribute modifier.");
             switch (option.Type)
             {
+                case EUpgradeOptionType.MechanismModifier:
+                    Require(tables.TbMechanismCard.DataList.Any(card => card.OptionId == option.Id) && option.MaxRank == 1 &&
+                            !option.RunWeaponId.HasValue && !option.RunPassiveId.HasValue && !option.TargetSkillId.HasValue &&
+                            option.Modifiers.Count == 0 && !option.HealMilli.HasValue,
+                        $"TbUpgradeOption {option.Id}: invalid mechanism modifier.");
+                    break;
                 case EUpgradeOptionType.RunWeapon:
                     Require(option.RunWeaponId_Ref != null && option.MaxRank == option.RunWeaponId_Ref.Ranks.Count &&
                             !option.RunPassiveId.HasValue && !option.TargetSkillId.HasValue && option.Modifiers.Count == 0 && !option.HealMilli.HasValue,
