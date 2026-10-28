@@ -65,14 +65,16 @@ namespace Roguelike.Features.Combat.Ui.Editor
             }
         }
 
-        /// <summary>创建全屏 HUD Canvas、顶部信息和底部经验条的正式结构。</summary>
+        /// <summary>创建独立于移动相机的屏幕覆盖 HUD Canvas，以及顶部信息和底部经验条的正式结构。</summary>
         /// <param name="font">正式 uGUI 字体。</param>
         /// <returns>等待保存的内存根对象。</returns>
+        /// <remarks>只创建调用方负责保存或销毁的内存对象；覆盖模式与像素对齐作为 Canvas 技术设置，已有手调 Prefab 不由本方法重建。</remarks>
         private static GameObject BuildHud(Font font)
         {
             GameObject root = RectObject("CombatHud", null);
             Canvas canvas = root.AddComponent<Canvas>();
-            canvas.renderMode = RenderMode.ScreenSpaceCamera;
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.pixelPerfect = true;
             canvas.planeDistance = 1f;
             canvas.sortingOrder = 100;
             CanvasScaler scaler = root.AddComponent<CanvasScaler>();

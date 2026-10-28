@@ -83,17 +83,17 @@ namespace Roguelike.Features.Combat.Runtime
             settlement.RestartButton.onClick.AddListener(RestartFromButton);
         }
 
-        /// <summary>按 TbCombatUiSet 逐项加载正式 Prefab 与字体，并在运行器节点下组成界面。</summary>
+        /// <summary>按 TbCombatUiSet 加载正式 Prefab 与字体，使用预制体定义的屏幕覆盖 Canvas 组成固定 HUD。</summary>
         /// <param name="definition">已经通过 UI 引用校验的 TbStage 聚合定义。</param>
         /// <param name="resources">统一 YooAsset 资源服务。</param>
-        /// <param name="parent">战斗运行器拥有的生命周期父节点。</param>
-        /// <param name="camera">正式战斗相机，用于让 ScreenSpaceCamera Canvas 进入同一帧缓冲。</param>
+        /// <param name="parent">战斗运行器拥有的生命周期父节点，持有 HUD 和本次自建输入事件系统。</param>
+        /// <param name="camera">当前正式战斗相机；验证调用方已完成场景初始化，固定 HUD 不绑定其移动或投影。</param>
         /// <param name="chooseUpgrade">升级卡按钮提交入口。</param>
         /// <param name="restart">结算按钮重开入口。</param>
         /// <param name="token">退出加载令牌。</param>
         /// <param name="claimChest">正式宝箱领取入口；不使用宝箱的测试入口可省略。</param>
         /// <returns>全部资源及实例就绪的正式 UI。</returns>
-        /// <remarks>部分加载或实例化失败时立即释放已有句柄和对象，不保存 Scene 或 Prefab。</remarks>
+        /// <remarks>HUD 的 ScreenSpaceOverlay 模式、像素对齐与布局均在 Prefab 保存，避免移动相机的批次更新或投影参与屏幕边缘遮挡。实例归本对象释放；部分失败立即释放句柄和对象，不改写布局或保存 Scene/Prefab。</remarks>
         public static async Task<CombatUiRuntime> CreateAsync(CombatRunDefinition definition,
             IResourceService resources, Transform parent, Camera camera, Func<ulong, int, bool> chooseUpgrade,
             Func<bool> restart, CancellationToken token, Func<ulong, int, bool> claimChest = null)
@@ -123,8 +123,8 @@ namespace Roguelike.Features.Combat.Runtime
                 CombatHudView hud = RequireView<CombatHudView>(root, "CombatHud");
                 Canvas canvas = root.GetComponent<Canvas>() ??
                     throw new InvalidOperationException("CombatHud prefab lacks its Canvas.");
-                canvas.renderMode = RenderMode.ScreenSpaceCamera;
-                canvas.worldCamera = camera;
+                if (canvas.renderMode != RenderMode.ScreenSpaceOverlay)
+                    throw new InvalidOperationException("CombatHud prefab must use a screen-space overlay Canvas.");
                 BossHealthBarView boss = RequireView<BossHealthBarView>(
                     UnityEngine.Object.Instantiate(bossHandle.Asset, root.transform, false), "BossHealthBar");
                 UpgradeChoicePanelView upgrade = RequireView<UpgradeChoicePanelView>(

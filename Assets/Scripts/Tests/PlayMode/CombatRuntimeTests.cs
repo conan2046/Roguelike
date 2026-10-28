@@ -247,9 +247,8 @@ namespace Roguelike.Tests
                 Assert.That(formalScale.z, Is.GreaterThan(0));
                 Assert.That(((RectTransform)runner.FormalUiRoot.transform).rect.size.sqrMagnitude, Is.GreaterThan(0));
                 Assert.That(formalCanvas.isActiveAndEnabled, Is.True);
-                Assert.That(formalCanvas.worldCamera, Is.EqualTo(runner.ViewCamera));
-                Assert.That(formalCanvas.planeDistance, Is.GreaterThan(runner.ViewCamera.nearClipPlane));
-                Assert.That(formalCanvas.planeDistance, Is.LessThan(runner.ViewCamera.farClipPlane));
+                Assert.That(formalCanvas.renderMode, Is.EqualTo(RenderMode.ScreenSpaceOverlay));
+                Assert.That(formalCanvas.worldCamera, Is.Null);
                 Assert.That(runner.RunModel.State, Is.EqualTo(CombatRunState.Playing));
                 Assert.That(runner.Coordinator, Is.Not.Null);
                 yield return CaptureCamera(runner.ViewCamera, "formal-stage.png");
@@ -305,7 +304,7 @@ namespace Roguelike.Tests
                 UpgradeChoicePanelView upgrade = runner.FormalUiRoot.GetComponentInChildren<UpgradeChoicePanelView>(true);
                 Assert.That(upgrade.gameObject.activeSelf, Is.True);
                 Assert.That(upgrade.CardContainer.childCount, Is.EqualTo(definition.UpgradePool.DrawCount));
-                upgrade.CardContainer.GetChild(0).GetComponent<UpgradeCardView>().SelectButton.onClick.Invoke();
+                yield return ClickHudButtonThroughRaycast(upgrade.CardContainer.GetChild(0).GetComponent<UpgradeCardView>().SelectButton);
                 Assert.That(runner.RunModel.State, Is.EqualTo(CombatRunState.Playing));
                 Assert.That(upgrade.gameObject.activeSelf, Is.False);
 
@@ -336,7 +335,7 @@ namespace Roguelike.Tests
                 Assert.That(runner.RunModel.State, Is.EqualTo(CombatRunState.VictorySettlement));
                 SettlementPanelView settlement = runner.FormalUiRoot.GetComponentInChildren<SettlementPanelView>(true);
                 Assert.That(settlement.gameObject.activeSelf, Is.True);
-                settlement.RestartButton.onClick.Invoke();
+                yield return ClickHudButtonThroughRaycast(settlement.RestartButton);
                 Assert.That(runner.RunModel.State, Is.EqualTo(CombatRunState.Playing));
                 Assert.That(runner.RunModel.ElapsedMilli, Is.Zero);
                 Assert.That(settlement.gameObject.activeSelf, Is.False);
@@ -383,7 +382,7 @@ namespace Roguelike.Tests
                 Assert.That(runner.Session.Statistics.Tick, Is.EqualTo(frozenTick));
                 Assert.That(runner.RunModel.ElapsedMilli, Is.EqualTo(frozenElapsedMilli));
 
-                settlement.RestartButton.onClick.Invoke();
+                yield return ClickHudButtonThroughRaycast(settlement.RestartButton);
                 Assert.That(runner.RunModel.State, Is.EqualTo(CombatRunState.Playing));
                 Assert.That(runner.RunModel.Result, Is.Null);
                 Assert.That(runner.RunModel.ElapsedMilli, Is.Zero);
@@ -562,6 +561,12 @@ namespace Roguelike.Tests
         /// <remarks>临时目标和 CPU 纹理在 finally 销毁，恢复相机原目标。</remarks>
         private static IEnumerator CaptureCamera(Camera camera, string fileName)
         {
+            if (UnityEngine.Object.FindObjectsOfType<CombatHudView>().Any(hud =>
+                hud.GetComponent<Canvas>().renderMode == RenderMode.ScreenSpaceOverlay))
+            {
+                yield return CaptureGameScreen(fileName);
+                yield break;
+            }
             var target = new RenderTexture(1280, 720, 24); var pixels = new Texture2D(1280, 720, TextureFormat.RGB24, false);
             var oldTarget = camera.targetTexture; var oldActive = RenderTexture.active;
             try
