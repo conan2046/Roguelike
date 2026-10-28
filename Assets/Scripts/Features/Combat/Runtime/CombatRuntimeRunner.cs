@@ -187,6 +187,7 @@ namespace Roguelike.Features.Combat.Runtime
             ViewCamera.transform.localPosition = new Vector3(0, 0, -presentation.CameraDepthPixels * worldUnitsPerPixel);
             UpdateCameraFit();
             UpdateCameraFollow();
+            InitializeArenaBoundary();
         }
 
         /// <summary>初始化测试入口时检查 OnGUI、输入帮助与相机参数。</summary>
@@ -283,7 +284,7 @@ namespace Roguelike.Features.Combat.Runtime
         }
 
         /// <summary>Unity LateUpdate 在模拟和选帧后推进自有 World 的变换与 Presentation。</summary>
-        /// <remarks>暂停时仍绘制冻结画面；编辑器内同步临时行走边界红框，范围来自本局 TbMap，跟随标记所有者退出回收。World 从不注册到全局 PlayerLoop。</remarks>
+        /// <remarks>暂停时仍绘制冻结画面；所有战斗入口同步来自会话实际移动边界的通用红框，由运行器退出回收。World 从不注册到全局 PlayerLoop。</remarks>
         private void LateUpdate()
         {
             if (!Ready) return;
@@ -291,9 +292,7 @@ namespace Roguelike.Features.Combat.Runtime
             {
                 UpdateCameraFit();
                 UpdateCameraFollow();
-#if UNITY_EDITOR
-                tribulationMarkers?.SynchronizeArenaBoundary(ViewCamera);
-#endif
+                arenaBoundary?.Synchronize(ViewCamera);
                 world.Update();
             }
             catch (Exception exception)
@@ -467,6 +466,7 @@ namespace Roguelike.Features.Combat.Runtime
         private void ReleaseOwnedObjects()
         {
             Ready = false;
+            arenaBoundary?.Dispose(); arenaBoundary = null;
             buildFeedbackUi?.Dispose(); buildFeedbackUi = null;
             Coordinator?.TerminateTribulation();
             tribulationMarkers?.Dispose(); tribulationMarkers = null;

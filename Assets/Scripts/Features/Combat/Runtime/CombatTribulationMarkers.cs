@@ -18,10 +18,6 @@ namespace Roguelike.Features.Combat.Runtime
         private readonly HashSet<string> visible = new HashSet<string>();
         private readonly Color warning, altar, domain, spent;
         private bool disposed;
-#if UNITY_EDITOR
-        private LineRenderer arenaBoundary;
-        private Material arenaBoundaryMaterial;
-#endif
 
         /// <summary>当前运行器就绪后建立临时绘制所有者；材质仅驻留内存并随Dispose释放。</summary>
         /// <param name="coordinator">当前正式协调器。</param><param name="parent">运行器根节点。</param>
@@ -60,7 +56,7 @@ namespace Roguelike.Features.Combat.Runtime
                 if (player.Target.Guard.IsActive(coordinator.Session.Statistics.Tick * coordinator.Session.StepSeconds))
                 {
                     float scale = coordinator.Model.Definition.CombatRules.WorldUnitsPerPixel;
-                    Draw("guard", player.Position.x / scale, player.Position.y / scale, state.Config.SignatureId_Ref.CounterRadiusPixels, altar);
+                    Draw("guard", player.Position.x / scale, player.Position.y / scale, coordinator.CounterRadiusPixels, altar);
                 }
             }
             foreach (string key in circles.Keys.Where(k => !visible.Contains(k)).ToArray())
@@ -91,52 +87,12 @@ namespace Roguelike.Features.Combat.Runtime
             }
         }
 
-#if UNITY_EDITOR
-        /// <summary>编辑器试玩期间常驻绘制真实行走场地红框，暂停及升级选择时仍按摄像机保持显示线宽。</summary>
-        /// <param name="camera">本局正交摄像机，用于将两个显示像素转换为世界线宽。</param>
-        /// <remarks>几何读取 TbMap.arenaHalfWidthPixels/arenaHalfHeightPixels 与 TbCombatRules.worldUnitsPerPixel；红色、两显示像素和最前队列仅为本次临时诊断样式。只创建内存线条与独占材质，由 Dispose 回收；不保存 Scene/Prefab 或生成预览资产，不参与正式构建。</remarks>
-        public void SynchronizeArenaBoundary(Camera camera)
-        {
-            if (disposed || camera == null || camera.pixelHeight <= 0) return;
-            if (arenaBoundary == null)
-            {
-                arenaBoundaryMaterial = new Material(material)
-                {
-                    name = "Arena Boundary Debug (Editor Only)",
-                    hideFlags = HideFlags.HideAndDontSave,
-                    renderQueue = 5000
-                };
-                var item = new GameObject("[Debug] Walkable Arena Boundary") { hideFlags = HideFlags.DontSave };
-                item.transform.SetParent(root.transform, false);
-                arenaBoundary = item.AddComponent<LineRenderer>();
-                arenaBoundary.sharedMaterial = arenaBoundaryMaterial;
-                arenaBoundary.useWorldSpace = false;
-                arenaBoundary.loop = true;
-                arenaBoundary.positionCount = 4;
-                arenaBoundary.alignment = LineAlignment.View;
-                arenaBoundary.sortingOrder = short.MaxValue;
-                arenaBoundary.startColor = arenaBoundary.endColor = Color.red;
-                var definition = coordinator.Model.Definition;
-                float scale = definition.CombatRules.WorldUnitsPerPixel;
-                float x = definition.Map.ArenaHalfWidthPixels * scale;
-                float y = definition.Map.ArenaHalfHeightPixels * scale;
-                arenaBoundary.SetPositions(new[] { new Vector3(-x, -y, 0), new Vector3(x, -y, 0),
-                    new Vector3(x, y, 0), new Vector3(-x, y, 0) });
-            }
-            arenaBoundary.startWidth = arenaBoundary.endWidth = camera.orthographicSize * 4f / camera.pixelHeight;
-        }
-#endif
-
-        /// <summary>关闭当前运行器时释放所有临时线条、共享内存材质及编辑器边界诊断材质；重复调用安全。</summary>
+        /// <summary>关闭当前运行器时释放职业临时线条及共享内存材质；通用行走边界由运行器单独回收，重复调用安全。</summary>
         /// <remarks>不删除磁盘资产；先禁用所有者，Unity在帧末销毁对象。</remarks>
         public void Dispose()
         {
             if (disposed) return; disposed = true;
             root.SetActive(false); UnityEngine.Object.Destroy(root); UnityEngine.Object.Destroy(material); circles.Clear(); visible.Clear();
-#if UNITY_EDITOR
-            if (arenaBoundaryMaterial != null) UnityEngine.Object.Destroy(arenaBoundaryMaterial);
-            arenaBoundary = null; arenaBoundaryMaterial = null;
-#endif
         }
     }
 }

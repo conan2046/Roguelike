@@ -79,6 +79,12 @@ public sealed partial class CombatPresentationConfig : Luban.BeanBase
         DamageNumberKerningPermille = _buf.ReadInt();
         DamageNumberGlyphScalePermille = _buf.ReadInt();
         {int n0 = _buf.ReadSize(); RenderConfigIds = new System.Collections.Generic.List<int>(n0);for(var i0 = 0 ; i0 < n0 ; i0++) { int _e0;  _e0 = _buf.ReadInt(); RenderConfigIds.Add(_e0);}}
+        ArenaBoundaryDefaultVisible = _buf.ReadBool();
+        ArenaBoundaryColor = _buf.ReadString();
+        ArenaBoundaryWidthPixels = _buf.ReadFloat();
+        ArenaBoundarySortingOrder = _buf.ReadInt();
+        ArenaBoundaryRenderQueue = _buf.ReadInt();
+        ArenaBoundaryShaderName = _buf.ReadString();
     }
 
     public static CombatPresentationConfig DeserializeCombatPresentationConfig(ByteBuf _buf)
@@ -317,6 +323,30 @@ public sealed partial class CombatPresentationConfig : Luban.BeanBase
     /// </summary>
     public readonly System.Collections.Generic.List<int> RenderConfigIds;
     public System.Collections.Generic.List<CombatRenderConfig> RenderConfigIds_Ref;
+    /// <summary>
+    /// 战斗地图行走边界默认显示；供统一运行时开关初始化
+    /// </summary>
+    public readonly bool ArenaBoundaryDefaultVisible;
+    /// <summary>
+    /// 真实行走边界线颜色
+    /// </summary>
+    public readonly string ArenaBoundaryColor;
+    /// <summary>
+    /// 边界线宽，显示像素，不改变行走范围
+    /// </summary>
+    public readonly float ArenaBoundaryWidthPixels;
+    /// <summary>
+    /// 世界边界线排序，低于屏幕覆盖HUD
+    /// </summary>
+    public readonly int ArenaBoundarySortingOrder;
+    /// <summary>
+    /// 世界边界线材质渲染队列
+    /// </summary>
+    public readonly int ArenaBoundaryRenderQueue;
+    /// <summary>
+    /// 边界线正式引擎Shader标识
+    /// </summary>
+    public readonly string ArenaBoundaryShaderName;
    
     public const int __ID__ = 600358192;
     public override int GetTypeId() => __ID__;
@@ -397,6 +427,12 @@ public sealed partial class CombatPresentationConfig : Luban.BeanBase
         + "damageNumberKerningPermille:" + DamageNumberKerningPermille + ","
         + "damageNumberGlyphScalePermille:" + DamageNumberGlyphScalePermille + ","
         + "renderConfigIds:" + Luban.StringUtil.CollectionToString(RenderConfigIds) + ","
+        + "arenaBoundaryDefaultVisible:" + ArenaBoundaryDefaultVisible + ","
+        + "arenaBoundaryColor:" + ArenaBoundaryColor + ","
+        + "arenaBoundaryWidthPixels:" + ArenaBoundaryWidthPixels + ","
+        + "arenaBoundarySortingOrder:" + ArenaBoundarySortingOrder + ","
+        + "arenaBoundaryRenderQueue:" + ArenaBoundaryRenderQueue + ","
+        + "arenaBoundaryShaderName:" + ArenaBoundaryShaderName + ","
         + "}";
     }
 }

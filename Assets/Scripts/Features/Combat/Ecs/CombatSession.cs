@@ -53,6 +53,8 @@ namespace Roguelike.Features.Combat.Ecs
         public double BacklogSeconds { get; private set; }
         public double PeakBacklogSeconds { get; private set; }
         public double StepSeconds { get; }
+        /// <summary>移动与生成判定实际使用的世界坐标半边界；只读可视化必须读取此值，不能以背景铺设范围替代。</summary>
+        public float2 MovementBoundsHalfSize => settings.Arena;
         public int UnitCount => units.Length;
         public int ProjectileCapacity => projectiles.Length;
         public int PlayerWeaponCount => playerWeapons.IsCreated ? playerWeapons.Length : 0;
