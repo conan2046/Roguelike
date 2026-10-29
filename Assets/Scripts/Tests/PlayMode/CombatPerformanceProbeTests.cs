@@ -36,6 +36,8 @@ namespace Roguelike.Tests
     public sealed class CombatPerformanceProbeTests
     {
         private const BindingFlags PrivateInstance = BindingFlags.Instance | BindingFlags.NonPublic;
+        private const ProfilerRecorderOptions FramePhaseOptions = ProfilerRecorderOptions.StartImmediately |
+            ProfilerRecorderOptions.SumAllSamplesInFrame | ProfilerRecorderOptions.WrapAroundWhenCapacityReached;
         private readonly List<Sample> samples = new List<Sample>(50000);
         private readonly List<Result> results = new List<Result>();
         private string output;
@@ -88,6 +90,12 @@ namespace Roguelike.Tests
         /// <remarks>只在测试副本改变同屏数量、补怪/恢复策略与构筑；复用正式战斗、ANI、反馈、地图。finally恢复Burst/帧设置并释放所有内存对象。</remarks>
         [UnityTest, Timeout(900000), Category("Stress"), Explicit("500/1000/2000渲染性能专项，仅在授权的独占窗口经MCP运行。")]
         public IEnumerator ThreeTiersMeasureCombatAndSixEvolutionEnvelope() => RunProbe(new[] { 500, 1000, 2000 }, new[] { false, true }, false);
+
+        /// <summary>只复测尚未通过的2000档基础与六超武负载，完整预热、采样及预算仍读取TbPerformanceScenario。</summary>
+        /// <returns>两组完整容量采样的协程。</returns>
+        /// <remarks>沿用原测试夹具与清理链；不改正式构筑、配置门槛，也不把专项执行成功当预算通过。</remarks>
+        [UnityTest, Timeout(420000), Category("Stress"), Explicit("2000档完整容量复测，精确选择名称运行。")]
+        public IEnumerator TwoThousandMeasureCombatAndSixEvolutionEnvelope() => RunProbe(new[] { 2000 }, new[] { false, true }, false);
 
         /// <summary>三档结果发现模拟瓶颈后，用一档较短诊断收集原生六阶段计时，不替代完整容量样本。</summary>
         /// <returns>真实资源与Burst计时的协程。</returns><remarks>仍只改测试会话；退出恢复全局设置并释放资源。</remarks>
@@ -310,7 +318,7 @@ namespace Roguelike.Tests
             }
         }
 
-        /// <summary>创建一档真实原生战斗与渲染，预热后按墙钟采样；不使用同步长循环阻断编辑器。</summary>
+        /// <summary>创建真实战斗与渲染，按TbPerformanceScenario预热后从实际采样边界计时，确保完整输入时长送达模拟。</summary>
         /// <param name="count">测试协议指定的存活怪物数量。</param><param name="evolved">是否使用源表通用六槽满星/满被动/全进化上界。</param>
         /// <returns>初始化、预热与采样协程。</returns>
         /// <remarks>关闭单局经验/箱/升级模型调度，仅测战斗、ANI选帧、反馈和Entities渲染；补怪与玩家恢复只存在于测试会话。</remarks>
@@ -354,12 +362,12 @@ namespace Roguelike.Tests
 #if UNITY_EDITOR
             var graphics = world.GetExistingSystemManaged<Unity.Rendering.EntitiesGraphicsSystem>();
 #endif
-            using var unitRead = ProfilerRecorder.StartNew(ProfilerCategory.Scripts, "Roguelike.Presentation.UnitRead", 1, ProfilerRecorderOptions.StartImmediately | ProfilerRecorderOptions.SumAllSamplesInFrame);
-            using var aniSample = ProfilerRecorder.StartNew(ProfilerCategory.Scripts, "Roguelike.Presentation.AniSample", 1, ProfilerRecorderOptions.StartImmediately | ProfilerRecorderOptions.SumAllSamplesInFrame);
-            using var renderWrite = ProfilerRecorder.StartNew(ProfilerCategory.Scripts, "Roguelike.Presentation.RenderWrite", 1, ProfilerRecorderOptions.StartImmediately | ProfilerRecorderOptions.SumAllSamplesInFrame);
-            using var healthBars = ProfilerRecorder.StartNew(ProfilerCategory.Scripts, "Roguelike.Presentation.HealthBars", 1, ProfilerRecorderOptions.StartImmediately | ProfilerRecorderOptions.SumAllSamplesInFrame);
-            using var damageNumbers = ProfilerRecorder.StartNew(ProfilerCategory.Scripts, "Roguelike.Presentation.DamageNumbers", 1, ProfilerRecorderOptions.StartImmediately | ProfilerRecorderOptions.SumAllSamplesInFrame);
-            using var skills = ProfilerRecorder.StartNew(ProfilerCategory.Scripts, "Roguelike.Presentation.Skills", 1, ProfilerRecorderOptions.StartImmediately | ProfilerRecorderOptions.SumAllSamplesInFrame);
+            using var unitRead = ProfilerRecorder.StartNew(ProfilerCategory.Scripts, "Roguelike.Presentation.UnitRead", 1, FramePhaseOptions);
+            using var aniSample = ProfilerRecorder.StartNew(ProfilerCategory.Scripts, "Roguelike.Presentation.AniSample", 1, FramePhaseOptions);
+            using var renderWrite = ProfilerRecorder.StartNew(ProfilerCategory.Scripts, "Roguelike.Presentation.RenderWrite", 1, FramePhaseOptions);
+            using var healthBars = ProfilerRecorder.StartNew(ProfilerCategory.Scripts, "Roguelike.Presentation.HealthBars", 1, FramePhaseOptions);
+            using var damageNumbers = ProfilerRecorder.StartNew(ProfilerCategory.Scripts, "Roguelike.Presentation.DamageNumbers", 1, FramePhaseOptions);
+            using var skills = ProfilerRecorder.StartNew(ProfilerCategory.Scripts, "Roguelike.Presentation.Skills", 1, FramePhaseOptions);
             double start = Time.realtimeSinceStartupAsDouble, previous = start;
             double sampleStart = 0, debtAtStart = 0;
             ulong ticksAtStart = 0;
@@ -367,12 +375,16 @@ namespace Roguelike.Tests
             int visibleAtStart = CountInView();
             WriteProgress("warmup", count, evolved);
             double sampleSeconds = diagnosticOnly ? Math.Min(limits.WarmupSeconds, limits.SampleSeconds) : limits.SampleSeconds;
-            while (Time.realtimeSinceStartupAsDouble - start < limits.WarmupSeconds + sampleSeconds)
+            // previous是已送入Advance的墙钟终点；仅用当前墙钟退出会漏掉最后一次模拟推进。
+            while (!announced || previous - sampleStart < sampleSeconds)
             {
                 double now = Time.realtimeSinceStartupAsDouble;
                 bool recording = now - start >= limits.WarmupSeconds;
                 if (recording && !announced)
                 {
+                    // 先结清未记录的预热尾段，再建立采样基线，避免把预热tick计入样本。
+                    session.Advance(now - previous, float2.zero);
+                    previous = now;
                     announced = true; sampleStart = now; ticksAtStart = session.Statistics.Tick; debtAtStart = session.BacklogSeconds;
                     WriteProgress("sampling", count, evolved);
                 }
@@ -413,9 +425,14 @@ namespace Roguelike.Tests
                         projectiles = session.Statistics.ActiveProjectiles, backlog = session.BacklogSeconds });
             }
             var stats = session.Statistics;
+            double measuredSeconds = Time.realtimeSinceStartupAsDouble - sampleStart;
+            Assert.That(measuredSeconds, Is.GreaterThanOrEqualTo(sampleSeconds), "The measured wall-clock window must be complete.");
+            Assert.That(previous - sampleStart, Is.GreaterThanOrEqualTo(sampleSeconds), "The full sampling interval must reach Advance; backlog remains visible.");
+            Assert.That(samples.Sum(item => item.ticks), Is.EqualTo((long)(stats.Tick - ticksAtStart)), "Per-frame ticks must reconcile with session statistics.");
             var result = new Result { monsters = count, load = evolved ? "six-evolution-envelope" : "initial-weapon", width = target.width, height = target.height,
-                frameCount = samples.Count, warmupSeconds = limits.WarmupSeconds, measuredSeconds = Time.realtimeSinceStartupAsDouble - sampleStart,
-                averageFps = samples.Count / (Time.realtimeSinceStartupAsDouble - sampleStart), frameP95Ms = Percentile(samples.Select(item => item.frameMs), .95),
+                frameCount = samples.Count, warmupSeconds = limits.WarmupSeconds, measuredSeconds = measuredSeconds,
+                requestedSampleSeconds = sampleSeconds, suppliedSampleSeconds = previous - sampleStart,
+                averageFps = samples.Count / measuredSeconds, frameP95Ms = Percentile(samples.Select(item => item.frameMs), .95),
                 frameP99Ms = Percentile(samples.Select(item => item.frameMs), .99), mainP95Ms = Percentile(samples.Select(item => item.mainMs), .95),
                 simulationP95Ms = Percentile(samples.Select(item => item.simulationMs), .95), bridgeP95Ms = Percentile(samples.Select(item => item.bridgeMs), .95),
                 worldP95Ms = Percentile(samples.Select(item => item.worldMs), .95), maxLocalGcBytes = samples.Max(item => item.localGc),
@@ -952,6 +969,7 @@ namespace Roguelike.Tests
             public bool diagnosticOnly, phaseCountersValid, presentationCountersValid;
             public double unitReadP95Ms, aniSampleP95Ms, renderWriteP95Ms, healthBarsP95Ms, damageNumbersP95Ms, skillsP95Ms;
             public double warmupSeconds, measuredSeconds, averageFps, frameP95Ms, frameP99Ms, mainP95Ms, simulationP95Ms, bridgeP95Ms, worldP95Ms;
+            public double requestedSampleSeconds, suppliedSampleSeconds;
             public double medianDrawCalls, medianBatches, debtAtStart, debtAtEnd, targetFps, frameBudgetMs;
             public double medianGraphicsCommands, medianGraphicsInstances;
             public double arenaHalfWidth, arenaHalfHeight, orthographicSize;
