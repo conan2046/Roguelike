@@ -29,13 +29,13 @@ namespace Roguelike.Features.Combat.Ui.Editor
             AssetDatabase.SaveAssets();
         }
 
-        /// <summary>建立正式切片Canvas；所有显示布局仅在此编辑器工厂中设置。</summary>
-        /// <param name="name">正式层级名。</param><param name="lobby">选角使用Overlay，局内沿用战斗相机。</param><returns>待保存Canvas根。</returns>
+        /// <summary>建立与战斗HUD同属Overlay的切片Canvas，使既有排序同时控制显示和射线优先级。</summary>
+        /// <param name="name">正式层级名。</param><param name="lobby">是否额外创建选角背景相机。</param><returns>待保存Canvas根。</returns>
         /// <remarks>只创建内存节点，由CreateMissingPrefab保存并销毁。</remarks>
         private static GameObject TribulationCanvas(string name, bool lobby)
         {
             var root = RectObject(name, null); var canvas = root.AddComponent<Canvas>();
-            canvas.renderMode = lobby ? RenderMode.ScreenSpaceOverlay : RenderMode.ScreenSpaceCamera;
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay; canvas.pixelPerfect = true;
             canvas.planeDistance = 1; canvas.sortingOrder = 101;
             var scaler = root.AddComponent<CanvasScaler>(); scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = new Vector2(1920, 1080); scaler.matchWidthOrHeight = 0.5f; root.AddComponent<GraphicRaycaster>();
